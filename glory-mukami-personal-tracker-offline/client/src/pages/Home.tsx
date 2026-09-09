@@ -37,6 +37,9 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { AccountPanel } from "@/components/AccountPanel";
 import { TodayPanel } from "@/components/TodayPanel";
+import { InsightsPanel } from "@/components/InsightsPanel";
+import { ReviewPanel } from "@/components/ReviewPanel";
+import { JournalCalendar } from "@/components/JournalCalendar";
 import { useRecordStore } from "@/contexts/RecordStoreContext";
 import { computeStreak, type HabitDayState } from "@/lib/core/streaks";
 import { trpc } from "@/lib/trpc";
@@ -8436,6 +8439,8 @@ function AnalyticsPage({
         </div>
       </div>
       <div className="spread-page analytics-page">
+        <InsightsPanel />
+        <ReviewPanel />
         <header className="analytics-page-heading">
           <span>your local record</span>
           <b>Quiet facts, kept in context</b>
@@ -13446,6 +13451,7 @@ function TimePage({
         </div>
       </div>
       <div className="spread-page time-clock-page">
+        <JournalCalendar />
         <section className="time-clock">
           <div className="time-clock-heading">
             <div>

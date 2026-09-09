@@ -7444,6 +7444,365 @@ button:focus-visible {
 }
 
 
+/* Insights — charts over the trackers that write records. */
+/* Looking back — counts and questions, never a score. */
+/* One month, with everything on it. */
+.journal-calendar {
+  display: grid;
+  gap: 0.7rem;
+  border: 1px solid rgba(43, 22, 33, 0.18);
+  border-radius: 0.6rem;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.calendar-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.calendar-heading button {
+  border: 1px solid rgba(43, 22, 33, 0.25);
+  border-radius: 0.35rem;
+  background: transparent;
+  color: #20131a;
+  font: inherit;
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 0.2rem 0.55rem;
+  cursor: pointer;
+}
+
+.calendar-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.calendar-filters button {
+  border: 1px solid rgba(43, 22, 33, 0.22);
+  border-radius: 0.35rem;
+  background: transparent;
+  color: #9a8790;
+  padding: 0.2rem 0.5rem;
+  font: inherit;
+  font-size: 0.8rem;
+  text-transform: capitalize;
+  cursor: pointer;
+}
+
+.calendar-filters button.active {
+  color: #20131a;
+  border-color: rgba(43, 22, 33, 0.5);
+}
+
+.calendar-filters small {
+  color: #735f67;
+  margin-left: 0.2rem;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.calendar-weekday {
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #735f67;
+  text-align: center;
+  padding-bottom: 0.2rem;
+}
+
+.calendar-day {
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.1rem;
+  border: 1px solid rgba(43, 22, 33, 0.1);
+  border-radius: 0.3rem;
+  background: transparent;
+  color: #20131a;
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.calendar-day:hover {
+  background: rgba(43, 22, 33, 0.05);
+}
+
+/* Padding days are real days, dimmed rather than blanked. */
+.calendar-day.outside {
+  color: #b6a7ad;
+}
+
+.calendar-day.today {
+  border-color: rgba(43, 22, 33, 0.6);
+  font-weight: 600;
+}
+
+.calendar-day.selected {
+  background: rgba(43, 22, 33, 0.09);
+}
+
+.calendar-day small {
+  font-size: 0.65rem;
+  color: #735f67;
+}
+
+.calendar-day-detail {
+  border-top: 1px solid rgba(43, 22, 33, 0.12);
+  padding-top: 0.6rem;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.calendar-day-detail ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.calendar-day-detail li {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+}
+
+.calendar-event-scope {
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #735f67;
+  min-width: 5rem;
+}
+
+.calendar-day-detail small {
+  color: #735f67;
+}
+
+
+.review-panel {
+  display: grid;
+  gap: 0.85rem;
+  border: 1px solid rgba(43, 22, 33, 0.18);
+  border-radius: 0.6rem;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.review-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.review-heading > div:first-child {
+  display: grid;
+  gap: 0.1rem;
+}
+
+.review-heading small,
+.review-empty,
+.review-coverage,
+.review-prompts > span,
+.review-totals small {
+  color: #735f67;
+}
+
+.review-periods {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.review-periods button {
+  border: 1px solid rgba(43, 22, 33, 0.25);
+  border-radius: 0.35rem;
+  background: transparent;
+  color: #735f67;
+  padding: 0.25rem 0.55rem;
+  font: inherit;
+  font-size: 0.85rem;
+  text-transform: capitalize;
+  cursor: pointer;
+}
+
+.review-periods button.active {
+  color: #20131a;
+  border-color: rgba(43, 22, 33, 0.55);
+  background: rgba(43, 22, 33, 0.06);
+}
+
+.review-totals {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+}
+
+.review-totals li {
+  display: grid;
+  gap: 0.1rem;
+}
+
+.review-coverage,
+.review-empty {
+  margin: 0;
+  line-height: 1.55;
+}
+
+.review-prompts {
+  display: grid;
+  gap: 0.6rem;
+  border-top: 1px solid rgba(43, 22, 33, 0.12);
+  padding-top: 0.75rem;
+}
+
+.review-prompts label {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.review-prompts textarea {
+  font: inherit;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid rgba(43, 22, 33, 0.25);
+  border-radius: 0.4rem;
+  background: transparent;
+  color: #20131a;
+  resize: vertical;
+}
+
+
+.insights-panel {
+  display: grid;
+  gap: 0.85rem;
+  border: 1px solid rgba(43, 22, 33, 0.18);
+  border-radius: 0.6rem;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.insights-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.insights-ranges {
+  display: flex;
+  gap: 0.3rem;
+}
+
+.insights-ranges button {
+  border: 1px solid rgba(43, 22, 33, 0.25);
+  border-radius: 0.35rem;
+  background: transparent;
+  color: #735f67;
+  padding: 0.25rem 0.55rem;
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.insights-ranges button.active {
+  color: #20131a;
+  border-color: rgba(43, 22, 33, 0.55);
+  background: rgba(43, 22, 33, 0.06);
+}
+
+.insights-charts {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+}
+
+.insights-empty,
+.insights-note {
+  margin: 0;
+  color: #735f67;
+  line-height: 1.55;
+}
+
+.tracker-chart {
+  margin: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.tracker-chart figcaption {
+  font-weight: 600;
+  color: #20131a;
+}
+
+.tracker-chart svg {
+  width: 100%;
+  height: 96px;
+  /* Recessive: the marks carry the meaning, not the frame. */
+  border-bottom: 1px solid rgba(43, 22, 33, 0.15);
+}
+
+.tracker-chart-summary,
+.tracker-chart-empty {
+  margin: 0;
+  color: #735f67;
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.tracker-chart-toggle {
+  justify-self: start;
+  border: 0;
+  background: transparent;
+  color: #735f67;
+  font: inherit;
+  font-size: 0.85rem;
+  text-decoration: underline;
+  padding: 0;
+  cursor: pointer;
+}
+
+.tracker-chart-table {
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  max-height: 14rem;
+  overflow: auto;
+  display: block;
+}
+
+.tracker-chart-table th,
+.tracker-chart-table td {
+  text-align: left;
+  padding: 0.15rem 0.6rem 0.15rem 0;
+  font-weight: 400;
+  color: #20131a;
+  white-space: nowrap;
+}
+
+.tracker-chart-table th {
+  color: #735f67;
+}
+
+
 .today-panel {
   display: grid;
   gap: 0.85rem;

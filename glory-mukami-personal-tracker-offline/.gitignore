@@ -115,3 +115,6 @@ client/public/__manus__/version.json
 
 # Byte-compiled Python from local tooling scripts
 __pycache__/
+
+# Local editing helper used while working; not part of the app.
+edit_helper.py

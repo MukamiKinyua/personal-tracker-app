@@ -1,3 +1,5 @@
+import { sortItems, type SortableItem } from "./core/sorting";
+
 export type PlanningTask = {
   id: string;
   title: string;
@@ -99,10 +101,50 @@ export function taskPlanningSummary(tasks: PlanningTask[]): {
   };
 }
 
+/**
+ * Maps a planning task onto the shared sorting model.
+ *
+ * `dueDay` is deliberately left unset. A task's `due` is free text — "Today ·
+ * 5:00 PM", "This week" — which cannot be turned into a calendar day without
+ * guessing, and a guessed date would drive a wrong "overdue" badge. Ordering
+ * therefore runs on priority, which is a real field, and the page stays honest
+ * about not knowing which tasks have actually slipped.
+ */
+function toSortable(task: PlanningTask): SortableItem {
+  return {
+    id: task.id,
+    title: task.title,
+    status: task.done ? "completed" : "not-started",
+    priority:
+      task.priority === "High"
+        ? "urgent"
+        : task.priority === "Low"
+          ? "low"
+          : "normal",
+    area: task.area,
+  };
+}
+
+/**
+ * One section of the task list, ordered.
+ *
+ * Previously this filtered without ordering, so tasks appeared in whatever
+ * order the store happened to return them and a high-priority task could sit
+ * below three low ones. Sorting by priority then title also makes the order
+ * stable, so the list does not reshuffle between renders.
+ */
 export function taskSection(
   tasks: PlanningTask[],
   section: "today" | "later" | "completed"
 ): PlanningTask[] {
-  if (section === "completed") return tasks.filter(task => task.done);
-  return tasks.filter(task => !task.done && task.when === section);
+  const matching =
+    section === "completed"
+      ? tasks.filter(task => task.done)
+      : tasks.filter(task => !task.done && task.when === section);
+
+  const byId = new Map(matching.map(task => [task.id, task]));
+
+  return sortItems(matching.map(toSortable), ["priority", "title"])
+    .map(item => byId.get(item.id))
+    .filter((task): task is PlanningTask => Boolean(task));
 }
