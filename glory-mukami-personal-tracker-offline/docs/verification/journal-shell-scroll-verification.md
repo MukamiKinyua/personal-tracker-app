@@ -1,0 +1,2 @@
+
+Layout audit: a 1280×720 desktop capture shows the journal stage maintaining a fixed-height two-column book frame with the left portrait artwork contained in the viewport. A 375×812 mobile capture shows the narrow cover remaining a single natural flow, with no nested fixed pane or visible stretching. The desktop-only overflow rules are scoped to widths above 820px; the mobile override restores auto height and ordinary document scrolling.

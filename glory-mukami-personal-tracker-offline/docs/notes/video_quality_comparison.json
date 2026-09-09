@@ -1,0 +1,60 @@
+{
+  "supplied": {
+    "programs": [
+
+    ],
+    "streams": [
+        {
+            "codec_name": "h264",
+            "codec_type": "video",
+            "width": 230,
+            "height": 126,
+            "pix_fmt": "yuv420p",
+            "avg_frame_rate": "30/1",
+            "bit_rate": "130368"
+        },
+        {
+            "codec_name": "aac",
+            "codec_type": "audio",
+            "avg_frame_rate": "0/0",
+            "bit_rate": "192001"
+        }
+    ],
+    "format": {
+        "filename": "/home/ubuntu/upload/pasted_file_YUNDhy_20260826-1559-57.9785529.mp4",
+        "duration": "3.033333",
+        "size": "124677",
+        "bit_rate": "328818"
+    }
+}
+,
+  "approvedInitial": {
+    "programs": [
+
+    ],
+    "streams": [
+        {
+            "codec_name": "h264",
+            "codec_type": "video",
+            "width": 1280,
+            "height": 720,
+            "pix_fmt": "yuv420p",
+            "avg_frame_rate": "24/1",
+            "bit_rate": "1779030"
+        },
+        {
+            "codec_name": "aac",
+            "codec_type": "audio",
+            "avg_frame_rate": "0/0",
+            "bit_rate": "128001"
+        }
+    ],
+    "format": {
+        "filename": "/home/ubuntu/webdev-static-assets/glory-workout/basic-crunches-live-loop.mp4",
+        "duration": "4.010000",
+        "size": "966270",
+        "bit_rate": "1927720"
+    }
+}
+
+}
