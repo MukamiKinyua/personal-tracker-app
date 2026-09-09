@@ -5,6 +5,8 @@ import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { RecordStoreProvider } from "./contexts/RecordStoreContext";
 import { SearchPalette } from "./components/SearchPalette";
+import { TimersProvider } from "./contexts/TimersContext";
+import { TimerBar } from "./components/TimerBar";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
 
@@ -33,12 +35,17 @@ function App() {
         // switchable
       >
         <RecordStoreProvider>
-          <TooltipProvider>
-            <Toaster />
-            {/* App-wide, so Cmd+K reaches the journal from any page. */}
-            <SearchPalette />
-            <Router />
-          </TooltipProvider>
+          <TimersProvider>
+            <TooltipProvider>
+              <Toaster />
+              {/* App-wide, so Cmd+K reaches the journal from any page. */}
+              <SearchPalette />
+              {/* Above the router, so a rest timer survives navigating away
+                  from the page that started it. */}
+              <TimerBar />
+              <Router />
+            </TooltipProvider>
+          </TimersProvider>
         </RecordStoreProvider>
       </ThemeProvider>
     </ErrorBoundary>

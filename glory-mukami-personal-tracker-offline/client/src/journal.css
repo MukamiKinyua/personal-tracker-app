@@ -7447,6 +7447,144 @@ button:focus-visible {
 /* Insights — charts over the trackers that write records. */
 /* Looking back — counts and questions, never a score. */
 /* One month, with everything on it. */
+/* The timer you can see from anywhere. */
+.timer-bar,
+.timer-bar-launch {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 55;
+}
+
+.timer-bar-launch {
+  border: 1px solid rgba(43, 22, 33, 0.25);
+  border-radius: 999px;
+  background: #fcfcfb;
+  color: #735f67;
+  font: inherit;
+  font-size: 0.8rem;
+  padding: 0.35rem 0.8rem;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(20, 12, 16, 0.14);
+}
+
+.timer-bar {
+  display: grid;
+  gap: 0.5rem;
+  width: min(20rem, calc(100vw - 2rem));
+  background: #fcfcfb;
+  border: 1px solid rgba(43, 22, 33, 0.2);
+  border-radius: 0.6rem;
+  padding: 0.6rem 0.7rem;
+  box-shadow: 0 10px 30px rgba(20, 12, 16, 0.2);
+}
+
+.timer-bar-primary {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.timer-bar-primary b {
+  font-size: 1.2rem;
+  font-variant-numeric: tabular-nums;
+  color: #20131a;
+}
+
+.timer-bar-primary span {
+  color: #20131a;
+}
+
+.timer-bar-primary small,
+.timer-bar-list small,
+.timer-bar-empty {
+  color: #735f67;
+}
+
+.timer-bar button {
+  border: 1px solid rgba(43, 22, 33, 0.25);
+  border-radius: 0.35rem;
+  background: transparent;
+  color: #20131a;
+  font: inherit;
+  font-size: 0.8rem;
+  padding: 0.2rem 0.5rem;
+  cursor: pointer;
+}
+
+.timer-bar button:hover {
+  background: rgba(43, 22, 33, 0.06);
+}
+
+.timer-bar-toggle {
+  justify-self: start;
+}
+
+.timer-bar-panel {
+  display: grid;
+  gap: 0.5rem;
+  border-top: 1px solid rgba(43, 22, 33, 0.12);
+  padding-top: 0.5rem;
+}
+
+.timer-bar-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.timer-bar-presets button {
+  display: grid;
+  gap: 0.05rem;
+  text-align: left;
+}
+
+.timer-bar-presets small {
+  color: #735f67;
+  font-size: 0.7rem;
+}
+
+.timer-bar-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.3rem;
+  max-height: 12rem;
+  overflow: auto;
+}
+
+.timer-bar-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+
+.timer-bar-time {
+  font-variant-numeric: tabular-nums;
+  color: #20131a;
+  min-width: 3.4rem;
+}
+
+.timer-bar-list li > span:nth-child(2) {
+  flex: 1;
+  color: #20131a;
+}
+
+.timer-bar-empty {
+  margin: 0;
+}
+
+@media (max-width: 560px) {
+  .timer-bar {
+    left: 1rem;
+    right: 1rem;
+    width: auto;
+  }
+}
+
+
 .journal-calendar {
   display: grid;
   gap: 0.7rem;
