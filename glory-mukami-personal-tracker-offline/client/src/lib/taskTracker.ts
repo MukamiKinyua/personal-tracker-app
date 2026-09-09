@@ -10,6 +10,12 @@ export type PlanningTask = {
   nextStep: string;
   note: string;
   done: boolean;
+  /**
+   * When it was actually ticked off. Absent while a task is open, and cleared
+   * again if it is reopened — a completion date against an open task is untrue,
+   * and it is what "tasks completed" is counted by.
+   */
+  completedAt?: string;
   subtasks: Array<{ id: string; label: string; done: boolean }>;
 };
 
@@ -78,6 +84,12 @@ export function normalizePlanningTasks(value: unknown): PlanningTask[] {
           typeof candidate.nextStep === "string" ? candidate.nextStep : "",
         note: typeof candidate.note === "string" ? candidate.note : "",
         done: candidate.done === true,
+        // Preserved rather than rebuilt: this normaliser constructs a fresh
+        // object, so any field not named here is silently dropped on every
+        // read — which would have quietly emptied the completions chart.
+        ...(typeof candidate.completedAt === "string" && candidate.done === true
+          ? { completedAt: candidate.completedAt }
+          : {}),
         subtasks,
       },
     ];

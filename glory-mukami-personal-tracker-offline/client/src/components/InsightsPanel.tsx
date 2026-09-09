@@ -21,12 +21,41 @@ import {
 import { shiftDayKey } from "@/lib/core/datetime";
 import { useMemo, useState } from "react";
 
-/** The number each tracker is actually measured by. */
-const MEASURES: Record<string, { field: string; reduce: "sum" | "count" }> = {
-  water: { field: "amountMl", reduce: "sum" },
-  sleep: { field: "hours", reduce: "sum" },
-  task: { field: "", reduce: "count" },
-  habit: { field: "", reduce: "count" },
+/**
+ * What each tracker is measured by over time, and which chart definition
+ * describes that measure.
+ *
+ * `chartKey` is separate from `scope` on purpose. `chartFor("water")` is the
+ * *meter* — one day's intake against its target — which is the wrong form for
+ * a fourteen-day history. The series here wants `water-history`, the column
+ * chart, and reading the scope's own entry would silently produce a chart
+ * labelled "Water" that draws something the label does not describe.
+ */
+const MEASURES: Record<
+  string,
+  {
+    chartKey: string;
+    field: string;
+    reduce: "sum" | "count";
+    /** Records that should not appear at all. */
+    include?: (body: Record<string, unknown>) => boolean;
+    /** The day this belongs on, when it is not the record's own day. */
+    dayField?: string;
+  }
+> = {
+  water: { chartKey: "water-history", field: "amountMl", reduce: "sum" },
+  sleep: { chartKey: "sleep", field: "hours", reduce: "sum" },
+  // "Tasks completed" must count completions, not creations. A task carries
+  // `completedAt` only once it has actually been ticked off, so one that was
+  // never completed contributes nothing rather than being counted on the day
+  // it was written down.
+  task: {
+    chartKey: "task",
+    field: "",
+    reduce: "count",
+    include: body => Boolean(body.done) && typeof body.completedAt === "string",
+    dayField: "completedAt",
+  },
 };
 
 const RANGES = [
@@ -45,15 +74,20 @@ export function InsightsPanel() {
   const charts = useMemo(() => {
     return Object.entries(MEASURES)
       .map(([scope, measure]) => {
-        const records = journal.inScope(scope);
+        const records = journal
+          .inScope(scope)
+          .filter(record => measure.include?.(record.body) ?? true);
         if (records.length === 0) return null;
 
-        const chart = chartFor(scope) ?? chartFor(`${scope}-history`);
+        const chart = chartFor(measure.chartKey);
 
         const byDay = valuesByDay({
           records,
           timezone: journal.store.timezone,
-          instant: record => record.period.start,
+          instant: record =>
+            measure.dayField
+              ? String(record.body[measure.dayField])
+              : record.period.start,
           value: record =>
             measure.reduce === "count"
               ? 1

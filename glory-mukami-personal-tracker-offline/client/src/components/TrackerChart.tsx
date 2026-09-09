@@ -118,6 +118,15 @@ function LineMarks({ series }: { series: Series }) {
   );
 }
 
+/**
+ * Forms this component can actually draw.
+ *
+ * A form it cannot draw must not be passed silently: `charts.ts` picks the
+ * form from the job the data has to do, and quietly substituting a different
+ * one throws that decision away where nobody can see it happen.
+ */
+const DRAWABLE = new Set<ChartForm>(["line", "column"]);
+
 export function TrackerChart({
   series,
   title,
@@ -125,8 +134,15 @@ export function TrackerChart({
 }: {
   series: Series;
   title: string;
+  /** Must be a form this component draws — see DRAWABLE. */
   form?: ChartForm;
 }) {
+  if (!DRAWABLE.has(form)) {
+    throw new Error(
+      `TrackerChart cannot draw "${form}". Pass a scope whose chart form is a line or a column, or implement it here.`
+    );
+  }
+
   const [showTable, setShowTable] = useState(false);
   const tableId = useId();
   const stats = seriesStats(series);

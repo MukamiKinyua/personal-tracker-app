@@ -143,3 +143,32 @@ describe("ordering a section", () => {
     expect(taskSection(many, "today")).toHaveLength(20);
   });
 });
+
+describe("completion time", () => {
+  it("survives normalisation, which rebuilds the object", () => {
+    const [task] = normalizePlanningTasks([
+      {
+        id: "t1",
+        title: "Done thing",
+        done: true,
+        completedAt: "2026-09-08T10:00:00.000Z",
+      },
+    ]);
+    // The normaliser constructs a fresh object, so an unnamed field is
+    // dropped on every read — which would empty the completions chart.
+    expect(task.completedAt).toBe("2026-09-08T10:00:00.000Z");
+  });
+
+  it("is not kept on a task that is not done", () => {
+    const [task] = normalizePlanningTasks([
+      {
+        id: "t1",
+        title: "Open thing",
+        done: false,
+        completedAt: "2026-09-08T10:00:00.000Z",
+      },
+    ]);
+    // A completion date against an open task would be a lie.
+    expect(task.completedAt).toBeUndefined();
+  });
+});

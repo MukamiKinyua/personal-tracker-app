@@ -17161,7 +17161,14 @@ function TasksPage({
     if (!task) return;
     journal.edit(
       id,
-      { ...task, done: !task.done },
+      {
+        ...task,
+        done: !task.done,
+        // Stamped so "tasks completed" can be counted on the day it actually
+        // happened. Cleared on reopening, because a completion date against an
+        // open task is simply untrue.
+        completedAt: task.done ? undefined : new Date().toISOString(),
+      },
       task.done ? `Reopened ${task.title}` : `Completed ${task.title}`
     );
     onRecord({
