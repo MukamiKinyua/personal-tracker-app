@@ -8027,6 +8027,44 @@ button:focus-visible {
 
 
 /* Settings — what the app knows and what it does about it. */
+/* Meals you have eaten before, offered as one tap. */
+.meal-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.5rem;
+}
+
+.meal-suggestions > span {
+  color: #735f67;
+  font-size: 0.85rem;
+}
+
+.meal-suggestions button {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.3rem;
+  border: 1px solid rgba(43, 22, 33, 0.25);
+  border-radius: 999px;
+  background: transparent;
+  color: #20131a;
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 0.2rem 0.6rem;
+  cursor: pointer;
+}
+
+.meal-suggestions button:hover {
+  background: rgba(43, 22, 33, 0.06);
+}
+
+.meal-suggestions small {
+  color: #735f67;
+  font-size: 0.72rem;
+}
+
+
 .settings-panel {
   display: grid;
   gap: 1.1rem;

@@ -43,6 +43,9 @@ import { JournalCalendar } from "@/components/JournalCalendar";
 import { SettingsPanel } from "@/components/SettingsPanel";
 import { useRecordStore } from "@/contexts/RecordStoreContext";
 import { computeStreak, type HabitDayState } from "@/lib/core/streaks";
+import { suggestMeals } from "@/lib/core/mealMemory";
+import { fromMeal, fromMealMessage } from "@/lib/core/grocery";
+import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
 import { useMongoJournalScope } from "../hooks/useMongoJournalScope";
@@ -19780,26 +19783,59 @@ function NutritionPage({
   const [meal, setMeal] = useState("Lunch");
   const [note, setNote] = useState("");
   const [tags, setTags] = useState<string[]>([]);
-  const [meals, setMeals] = useState<MealEntry[]>([]);
+  /**
+   * Meals and the grocery list are records, so they carry undo and reach the
+   * other devices — a shopping list is the clearest case for that: written on
+   * the laptop, needed in the shop.
+   */
+  const journal = useRecordStore();
+
+  const meals: MealEntry[] = journal
+    .inScope("meal")
+    .slice()
+    .sort((a, b) => b.period.start.localeCompare(a.period.start))
+    .map(record => ({
+      id: record.id,
+      meal: String(record.body.meal ?? ""),
+      note: String(record.body.note ?? ""),
+      time: new Date(record.period.start).toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+      tags: Array.isArray(record.body.tags)
+        ? (record.body.tags as string[])
+        : [],
+    }));
+
+  const groceries: GroceryItem[] = journal.inScope("grocery").map(record => ({
+    id: record.id,
+    title: String(record.body.title ?? ""),
+    quantity: String(record.body.quantity ?? ""),
+    category: String(record.body.category ?? "Other"),
+    done: Boolean(record.body.done),
+  }));
+
+  /**
+   * Meals worth offering as one tap.
+   *
+   * Only what has actually been eaten more than once, and only within the same
+   * slot — breakfast must not offer last night's dinner.
+   */
+  const suggestions = suggestMeals({
+    meals: journal.inScope("meal").map(record => ({
+      id: record.id,
+      mealType: String(record.body.meal ?? ""),
+      description: String(record.body.note ?? ""),
+      at: record.period.start,
+    })),
+    mealType: meal,
+    limit: 3,
+  });
   const [intention, setIntention] = useState("");
   const [reflection, setReflection] = useState("");
   const [groceryTitle, setGroceryTitle] = useState("");
   const [groceryQuantity, setGroceryQuantity] = useState("");
   const [groceryCategory, setGroceryCategory] = useState("Produce");
-  const [groceries, setGroceries] = useState<GroceryItem[]>([]);
-  useMongoJournalScope({
-    scope: "nutrition",
-    payload: { meals, groceries, intention, reflection },
-    hydrate: payload => {
-      if (Array.isArray(payload.meals)) setMeals(payload.meals as MealEntry[]);
-      if (Array.isArray(payload.groceries))
-        setGroceries(payload.groceries as GroceryItem[]);
-      if (typeof payload.intention === "string")
-        setIntention(payload.intention);
-      if (typeof payload.reflection === "string")
-        setReflection(payload.reflection);
-    },
-  });
   const tagsAvailable = [
     "Fruit / veg",
     "Protein",
@@ -19814,17 +19850,11 @@ function NutritionPage({
   function addMeal(text = note) {
     const trimmed = text.trim();
     if (!trimmed) return;
-    const entry = {
-      id: `${Date.now()}-${trimmed}`,
-      meal,
-      note: trimmed,
-      time: new Date().toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-      tags,
-    };
-    setMeals(current => [entry, ...current]);
+    journal.add({
+      scope: "meal",
+      body: { meal, note: trimmed, tags },
+      undoLabel: `Logged ${meal.toLowerCase()}`,
+    });
     onRecord({ module: "Nutrition", amount: 1, label: `${meal} meal note` });
     setNote("");
     setTags([]);
@@ -19832,19 +19862,56 @@ function NutritionPage({
     const day = new Date().getDate();
     pixelStore?.set("nutrition", monthIndex, day, "#ec4899");
   }
+  /**
+   * Sends one thing from a meal to the shopping list.
+   *
+   * Anything already waiting to be bought is skipped rather than added twice —
+   * two "milk" lines is a worse list than one — and the result is confirmed,
+   * so a tap that deliberately did nothing does not look like a tap that
+   * failed.
+   */
+  function sendToGrocery(name: string) {
+    const result = fromMeal({
+      items: groceries.map(item => ({
+        id: item.id,
+        name: item.title,
+        category: "other" as const,
+        pickedUp: item.done,
+        addedAt: "",
+      })),
+      mealId: "meal",
+      ingredients: [name],
+    });
+
+    for (const item of result.items.slice(groceries.length)) {
+      journal.add({
+        scope: "grocery",
+        body: {
+          title: item.name,
+          quantity: "",
+          category: "Pantry",
+          done: false,
+        },
+        undoLabel: `Added ${item.name}`,
+      });
+    }
+
+    if (result.added === 0) toast(fromMealMessage(result));
+  }
+
   function addGrocery(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!groceryTitle.trim()) return;
-    setGroceries(current => [
-      {
-        id: `${Date.now()}-${groceryTitle}`,
+    journal.add({
+      scope: "grocery",
+      body: {
         title: groceryTitle.trim(),
         quantity: groceryQuantity.trim(),
         category: groceryCategory,
         done: false,
       },
-      ...current,
-    ]);
+      undoLabel: `Added ${groceryTitle.trim()}`,
+    });
     setGroceryTitle("");
     setGroceryQuantity("");
   }
@@ -19909,6 +19976,23 @@ function NutritionPage({
               </button>
             ))}
           </div>
+          {suggestions.length > 0 ? (
+            <div className="meal-suggestions">
+              {/* Only meals actually eaten more than once in this slot, so a
+                  single unusual dinner never becomes a suggestion. */}
+              <span>Again?</span>
+              {suggestions.map(suggestion => (
+                <button
+                  key={suggestion.description}
+                  type="button"
+                  onClick={() => addMeal(suggestion.description)}
+                >
+                  {suggestion.description}
+                  <small>{suggestion.count}×</small>
+                </button>
+              ))}
+            </div>
+          ) : null}
           <label>
             What nourished you?
             <input
@@ -19992,27 +20076,14 @@ function NutritionPage({
                 <div className="meal-entry-actions">
                   <button
                     type="button"
-                    onClick={() =>
-                      setGroceries(current => [
-                        {
-                          id: `${Date.now()}-${entry.note}`,
-                          title: entry.note,
-                          quantity: "",
-                          category: "Pantry",
-                          done: false,
-                        },
-                        ...current,
-                      ])
-                    }
+                    onClick={() => sendToGrocery(entry.note)}
                   >
                     To grocery
                   </button>
                   <button
                     type="button"
                     onClick={() =>
-                      setMeals(current =>
-                        current.filter(item => item.id !== entry.id)
-                      )
+                      journal.remove(entry.id, `Removed ${entry.meal}`)
                     }
                     aria-label={`Remove ${entry.meal}`}
                   >
@@ -20060,12 +20131,10 @@ function NutritionPage({
                   <button
                     type="button"
                     onClick={() =>
-                      setGroceries(current =>
-                        current.map(value =>
-                          value.id === item.id
-                            ? { ...value, done: !value.done }
-                            : value
-                        )
+                      journal.edit(
+                        item.id,
+                        { ...item, done: !item.done },
+                        item.done ? "Unticked" : "Picked up"
                       )
                     }
                     aria-label={`Mark ${item.title} ${item.done ? "not done" : "done"}`}
@@ -20081,9 +20150,7 @@ function NutritionPage({
                   <button
                     type="button"
                     onClick={() =>
-                      setGroceries(current =>
-                        current.filter(value => value.id !== item.id)
-                      )
+                      journal.remove(item.id, `Removed ${item.title}`)
                     }
                   >
                     Remove
