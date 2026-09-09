@@ -8026,6 +8026,149 @@ button:focus-visible {
 }
 
 
+/* Settings — what the app knows and what it does about it. */
+.settings-panel {
+  display: grid;
+  gap: 1.1rem;
+  border: 1px solid rgba(43, 22, 33, 0.18);
+  border-radius: 0.6rem;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.settings-panel section {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.settings-panel h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  color: #20131a;
+}
+
+.settings-note,
+.settings-list small,
+.settings-reminders small,
+.settings-toggle small {
+  color: #735f67;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.settings-error {
+  color: #d03b3b;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.settings-list,
+.settings-reminders {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.settings-list li,
+.settings-reminders li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.3rem 0;
+  border-bottom: 1px solid rgba(43, 22, 33, 0.1);
+}
+
+.settings-reminders li {
+  justify-content: flex-start;
+  gap: 0.5rem;
+}
+
+.settings-reminders b {
+  text-transform: capitalize;
+  min-width: 4.5rem;
+}
+
+.settings-panel button {
+  border: 1px solid rgba(43, 22, 33, 0.28);
+  border-radius: 0.4rem;
+  background: transparent;
+  color: #20131a;
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 0.3rem 0.6rem;
+  cursor: pointer;
+}
+
+.settings-panel button:hover {
+  background: rgba(43, 22, 33, 0.06);
+}
+
+.settings-add {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.settings-add input[type="text"],
+.settings-add input:not([type]) {
+  flex: 1;
+  min-width: 10rem;
+  font: inherit;
+  padding: 0.35rem 0.55rem;
+  border: 1px solid rgba(43, 22, 33, 0.25);
+  border-radius: 0.4rem;
+  background: transparent;
+  color: #20131a;
+}
+
+.settings-toggle {
+  display: flex;
+  gap: 0.55rem;
+  align-items: flex-start;
+}
+
+.settings-toggle span {
+  display: grid;
+  gap: 0.15rem;
+}
+
+/* A suggestion is a question, so it reads differently from a fact. */
+.settings-suggestion {
+  display: grid;
+  gap: 0.4rem;
+  border: 1px dashed rgba(43, 22, 33, 0.3);
+  border-radius: 0.45rem;
+  padding: 0.6rem;
+}
+
+.settings-suggestion div {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.settings-restore {
+  display: grid;
+  gap: 0.35rem;
+  border-top: 1px solid rgba(43, 22, 33, 0.12);
+  padding-top: 0.6rem;
+}
+
+.settings-restore label {
+  display: flex;
+  gap: 0.45rem;
+  align-items: center;
+}
+
+.settings-restore p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+
 .account-panel {
   display: grid;
   gap: 0.75rem;

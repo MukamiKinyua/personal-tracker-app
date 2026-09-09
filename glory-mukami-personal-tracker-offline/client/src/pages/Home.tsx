@@ -40,6 +40,7 @@ import { TodayPanel } from "@/components/TodayPanel";
 import { InsightsPanel } from "@/components/InsightsPanel";
 import { ReviewPanel } from "@/components/ReviewPanel";
 import { JournalCalendar } from "@/components/JournalCalendar";
+import { SettingsPanel } from "@/components/SettingsPanel";
 import { useRecordStore } from "@/contexts/RecordStoreContext";
 import { computeStreak, type HabitDayState } from "@/lib/core/streaks";
 import { trpc } from "@/lib/trpc";
@@ -7803,6 +7804,7 @@ function PrivacyPage({
       </div>
       <div className="spread-page privacy-page">
         <AccountPanel />
+        <SettingsPanel />
         <label className="privacy-toggle">
           <input
             type="checkbox"
