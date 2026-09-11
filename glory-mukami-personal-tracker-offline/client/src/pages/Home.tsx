@@ -41,6 +41,7 @@ import { InsightsPanel } from "@/components/InsightsPanel";
 import { ReviewPanel } from "@/components/ReviewPanel";
 import { JournalCalendar } from "@/components/JournalCalendar";
 import { SettingsPanel } from "@/components/SettingsPanel";
+import { DayPlanner } from "@/components/DayPlanner";
 import { useRecordStore } from "@/contexts/RecordStoreContext";
 import { computeStreak, type HabitDayState } from "@/lib/core/streaks";
 import { suggestMeals } from "@/lib/core/mealMemory";
@@ -13457,6 +13458,7 @@ function TimePage({
       </div>
       <div className="spread-page time-clock-page">
         <JournalCalendar />
+        <DayPlanner />
         <section className="time-clock">
           <div className="time-clock-heading">
             <div>
