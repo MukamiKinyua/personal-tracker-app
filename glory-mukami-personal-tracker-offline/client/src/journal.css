@@ -28309,3 +28309,132 @@ body {
     max-width: 100%;
   }
 }
+
+/* Workout studio — what was actually lifted, under the routine that suggested it. */
+.workout-studio {
+  display: grid;
+  gap: 0.7rem;
+  border: 1px solid rgba(43, 22, 33, 0.18);
+  border-radius: 0.6rem;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.studio-heading {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.studio-heading small,
+.studio-note,
+.studio-week small,
+.studio-records small {
+  color: #735f67;
+}
+
+.studio-note {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.studio-log {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.4rem;
+}
+
+.studio-log label {
+  display: grid;
+  gap: 0.15rem;
+  font-size: 0.8rem;
+  color: #735f67;
+}
+
+.studio-log input,
+.studio-log select {
+  font: inherit;
+  padding: 0.35rem 0.55rem;
+  border: 1px solid rgba(43, 22, 33, 0.25);
+  border-radius: 0.4rem;
+  background: transparent;
+  color: #20131a;
+}
+
+.studio-log input[type="number"],
+.studio-log select {
+  width: 5.5rem;
+}
+
+.studio-log > input {
+  flex: 1 1 9rem;
+  min-width: 8rem;
+}
+
+.studio-log button,
+.studio-rest button,
+.studio-sets button {
+  font: inherit;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid rgba(43, 22, 33, 0.25);
+  border-radius: 0.4rem;
+  background: transparent;
+  color: #20131a;
+  cursor: pointer;
+}
+
+.studio-rest {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  color: #735f67;
+}
+
+.studio-rest button {
+  padding: 0.15rem 0.5rem;
+  line-height: 1.2;
+}
+
+.studio-pr,
+.studio-beaten p {
+  margin: 0;
+  font-weight: 600;
+  color: #7a5320;
+}
+
+.studio-beaten {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.studio-sets,
+.studio-records ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.studio-sets li,
+.studio-records li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.3rem 0;
+  border-bottom: 1px dashed rgba(43, 22, 33, 0.14);
+}
+
+.studio-sets button {
+  padding: 0.1rem 0.45rem;
+  line-height: 1.2;
+}
+
+.studio-week,
+.studio-records {
+  display: grid;
+  gap: 0.2rem;
+}

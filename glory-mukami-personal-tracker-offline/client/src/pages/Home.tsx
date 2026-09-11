@@ -42,6 +42,7 @@ import { ReviewPanel } from "@/components/ReviewPanel";
 import { JournalCalendar } from "@/components/JournalCalendar";
 import { SettingsPanel } from "@/components/SettingsPanel";
 import { DayPlanner } from "@/components/DayPlanner";
+import { WorkoutStudio } from "@/components/WorkoutStudio";
 import { useRecordStore } from "@/contexts/RecordStoreContext";
 import { computeStreak, type HabitDayState } from "@/lib/core/streaks";
 import { suggestMeals } from "@/lib/core/mealMemory";
@@ -3291,6 +3292,7 @@ function WorkoutPage({
             );
           })}
         </div>
+        <WorkoutStudio />
         <div className="workout-log">
           <div>
             <span>Cool down</span>
