@@ -28,7 +28,9 @@ import {
   NotebookPen,
   Play,
   Plus,
+  Search,
   Sparkles,
+  Star,
   Target,
   TimerReset,
   X,
@@ -409,6 +411,30 @@ const groups: ContentsGroup[] = [
   },
 ];
 
+const allContentsItems = groups.flatMap(group =>
+  group.items.map(item => ({ ...item, groupLabel: group.label }))
+);
+
+function findContentsItem(view: View) {
+  return allContentsItems.find(item => item.view === view);
+}
+
+function contentsGroupsMatchingSearch(query: string): ContentsGroup[] {
+  const normalized = query.trim().toLowerCase();
+  if (!normalized) return groups;
+  return groups
+    .map(group => ({
+      ...group,
+      items: group.items.filter(
+        item =>
+          item.label.toLowerCase().includes(normalized) ||
+          item.note.toLowerCase().includes(normalized) ||
+          group.label.toLowerCase().includes(normalized)
+      ),
+    }))
+    .filter(group => group.items.length > 0);
+}
+
 const viewTitles: Record<View, string> = {
   cover: "Glory Mukami’s Personal Tracker",
   contents: "Table of Contents",
@@ -761,6 +787,8 @@ type JournalShellPayload = {
   contentsPreferences?: {
     expandedGroup: string;
     lastVisitedPage: View;
+    favorites?: View[];
+    recentPages?: View[];
   };
 };
 const ReminderPreviewContext = createContext("Hide sensitive names");
@@ -833,7 +861,10 @@ export default function Home() {
   const [contentsPreferences, setContentsPreferences] = useState({
     expandedGroup: "Body",
     lastVisitedPage: "dashboard" as View,
+    favorites: [] as View[],
+    recentPages: [] as View[],
   });
+  const [contentsSearch, setContentsSearch] = useState("");
   const [insightActivity, setInsightActivity] = useState<InsightActivity[]>([]);
   const [privateMode, setPrivateMode] = useState(false);
   const [showSensitiveSummaries, setShowSensitiveSummaries] = useState(true);
@@ -904,7 +935,12 @@ export default function Home() {
       payload.contentsPreferences &&
       typeof payload.contentsPreferences === "object"
     )
-      setContentsPreferences(payload.contentsPreferences);
+      setContentsPreferences(prev => ({
+        ...prev,
+        ...payload.contentsPreferences,
+        favorites: payload.contentsPreferences?.favorites ?? [],
+        recentPages: payload.contentsPreferences?.recentPages ?? [],
+      }));
     hydratedOwnerRef.current = auth.user.id;
   }, [
     auth.user,
@@ -965,7 +1001,12 @@ export default function Home() {
         payload.contentsPreferences &&
         typeof payload.contentsPreferences === "object"
       )
-        setContentsPreferences(payload.contentsPreferences);
+        setContentsPreferences(prev => ({
+          ...prev,
+          ...payload.contentsPreferences,
+          favorites: payload.contentsPreferences?.favorites ?? [],
+          recentPages: payload.contentsPreferences?.recentPages ?? [],
+        }));
     } catch {
       // A blocked or malformed browser-local store must not stop the journal shell.
     }
@@ -1179,8 +1220,28 @@ export default function Home() {
   }
 
   function selectContentsItem(nextView: View) {
-    setContentsPreferences(prev => ({ ...prev, lastVisitedPage: nextView }));
+    setContentsPreferences(prev => ({
+      ...prev,
+      lastVisitedPage: nextView,
+      recentPages: [
+        nextView,
+        ...(prev.recentPages ?? []).filter(page => page !== nextView),
+      ].slice(0, 5),
+    }));
     turnTo(nextView, "forward");
+  }
+
+  function toggleFavoritePage(view: View) {
+    setContentsPreferences(prev => {
+      const favorites = prev.favorites ?? [];
+      const isFavorite = favorites.includes(view);
+      return {
+        ...prev,
+        favorites: isFavorite
+          ? favorites.filter(page => page !== view)
+          : [...favorites, view],
+      };
+    });
   }
 
   function renderPage() {
@@ -1263,7 +1324,13 @@ export default function Home() {
           </section>
         );
 
-      case "contents":
+      case "contents": {
+        const favorites = contentsPreferences.favorites ?? [];
+        const recentPages = (contentsPreferences.recentPages ?? []).filter(
+          page => page !== "contents"
+        );
+        const isSearching = contentsSearch.trim().length > 0;
+        const filteredGroups = contentsGroupsMatchingSearch(contentsSearch);
         return (
           <section
             className="journal-spread contents-spread glass-scope"
@@ -1293,13 +1360,100 @@ export default function Home() {
               </p>
             </div>
             <div className="spread-page contents-list">
+              <label className="contents-search" htmlFor="contents-search-input">
+                <Search size={16} aria-hidden="true" />
+                <input
+                  id="contents-search-input"
+                  type="search"
+                  placeholder="Search your journal…"
+                  value={contentsSearch}
+                  onChange={e => setContentsSearch(e.target.value)}
+                  aria-label="Search chapters and pages"
+                />
+                {isSearching && (
+                  <button
+                    type="button"
+                    className="contents-search-clear"
+                    onClick={() => setContentsSearch("")}
+                    aria-label="Clear search"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </label>
+
+              {!isSearching && favorites.length > 0 && (
+                <div className="contents-quick-section" aria-label="Favorite pages">
+                  <div className="contents-quick-heading">
+                    <Star size={13} /> <span>Favorites</span>
+                  </div>
+                  <div className="contents-quick-row">
+                    {favorites.map(view => {
+                      const item = findContentsItem(view);
+                      if (!item) return null;
+                      return (
+                        <button
+                          key={view}
+                          type="button"
+                          className={cn(
+                            "contents-quick-chip",
+                            activePage === view && "is-current"
+                          )}
+                          onClick={() => selectContentsItem(view)}
+                        >
+                          {item.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {!isSearching && recentPages.length > 0 && (
+                <div className="contents-quick-section" aria-label="Recently visited pages">
+                  <div className="contents-quick-heading">
+                    <Clock3 size={13} /> <span>Recently visited</span>
+                  </div>
+                  <div className="contents-quick-row">
+                    {recentPages.map(view => {
+                      const item = findContentsItem(view);
+                      if (!item) return null;
+                      return (
+                        <button
+                          key={view}
+                          type="button"
+                          className={cn(
+                            "contents-quick-chip",
+                            activePage === view && "is-current"
+                          )}
+                          onClick={() => selectContentsItem(view)}
+                        >
+                          {item.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               <div className="contents-list-heading">
                 <span>chapters</span>
-                <span>01 — 05</span>
+                <span>
+                  {isSearching
+                    ? `${filteredGroups.reduce((sum, group) => sum + group.items.length, 0)} match${filteredGroups.reduce((sum, group) => sum + group.items.length, 0) === 1 ? "" : "es"}`
+                    : "01 — 05"}
+                </span>
               </div>
-              {groups.map((group, index) => {
+
+              {filteredGroups.length === 0 && (
+                <p className="contents-empty-state" role="status">
+                  No pages match “{contentsSearch}”. Try a different word.
+                </p>
+              )}
+
+              {filteredGroups.map((group, index) => {
                 const Icon = group.icon;
-                const isOpen = expandedGroup === group.label;
+                const isOpen = isSearching || expandedGroup === group.label;
                 return (
                   <div
                     className={cn("contents-group", isOpen && "is-open")}
@@ -1309,7 +1463,8 @@ export default function Home() {
                       className="contents-group-trigger"
                       type="button"
                       onClick={() => {
-                        const newGroup = isOpen ? "" : group.label;
+                        const newGroup =
+                          expandedGroup === group.label ? "" : group.label;
                         setExpandedGroup(newGroup);
                         setContentsPreferences(prev => ({
                           ...prev,
@@ -1320,7 +1475,8 @@ export default function Home() {
                       onKeyDown={e => {
                         if (e.key === " " || e.key === "Enter") {
                           e.preventDefault();
-                          const newGroup = isOpen ? "" : group.label;
+                          const newGroup =
+                            expandedGroup === group.label ? "" : group.label;
                           setExpandedGroup(newGroup);
                           setContentsPreferences(prev => ({
                             ...prev,
@@ -1344,30 +1500,56 @@ export default function Home() {
                       )}
                     </button>
                     <div className="contents-subtopics">
-                      {group.items.map(item => (
-                        <button
-                          key={item.label}
-                          type="button"
-                          className={cn(
-                            "contents-subtopic",
-                            activePage === item.view && "is-current"
-                          )}
-                          onClick={() => selectContentsItem(item.view)}
-                          aria-current={
-                            activePage === item.view ? "page" : undefined
-                          }
-                        >
-                          <span>
-                            <b>{item.label}</b>
-                            <small>{item.note}</small>
-                          </span>
-                          {activePage === item.view ? (
-                            <CircleCheck size={15} />
-                          ) : (
-                            <ArrowRight size={15} />
-                          )}
-                        </button>
-                      ))}
+                      {group.items.map(item => {
+                        const isFavorite = favorites.includes(item.view);
+                        return (
+                          <div
+                            key={item.label}
+                            className={cn(
+                              "contents-subtopic-row",
+                              activePage === item.view && "is-current"
+                            )}
+                          >
+                            <button
+                              type="button"
+                              className={cn(
+                                "contents-subtopic",
+                                activePage === item.view && "is-current"
+                              )}
+                              onClick={() => selectContentsItem(item.view)}
+                              aria-current={
+                                activePage === item.view ? "page" : undefined
+                              }
+                            >
+                              <span>
+                                <b>{item.label}</b>
+                                <small>{item.note}</small>
+                              </span>
+                              {activePage === item.view ? (
+                                <CircleCheck size={15} />
+                              ) : (
+                                <ArrowRight size={15} />
+                              )}
+                            </button>
+                            <button
+                              type="button"
+                              className={cn(
+                                "contents-favorite-toggle",
+                                isFavorite && "is-favorite"
+                              )}
+                              onClick={() => toggleFavoritePage(item.view)}
+                              aria-pressed={isFavorite}
+                              aria-label={
+                                isFavorite
+                                  ? `Remove ${item.label} from favorites`
+                                  : `Add ${item.label} to favorites`
+                              }
+                            >
+                              <Star size={15} />
+                            </button>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 );
@@ -1375,6 +1557,7 @@ export default function Home() {
             </div>
           </section>
         );
+      }
 
       case "dashboard":
         return (

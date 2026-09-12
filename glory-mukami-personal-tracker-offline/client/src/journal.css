@@ -848,28 +848,38 @@ button:focus-visible {
   overflow: hidden;
 }
 .contents-group.is-open .contents-subtopics {
-  max-height: 520px;
+  max-height: 1400px;
   opacity: 1;
+  overflow-y: auto;
+}
+.contents-subtopic-row {
+  display: flex;
+  align-items: stretch;
+  border-top: 1px dashed rgba(57, 36, 84, 0.13);
+  background: rgba(255, 255, 255, 0.38);
+  transition: background 180ms ease;
+}
+.contents-subtopic-row:hover {
+  background: #fff;
 }
 .contents-subtopic {
   border: 0;
-  border-top: 1px dashed rgba(57, 36, 84, 0.13);
-  background: rgba(255, 255, 255, 0.38);
+  background: transparent;
   color: #47304f;
   padding: 0.72rem 0.4rem 0.72rem 2.8rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
   text-align: left;
+  flex: 1;
+  min-width: 0;
   transition:
-    background 180ms ease,
     padding 180ms ease,
     font-weight 180ms ease;
   outline: 2px solid transparent;
   outline-offset: -2px;
 }
-.contents-subtopic:hover {
-  background: #fff;
+.contents-subtopic-row:hover .contents-subtopic {
   padding-left: 3.05rem;
 }
 .contents-subtopic:focus-visible {
@@ -882,6 +892,139 @@ button:focus-visible {
 }
 .contents-subtopic.is-current b {
   font-weight: 700;
+}
+.contents-favorite-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.6rem;
+  border: 0;
+  background: transparent;
+  color: rgba(71, 48, 79, 0.35);
+  cursor: pointer;
+  transition:
+    color 160ms ease,
+    transform 160ms ease;
+  outline: 2px solid transparent;
+  outline-offset: -2px;
+}
+.contents-favorite-toggle:hover {
+  color: var(--journal-magenta);
+  transform: scale(1.1);
+}
+.contents-favorite-toggle:focus-visible {
+  outline: 2px solid var(--journal-magenta);
+  outline-offset: -2px;
+}
+.contents-favorite-toggle.is-favorite {
+  color: #f1b633;
+}
+.contents-favorite-toggle.is-favorite svg {
+  fill: #f1b633;
+}
+
+.contents-search {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid var(--journal-line);
+  border-radius: 999px;
+  padding: 0.65rem 1rem;
+  margin-top: 1.6rem;
+  color: #6b5b6e;
+  transition: border-color 160ms ease, background 160ms ease;
+}
+.contents-search:focus-within {
+  border-color: var(--journal-magenta);
+  background: #fff;
+}
+.contents-search input {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  outline: none;
+  font-size: 0.85rem;
+  color: var(--journal-ink);
+  min-width: 0;
+}
+.contents-search input::placeholder {
+  color: #a596a4;
+}
+.contents-search-clear {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: rgba(57, 36, 84, 0.08);
+  border-radius: 999px;
+  width: 1.5rem;
+  height: 1.5rem;
+  color: #6b5b6e;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.contents-search-clear:hover {
+  background: rgba(57, 36, 84, 0.16);
+}
+
+.contents-quick-section {
+  margin-top: 1.4rem;
+}
+.contents-quick-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ui-text-secondary);
+  margin-bottom: 0.55rem;
+}
+.contents-quick-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.contents-quick-chip {
+  border: 1px solid var(--journal-line);
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 999px;
+  padding: 0.4rem 0.85rem;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--journal-ink);
+  cursor: pointer;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    transform 160ms ease;
+  outline: 2px solid transparent;
+  outline-offset: 1px;
+}
+.contents-quick-chip:hover {
+  background: #fff;
+  transform: translateY(-1px);
+}
+.contents-quick-chip:focus-visible {
+  outline: 2px solid var(--journal-magenta);
+}
+.contents-quick-chip.is-current {
+  background: var(--journal-magenta);
+  border-color: var(--journal-magenta);
+  color: #fff;
+}
+
+.contents-empty-state {
+  margin-top: 1.5rem;
+  padding: 1.1rem;
+  text-align: center;
+  color: var(--ui-text-secondary);
+  font-size: 0.85rem;
+  background: rgba(255, 255, 255, 0.4);
+  border: 1px dashed var(--journal-line);
+  border-radius: 12px;
 }
 
 .dashboard-page {
