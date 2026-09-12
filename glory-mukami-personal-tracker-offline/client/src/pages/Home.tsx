@@ -1186,8 +1186,14 @@ export default function Home() {
   function renderPage() {
     switch (view) {
       case "cover":
+        const lastVisitedPage = contentsPreferences?.lastVisitedPage;
+        const canResumeSession = lastVisitedPage && lastVisitedPage !== "cover";
         return (
-          <section className="journal-cover" aria-labelledby="cover-title">
+          <section
+            className="journal-cover"
+            aria-labelledby="cover-title"
+            role="main"
+          >
             <div className="cover-art" />
             <div className="cover-vignette" />
             <div className="cover-content">
@@ -1208,12 +1214,38 @@ export default function Home() {
                 A beautifully practical place to notice your rhythms, plan with
                 ease, and collect the moments that shape you.
               </p>
-              <Button
-                className="cover-button"
-                onClick={() => turnTo("contents")}
-              >
-                Open journal <ArrowRight size={17} />
-              </Button>
+
+              <div className="cover-action-group">
+                {canResumeSession ? (
+                  <>
+                    <Button
+                      className="cover-button cover-button-primary"
+                      onClick={() => turnTo(lastVisitedPage)}
+                      aria-label={`Continue where you left off in ${lastVisitedPage}`}
+                    >
+                      Continue where you left off
+                      <ArrowRight size={17} />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="cover-button cover-button-secondary"
+                      onClick={() => turnTo("contents")}
+                      aria-label="Open journal table of contents"
+                    >
+                      Open journal
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    className="cover-button cover-button-primary"
+                    onClick={() => turnTo("contents")}
+                    aria-label="Open journal to table of contents"
+                  >
+                    Open journal <ArrowRight size={17} />
+                  </Button>
+                )}
+              </div>
+
               <div className="cover-rhythm-index" aria-label="Journal chapters">
                 <span>01 Body</span>
                 <span>02 Mind</span>
@@ -1221,6 +1253,12 @@ export default function Home() {
                 <span>04 Growth</span>
                 <span>05 Utilities</span>
               </div>
+
+              {!navigator.onLine && (
+                <div className="cover-offline-notice" role="status" aria-live="polite">
+                  <span aria-label="Offline status">●</span> You are offline — your journal will load from local storage
+                </div>
+              )}
             </div>
           </section>
         );
@@ -1228,7 +1266,7 @@ export default function Home() {
       case "contents":
         return (
           <section
-            className="journal-spread contents-spread"
+            className="journal-spread contents-spread glass-scope"
             aria-labelledby="contents-title"
           >
             <div className="spread-page contents-intro">
@@ -1236,7 +1274,7 @@ export default function Home() {
                 onContents={() => turnTo("contents", "backward")}
                 onCover={() => turnTo("cover", "backward")}
               />
-              <p className="page-kicker">your journal index</p>
+              <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">your journal index</p>
               <h2 id="contents-title">
                 Table of
                 <br />
@@ -1341,7 +1379,7 @@ export default function Home() {
       case "dashboard":
         return (
           <section
-            className="journal-spread dashboard-spread"
+            className="journal-spread dashboard-spread glass-scope"
             aria-labelledby="dashboard-title"
           >
             <div className="spread-page dashboard-intro">
@@ -1349,7 +1387,7 @@ export default function Home() {
                 onContents={() => turnTo("contents", "backward")}
                 onCover={() => turnTo("cover", "backward")}
               />
-              <p className="page-kicker">your day · dashboard</p>
+              <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">your day · dashboard</p>
               <h2 id="dashboard-title">
                 Good morning,
                 <br />
@@ -1501,7 +1539,7 @@ export default function Home() {
                 >
                   <X size={17} />
                 </button>
-                <p className="page-kicker">capture a moment</p>
+                <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">capture a moment</p>
                 <h3>What would you like to add?</h3>
                 <div className="quick-options">
                   {quickItems.map(item => (
@@ -1935,6 +1973,44 @@ export default function Home() {
             !showSensitiveSummaries && "sensitive-summaries-hidden"
           )}
         >
+          {/* Shared Liquid Glass defs, rendered once for the whole app so
+              every page's .glass-scope elements can reference them by id
+              without duplicating the filter/gradients per page. */}
+          <svg
+            role="presentation"
+            aria-hidden="true"
+            style={{ position: "absolute", width: 0, height: 0, overflow: "hidden" }}
+          >
+            <defs>
+              <filter id="glass-distortion-fit" x="0%" y="0%" width="100%" height="100%" filterUnits="objectBoundingBox">
+                <feTurbulence type="fractalNoise" baseFrequency="0.001 0.005" numOctaves={1} seed={17} result="turbulence" />
+                <feComponentTransfer in="turbulence" result="mapped">
+                  <feFuncR type="gamma" amplitude={1} exponent={10} offset={0.5} />
+                  <feFuncG type="gamma" amplitude={0} exponent={1} offset={0} />
+                  <feFuncB type="gamma" amplitude={0} exponent={1} offset={0.5} />
+                </feComponentTransfer>
+                <feGaussianBlur in="turbulence" stdDeviation={3} result="softMap" />
+                <feSpecularLighting in="softMap" surfaceScale={5} specularConstant={1} specularExponent={100} lightingColor="white" result="specLight">
+                  <fePointLight x={-200} y={-200} z={300} />
+                </feSpecularLighting>
+                <feComposite in="specLight" operator="arithmetic" k1={0} k2={1} k3={1} k4={0} result="litImage" />
+                <feDisplacementMap in="SourceGraphic" in2="softMap" scale={200} xChannelSelector="R" yChannelSelector="G" />
+              </filter>
+              <linearGradient id="glassTopLeft" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stopColor="white" stopOpacity={0.72} />
+                <stop offset="32%" stopColor="white" stopOpacity={0.48} />
+                <stop offset="55%" stopColor="white" stopOpacity={0} />
+                <stop offset="100%" stopColor="white" stopOpacity={0} />
+              </linearGradient>
+              <linearGradient id="glassBottomRight" x1="1" y1="1" x2="0" y2="0">
+                <stop offset="0%" stopColor="white" stopOpacity={0.58} />
+                <stop offset="28%" stopColor="white" stopOpacity={0.42} />
+                <stop offset="52%" stopColor="white" stopOpacity={0} />
+                <stop offset="100%" stopColor="white" stopOpacity={0} />
+              </linearGradient>
+            </defs>
+          </svg>
+
           <div
             className={cn("journal-stage", view !== "cover" && "journal-open")}
             data-journal-view={view}
@@ -2017,7 +2093,7 @@ export default function Home() {
                 >
                   <X size={19} />
                 </button>
-                <p className="page-kicker">journal navigation</p>
+                <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">journal navigation</p>
                 <h3>Choose a chapter</h3>
                 {groups.map(group => (
                   <div className="mobile-chapter" key={group.label}>
@@ -2099,13 +2175,13 @@ function LegacyWorkoutPage({
   const completedCount = workouts.filter(([name]) => completed[name]).length;
   return (
     <section
-      className="journal-spread workout-spread"
+      className="journal-spread workout-spread glass-scope"
       aria-labelledby="workout-title"
     >
       <div className="spread-page workout-intro">
         <JournalActions onContents={onContents} onCover={onCover} />
         <div className="editorial-contrast-panel">
-          <p className="page-kicker">fitness · workout studio</p>
+          <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">fitness · workout studio</p>
           <h2 id="workout-title">
             Move with
             <br />
@@ -2326,13 +2402,13 @@ function WorkoutPage({
   });
   return (
     <section
-      className="journal-spread workout-spread"
+      className="journal-spread workout-spread glass-scope"
       aria-labelledby="workout-title"
     >
       <div className="spread-page workout-intro">
         <JournalActions onContents={onContents} onCover={onCover} />
         <div className="editorial-contrast-panel">
-          <p className="page-kicker">fitness · workout studio</p>
+          <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">fitness · workout studio</p>
           <h2 id="workout-title">
             Move with
             <br />
@@ -3605,12 +3681,12 @@ function EnhancedAssignmentsPage({
   }
   return (
     <section
-      className="journal-spread assignment-spread"
+      className="journal-spread assignment-spread glass-scope"
       aria-labelledby="assignment-title"
     >
       <div className="spread-page assignment-intro">
         <JournalActions onContents={onContents} onCover={onCover} />
-        <p className="page-kicker">education · assignments</p>
+        <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">education · assignments</p>
         <h2 id="assignment-title">
           Make space for
           <br />
@@ -3963,12 +4039,12 @@ function AssignmentsPage({
   }
   return (
     <section
-      className="journal-spread assignment-spread"
+      className="journal-spread assignment-spread glass-scope"
       aria-labelledby="assignment-title"
     >
       <div className="spread-page assignment-intro">
         <JournalActions onContents={onContents} onCover={onCover} />
-        <p className="page-kicker">education · assignments</p>
+        <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">education · assignments</p>
         <h2 id="assignment-title">
           Make space for
           <br />
@@ -4287,12 +4363,12 @@ function LearningPage({
   }
   return (
     <section
-      className="journal-spread learning-spread"
+      className="journal-spread learning-spread glass-scope"
       aria-labelledby="learning-title"
     >
       <div className="spread-page learning-intro">
         <JournalActions onContents={onContents} onCover={onCover} />
-        <p className="page-kicker">growth · learning something new</p>
+        <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">growth · learning something new</p>
         <h2 id="learning-title">
           Your curiosity
           <br />
@@ -4720,12 +4796,12 @@ function LearningWorkbenchPage({
   }
   return (
     <section
-      className="journal-spread learning-spread"
+      className="journal-spread learning-spread glass-scope"
       aria-labelledby="learning-title"
     >
       <div className="spread-page learning-intro">
         <JournalActions onContents={onContents} onCover={onCover} />
-        <p className="page-kicker">growth · learning something new</p>
+        <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">growth · learning something new</p>
         <h2 id="learning-title">
           Your curiosity
           <br />
@@ -5081,12 +5157,12 @@ function PersonalGrowthPage({
   }
   return (
     <section
-      className="journal-spread growth-spread"
+      className="journal-spread growth-spread glass-scope"
       aria-labelledby="growth-title"
     >
       <div className="spread-page growth-intro">
         <JournalActions onContents={onContents} onCover={onCover} />
-        <p className="page-kicker">goals & growth · personal growth</p>
+        <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">goals & growth · personal growth</p>
         <h2 id="growth-title">
           Grow in a way
           <br />
@@ -5247,12 +5323,12 @@ function AchievementsPage({
   }
   return (
     <section
-      className="journal-spread achievements-spread"
+      className="journal-spread achievements-spread glass-scope"
       aria-labelledby="achievements-title"
     >
       <div className="spread-page achievements-intro">
         <JournalActions onContents={onContents} onCover={onCover} />
-        <p className="page-kicker">goals & growth · achievements</p>
+        <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">goals & growth · achievements</p>
         <h2 id="achievements-title">
           Let yourself
           <br />
@@ -5419,12 +5495,12 @@ function ExperiencesPage({
   }
   return (
     <section
-      className="journal-spread experiences-spread"
+      className="journal-spread experiences-spread glass-scope"
       aria-labelledby="experiences-title"
     >
       <div className="spread-page experiences-intro">
         <JournalActions onContents={onContents} onCover={onCover} />
-        <p className="page-kicker">goals & growth · experiences</p>
+        <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">goals & growth · experiences</p>
         <h2 id="experiences-title">
           Collect the moments
           <br />
@@ -5610,12 +5686,12 @@ function HobbiesPage({
   }
   return (
     <section
-      className="journal-spread hobbies-spread"
+      className="journal-spread hobbies-spread glass-scope"
       aria-labelledby="hobbies-title"
     >
       <div className="spread-page hobbies-intro">
         <JournalActions onContents={onContents} onCover={onCover} />
-        <p className="page-kicker">goals & growth · hobbies</p>
+        <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">goals & growth · hobbies</p>
         <h2 id="hobbies-title">
           Make space for
           <br />
@@ -5798,12 +5874,12 @@ function FamilyPage({
   }
   return (
     <section
-      className="journal-spread family-spread"
+      className="journal-spread family-spread glass-scope"
       aria-labelledby="family-title"
     >
       <div className="spread-page family-intro">
         <JournalActions onContents={onContents} onCover={onCover} />
-        <p className="page-kicker">life · family</p>
+        <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">life · family</p>
         <h2 id="family-title">
           Keep shared care
           <br />
@@ -5992,12 +6068,12 @@ function InternshipsPage({
   }
   return (
     <section
-      className="journal-spread internships-spread"
+      className="journal-spread internships-spread glass-scope"
       aria-labelledby="internships-title"
     >
       <div className="spread-page internships-intro">
         <JournalActions onContents={onContents} onCover={onCover} />
-        <p className="page-kicker">life · career · internship applications</p>
+        <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">life · career · internship applications</p>
         <h2 id="internships-title">
           Apply with
           <br />
@@ -6187,10 +6263,10 @@ function CvPage({
     setSaved(true);
   }
   return (
-    <section className="journal-spread cv-spread" aria-labelledby="cv-title">
+    <section className="journal-spread cv-spread glass-scope" aria-labelledby="cv-title">
       <div className="spread-page cv-intro">
         <JournalActions onContents={onContents} onCover={onCover} />
-        <p className="page-kicker">life · career · CV</p>
+        <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">life · career · CV</p>
         <h2 id="cv-title">
           Tell your story
           <br />
@@ -6361,12 +6437,12 @@ function CertificationsPage({
   }
   return (
     <section
-      className="journal-spread certifications-spread"
+      className="journal-spread certifications-spread glass-scope"
       aria-labelledby="certifications-title"
     >
       <div className="spread-page certifications-intro">
         <JournalActions onContents={onContents} onCover={onCover} />
-        <p className="page-kicker">life · career · certifications</p>
+        <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">life · career · certifications</p>
         <h2 id="certifications-title">
           Mark the learning
           <br />
@@ -6550,12 +6626,12 @@ function ProjectsPage({
   }
   return (
     <section
-      className="journal-spread projects-spread"
+      className="journal-spread projects-spread glass-scope"
       aria-labelledby="projects-title"
     >
       <div className="spread-page projects-intro">
         <JournalActions onContents={onContents} onCover={onCover} />
-        <p className="page-kicker">life · career · projects</p>
+        <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">life · career · projects</p>
         <h2 id="projects-title">
           Make the work
           <br />
@@ -6802,12 +6878,12 @@ function HistoryPage({
   ];
   return (
     <section
-      className="journal-spread history-spread"
+      className="journal-spread history-spread glass-scope"
       aria-labelledby="history-title"
     >
       <div className="spread-page history-intro">
         <JournalActions onContents={onContents} onCover={onCover} />
-        <p className="page-kicker">utilities · history</p>
+        <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">utilities · history</p>
         <h2 id="history-title">
           Look back
           <br />
@@ -7063,12 +7139,12 @@ function RecommendationsPage({
   };
   return (
     <section
-      className="journal-spread recommendations-spread"
+      className="journal-spread recommendations-spread glass-scope"
       aria-labelledby="recommendations-title"
     >
       <div className="spread-page recommendations-intro">
         <JournalActions onContents={onContents} onCover={onCover} />
-        <p className="page-kicker">utilities · recommendations</p>
+        <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">utilities · recommendations</p>
         <h2 id="recommendations-title">
           A next step,
           <br />
@@ -7321,12 +7397,12 @@ function ExportPage({
   }
   return (
     <section
-      className="journal-spread export-spread"
+      className="journal-spread export-spread glass-scope"
       aria-labelledby="export-title"
     >
       <div className="spread-page export-intro">
         <JournalActions onContents={onContents} onCover={onCover} />
-        <p className="page-kicker">utilities · export</p>
+        <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">utilities · export</p>
         <h2 id="export-title">
           Keep a copy
           <br />
@@ -7494,12 +7570,12 @@ function NotificationPreviewPage({
   }
   return (
     <section
-      className="journal-spread notifications-spread"
+      className="journal-spread notifications-spread glass-scope"
       aria-labelledby="notifications-title"
     >
       <div className="spread-page notifications-intro">
         <JournalActions onContents={onContents} onCover={onCover} />
-        <p className="page-kicker">utilities · reminder preview</p>
+        <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">utilities · reminder preview</p>
         <h2 id="notifications-title">
           Decide what a<br />
           <em>reminder reveals.</em>
@@ -7785,12 +7861,12 @@ function PrivacyPage({
   });
   return (
     <section
-      className="journal-spread privacy-spread"
+      className="journal-spread privacy-spread glass-scope"
       aria-labelledby="privacy-title"
     >
       <div className="spread-page privacy-intro">
         <JournalActions onContents={onContents} onCover={onCover} />
-        <p className="page-kicker">utilities · privacy controls</p>
+        <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">utilities · privacy controls</p>
         <h2 id="privacy-title">
           Keep sensitive
           <br />
@@ -8030,12 +8106,12 @@ function InsightsPage({
 
   return (
     <section
-      className="journal-spread insights-spread"
+      className="journal-spread insights-spread glass-scope"
       aria-labelledby="insights-title"
     >
       <div className="spread-page insights-intro">
         <JournalActions onContents={onContents} onCover={onCover} />
-        <p className="page-kicker">utilities · insights</p>
+        <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">utilities · insights</p>
         <h2 id="insights-title">
           Observe a pattern,
           <br />
@@ -8295,12 +8371,12 @@ function LegacyInsightsPage({
   ];
   return (
     <section
-      className="journal-spread insights-spread"
+      className="journal-spread insights-spread glass-scope"
       aria-labelledby="insights-title"
     >
       <div className="spread-page insights-intro">
         <JournalActions onContents={onContents} onCover={onCover} />
-        <p className="page-kicker">utilities · insights</p>
+        <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">utilities · insights</p>
         <h2 id="insights-title">
           Observe a pattern,
           <br />
@@ -8425,12 +8501,12 @@ function AnalyticsPage({
 
   return (
     <section
-      className="journal-spread analytics-spread"
+      className="journal-spread analytics-spread glass-scope"
       aria-labelledby="analytics-title"
     >
       <div className="spread-page analytics-intro">
         <JournalActions onContents={onContents} onCover={onCover} />
-        <p className="page-kicker">utilities · analytics</p>
+        <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">utilities · analytics</p>
         <h2 id="analytics-title">
           Read what you
           <br />
@@ -8707,12 +8783,12 @@ function LegacyFactualAnalyticsPage({
 
   return (
     <section
-      className="journal-spread analytics-spread"
+      className="journal-spread analytics-spread glass-scope"
       aria-labelledby="analytics-title"
     >
       <div className="spread-page analytics-intro">
         <JournalActions onContents={onContents} onCover={onCover} />
-        <p className="page-kicker">utilities · analytics</p>
+        <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">utilities · analytics</p>
         <h2 id="analytics-title">
           Read what you
           <br />
@@ -8865,12 +8941,12 @@ function LegacyAnalyticsPage({
   const [suggestionSize, setSuggestionSize] = useState("15 minutes");
   return (
     <section
-      className="journal-spread analytics-spread"
+      className="journal-spread analytics-spread glass-scope"
       aria-labelledby="analytics-title"
     >
       <div className="spread-page analytics-intro">
         <JournalActions onContents={onContents} onCover={onCover} />
-        <p className="page-kicker">utilities · analytics</p>
+        <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">utilities · analytics</p>
         <h2 id="analytics-title">
           See the signal,
           <br />
@@ -9049,12 +9125,12 @@ function PortfolioPage({
   }
   return (
     <section
-      className="journal-spread portfolio-spread"
+      className="journal-spread portfolio-spread glass-scope"
       aria-labelledby="portfolio-title"
     >
       <div className="spread-page portfolio-intro">
         <JournalActions onContents={onContents} onCover={onCover} />
-        <p className="page-kicker">life · career · portfolio</p>
+        <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">life · career · portfolio</p>
         <h2 id="portfolio-title">
           Let your work
           <br />
@@ -9223,12 +9299,12 @@ function SocialLifePage({
   }
   return (
     <section
-      className="journal-spread social-spread"
+      className="journal-spread social-spread glass-scope"
       aria-labelledby="social-title"
     >
       <div className="spread-page social-intro">
         <JournalActions onContents={onContents} onCover={onCover} />
-        <p className="page-kicker">life · social life</p>
+        <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">life · social life</p>
         <h2 id="social-title">
           Let connection
           <br />
@@ -9407,12 +9483,12 @@ function CareerPage({
   }
   return (
     <section
-      className="journal-spread career-spread"
+      className="journal-spread career-spread glass-scope"
       aria-labelledby="career-title"
     >
       <div className="spread-page career-intro">
         <JournalActions onContents={onContents} onCover={onCover} />
-        <p className="page-kicker">life · career goals</p>
+        <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">life · career goals</p>
         <h2 id="career-title">
           Build a direction
           <br />
@@ -9608,12 +9684,12 @@ function ResponsibilitiesPage({
   }
   return (
     <section
-      className="journal-spread responsibilities-spread"
+      className="journal-spread responsibilities-spread glass-scope"
       aria-labelledby="responsibilities-title"
     >
       <div className="spread-page responsibilities-intro">
         <JournalActions onContents={onContents} onCover={onCover} />
-        <p className="page-kicker">life · responsibilities</p>
+        <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">life · responsibilities</p>
         <h2 id="responsibilities-title">
           Let repetition
           <br />
@@ -9819,12 +9895,12 @@ function PurchasesPage({
   }
   return (
     <section
-      className="journal-spread purchases-spread"
+      className="journal-spread purchases-spread glass-scope"
       aria-labelledby="purchases-title"
     >
       <div className="spread-page purchases-intro">
         <JournalActions onContents={onContents} onCover={onCover} />
-        <p className="page-kicker">life · purchases</p>
+        <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">life · purchases</p>
         <h2 id="purchases-title">
           Buy with a little
           <br />
@@ -10128,12 +10204,12 @@ function EnvironmentPage({
   const upkeep = items.filter(item => !item.done || item.recurring);
   return (
     <section
-      className="journal-spread environment-spread"
+      className="journal-spread environment-spread glass-scope"
       aria-labelledby="environment-title"
     >
       <div className="spread-page environment-intro">
         <JournalActions onContents={onContents} onCover={onCover} />
-        <p className="page-kicker">life · environment</p>
+        <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">life · environment</p>
         <h2 id="environment-title">
           Care for the
           <br />
@@ -10320,12 +10396,12 @@ function SecurityPage({
   }
   return (
     <section
-      className="journal-spread security-spread"
+      className="journal-spread security-spread glass-scope"
       aria-labelledby="security-title"
     >
       <div className="spread-page security-intro">
         <JournalActions onContents={onContents} onCover={onCover} />
-        <p className="page-kicker">life · security</p>
+        <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">life · security</p>
         <h2 id="security-title">
           Keep your digital
           <br />
@@ -10760,12 +10836,12 @@ function SecurityWorkspacePage({
 
   return (
     <section
-      className="journal-spread security-spread security-workspace-spread"
+      className="journal-spread security-spread security-workspace-spread glass-scope"
       aria-labelledby="security-title"
     >
       <div className="spread-page security-intro">
         <JournalActions onContents={onContents} onCover={onCover} />
-        <p className="page-kicker">life · security</p>
+        <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">life · security</p>
         <h2 id="security-title">
           Keep your digital
           <br />
@@ -11402,12 +11478,12 @@ function SecurityReviewWorkspacePage({
 
   return (
     <section
-      className="journal-spread security-spread security-workspace-spread"
+      className="journal-spread security-spread security-workspace-spread glass-scope"
       aria-labelledby="security-title"
     >
       <div className="spread-page security-intro">
         <JournalActions onContents={onContents} onCover={onCover} />
-        <p className="page-kicker">life · security</p>
+        <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">life · security</p>
         <h2 id="security-title">
           Keep your digital
           <br />
@@ -11747,12 +11823,12 @@ function DocumentsPage({
   }
   return (
     <section
-      className="journal-spread documents-spread"
+      className="journal-spread documents-spread glass-scope"
       aria-labelledby="documents-title"
     >
       <div className="spread-page documents-intro">
         <JournalActions onContents={onContents} onCover={onCover} />
-        <p className="page-kicker">life · documents</p>
+        <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">life · documents</p>
         <h2 id="documents-title">
           Keep the dates,
           <br />
@@ -12256,12 +12332,12 @@ function DocumentRenewalPage({
   }
   return (
     <section
-      className="journal-spread documents-spread"
+      className="journal-spread documents-spread glass-scope"
       aria-labelledby="documents-title"
     >
       <div className="spread-page documents-intro">
         <JournalActions onContents={onContents} onCover={onCover} />
-        <p className="page-kicker">life · documents</p>
+        <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">life · documents</p>
         <h2 id="documents-title">
           Keep the dates,
           <br />
@@ -12527,12 +12603,12 @@ function FinancesPage({
   }
   return (
     <section
-      className="journal-spread finances-spread"
+      className="journal-spread finances-spread glass-scope"
       aria-labelledby="finances-title"
     >
       <div className="spread-page finances-intro">
         <JournalActions onContents={onContents} onCover={onCover} />
-        <p className="page-kicker">life · finances</p>
+        <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">life · finances</p>
         <h2 id="finances-title">
           Know the flow
           <br />
@@ -12809,12 +12885,12 @@ function FinanceCashflowPage({
     : "";
   return (
     <section
-      className="journal-spread finances-spread"
+      className="journal-spread finances-spread glass-scope"
       aria-labelledby="finances-title"
     >
       <div className="spread-page finances-intro">
         <JournalActions onContents={onContents} onCover={onCover} />
-        <p className="page-kicker">life · finances</p>
+        <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">life · finances</p>
         <h2 id="finances-title">
           Know the flow
           <br />
@@ -13435,12 +13511,12 @@ function TimePage({
   }
   return (
     <section
-      className="journal-spread time-spread"
+      className="journal-spread time-spread glass-scope"
       aria-labelledby="time-title"
     >
       <div className="spread-page time-intro">
         <JournalActions onContents={onContents} onCover={onCover} />
-        <p className="page-kicker">life · time</p>
+        <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">life · time</p>
         <h2 id="time-title">
           Let the day
           <br />
@@ -13874,12 +13950,12 @@ function GoalsPage({
   }
   return (
     <section
-      className="journal-spread goals-spread"
+      className="journal-spread goals-spread glass-scope"
       aria-labelledby="goals-title"
     >
       <div className="spread-page goals-intro">
         <JournalActions onContents={onContents} onCover={onCover} />
-        <p className="page-kicker">goals & growth · goals</p>
+        <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">goals & growth · goals</p>
         <h2 id="goals-title">
           Let the future
           <br />
@@ -14453,12 +14529,12 @@ function GoalsWorkspacePage({
 
   return (
     <section
-      className="journal-spread goals-spread goals-workspace-spread"
+      className="journal-spread goals-spread goals-workspace-spread glass-scope"
       aria-labelledby="goals-title"
     >
       <div className="spread-page goals-intro">
         <JournalActions onContents={onContents} onCover={onCover} />
-        <p className="page-kicker">goals & growth · goals</p>
+        <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">goals & growth · goals</p>
         <h2 id="goals-title">
           Let the future
           <br />
@@ -14868,12 +14944,12 @@ function StudyWorkbenchPage({
   }
   return (
     <section
-      className="journal-spread study-spread"
+      className="journal-spread study-spread glass-scope"
       aria-labelledby="study-title"
     >
       <div className="spread-page study-intro">
         <JournalActions onContents={onContents} onCover={onCover} />
-        <p className="page-kicker">life · education · study sessions</p>
+        <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">life · education · study sessions</p>
         <h2 id="study-title">
           Give focus
           <br />
@@ -15197,12 +15273,12 @@ function StudySessionsPage({
   }
   return (
     <section
-      className="journal-spread study-spread"
+      className="journal-spread study-spread glass-scope"
       aria-labelledby="study-title"
     >
       <div className="spread-page study-intro">
         <JournalActions onContents={onContents} onCover={onCover} />
-        <p className="page-kicker">life · education · study sessions</p>
+        <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">life · education · study sessions</p>
         <h2 id="study-title">
           Give focus
           <br />
@@ -15627,12 +15703,12 @@ function ExamPlannerPage({
   }
   return (
     <section
-      className="journal-spread exams-spread"
+      className="journal-spread exams-spread glass-scope"
       aria-labelledby="exams-title"
     >
       <div className="spread-page exams-intro">
         <JournalActions onContents={onContents} onCover={onCover} />
-        <p className="page-kicker">life · education · exams</p>
+        <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">life · education · exams</p>
         <h2 id="exams-title">
           Prepare with
           <br />
@@ -15938,12 +16014,12 @@ function ExamsPage({
   }
   return (
     <section
-      className="journal-spread exams-spread"
+      className="journal-spread exams-spread glass-scope"
       aria-labelledby="exams-title"
     >
       <div className="spread-page exams-intro">
         <JournalActions onContents={onContents} onCover={onCover} />
-        <p className="page-kicker">life · education · exams</p>
+        <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">life · education · exams</p>
         <h2 id="exams-title">
           Prepare with
           <br />
@@ -16422,12 +16498,12 @@ function CourseWorkspacePage({
   }
   return (
     <section
-      className="journal-spread courses-spread"
+      className="journal-spread courses-spread glass-scope"
       aria-labelledby="courses-title"
     >
       <div className="spread-page courses-intro">
         <JournalActions onContents={onContents} onCover={onCover} />
-        <p className="page-kicker">life · education · courses</p>
+        <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">life · education · courses</p>
         <h2 id="courses-title">
           Make each
           <br />
@@ -16901,12 +16977,12 @@ function CoursesPage({
   }
   return (
     <section
-      className="journal-spread courses-spread"
+      className="journal-spread courses-spread glass-scope"
       aria-labelledby="courses-title"
     >
       <div className="spread-page courses-intro">
         <JournalActions onContents={onContents} onCover={onCover} />
-        <p className="page-kicker">life · education · courses</p>
+        <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">life · education · courses</p>
         <h2 id="courses-title">
           Make each
           <br />
@@ -17234,12 +17310,12 @@ function TasksPage({
   }
   return (
     <section
-      className="journal-spread tasks-spread"
+      className="journal-spread tasks-spread glass-scope"
       aria-labelledby="tasks-title"
     >
       <div className="spread-page tasks-intro">
         <JournalActions onContents={onContents} onCover={onCover} />
-        <p className="page-kicker">life · tasks</p>
+        <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">life · tasks</p>
         <h2 id="tasks-title">
           Keep the next
           <br />
@@ -17531,6 +17607,7 @@ function DigitalLifePage({
     note: "",
   });
   const [editingId, setEditingId] = useState<string | null>(null);
+  const minutesRef = useRef<HTMLInputElement>(null);
   useMongoJournalScope({
     scope: "digital-life",
     payload: { goal, boundary, boundaryTime, entries },
@@ -17588,12 +17665,12 @@ function DigitalLifePage({
   }
   return (
     <section
-      className="journal-spread digital-life-spread"
+      className="journal-spread digital-life-spread glass-scope"
       aria-labelledby="digital-life-title"
     >
       <div className="spread-page digital-life-intro">
         <JournalActions onContents={onContents} onCover={onCover} />
-        <p className="page-kicker">mind · digital life</p>
+        <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">mind · digital life</p>
         <h2 id="digital-life-title">
           Use your attention
           <br />
@@ -17603,7 +17680,20 @@ function DigitalLifePage({
           A private screen-time check-in that makes space for boundaries, focus,
           and the parts of life that do not live behind a screen.
         </p>
-        <div className="digital-sparkle">✦ ✦ ✦</div>
+        <button
+          type="button"
+          className="ink-button"
+          onClick={() => {
+            resetDraft();
+            minutesRef.current?.scrollIntoView({
+              block: "center",
+              behavior: "smooth",
+            });
+            minutesRef.current?.focus();
+          }}
+        >
+          <Plus size={15} /> Log screen time
+        </button>
       </div>
       <div className="spread-page digital-life-page">
         <section className="digital-today">
@@ -17662,6 +17752,7 @@ function DigitalLifePage({
             <label>
               Minutes
               <input
+                ref={minutesRef}
                 type="number"
                 min="1"
                 step="5"
@@ -17944,12 +18035,12 @@ function ProductivityPage({
   }
   return (
     <section
-      className="journal-spread productivity-spread"
+      className="journal-spread productivity-spread glass-scope"
       aria-labelledby="productivity-title"
     >
       <div className="spread-page productivity-intro">
         <JournalActions onContents={onContents} onCover={onCover} />
-        <p className="page-kicker">mind · productivity</p>
+        <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">mind · productivity</p>
         <h2 id="productivity-title">
           Make room for
           <br />
@@ -18344,12 +18435,12 @@ function HabitsPage({
   }
   return (
     <section
-      className="journal-spread habits-spread"
+      className="journal-spread habits-spread glass-scope"
       aria-labelledby="habits-title"
     >
       <div className="spread-page habits-intro">
         <JournalActions onContents={onContents} onCover={onCover} />
-        <p className="page-kicker">mind · habits</p>
+        <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">mind · habits</p>
         <h2 id="habits-title">
           Small rituals,
           <br />
@@ -18744,12 +18835,12 @@ function SleepPage({
   }
   return (
     <section
-      className="journal-spread sleep-spread"
+      className="journal-spread sleep-spread glass-scope"
       aria-labelledby="sleep-title"
     >
       <div className="spread-page sleep-intro">
         <JournalActions onContents={onContents} onCover={onCover} />
-        <p className="page-kicker">body · sleep</p>
+        <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">body · sleep</p>
         <h2 id="sleep-title">
           Let rest be
           <br />
@@ -18982,13 +19073,13 @@ function WellbeingPage({
   }
   return (
     <section
-      className="journal-spread wellbeing-spread"
+      className="journal-spread wellbeing-spread glass-scope"
       aria-labelledby="wellbeing-title"
     >
       <div className="spread-page wellbeing-intro">
         <JournalActions onContents={onContents} onCover={onCover} />
         <div className="editorial-contrast-panel">
-          <p className="page-kicker">mind · wellbeing</p>
+          <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">mind · wellbeing</p>
           <h2 id="wellbeing-title">
             Meet yourself
             <br />
@@ -19246,12 +19337,12 @@ function CyclePage({
   const estimate = estimateCycle(entries);
   return (
     <section
-      className="journal-spread cycle-spread"
+      className="journal-spread cycle-spread glass-scope"
       aria-labelledby="cycle-title"
     >
       <div className="spread-page cycle-intro">
         <JournalActions onContents={onContents} onCover={onCover} />
-        <p className="page-kicker">body · period &amp; cycle tracker</p>
+        <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">body · period &amp; cycle tracker</p>
         <h2 id="cycle-title">
           In rhythm with
           <br />
@@ -19621,13 +19712,13 @@ function LegacyNutritionPage({
   }
   return (
     <section
-      className="journal-spread nutrition-spread"
+      className="journal-spread nutrition-spread glass-scope"
       aria-labelledby="nutrition-title"
     >
       <div className="spread-page nutrition-intro">
         <JournalActions onContents={onContents} onCover={onCover} />
         <div className="editorial-contrast-panel">
-          <p className="page-kicker">body · nutrition</p>
+          <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">body · nutrition</p>
           <h2 id="nutrition-title">
             Nourish the
             <br />
@@ -19921,13 +20012,13 @@ function NutritionPage({
   }
   return (
     <section
-      className="journal-spread nutrition-spread"
+      className="journal-spread nutrition-spread glass-scope"
       aria-labelledby="nutrition-title"
     >
       <div className="spread-page nutrition-intro">
         <JournalActions onContents={onContents} onCover={onCover} />
         <div className="editorial-contrast-panel">
-          <p className="page-kicker">body · nutrition</p>
+          <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">body · nutrition</p>
           <h2 id="nutrition-title">
             Nourish the
             <br />
@@ -20238,12 +20329,12 @@ function WaterIntakePage({
 
   return (
     <section
-      className="journal-spread water-spread"
+      className="journal-spread water-spread glass-scope"
       aria-labelledby="water-title"
     >
       <div className="spread-page water-intro">
         <JournalActions onContents={onContents} onCover={onCover} />
-        <p className="page-kicker">body · nutrition & hydration</p>
+        <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">body · nutrition & hydration</p>
         <h2 id="water-title">
           A little more
           <br />
@@ -20525,13 +20616,15 @@ function ReflectionPage({
   }
   return (
     <section
-      className="journal-spread reflection-spread"
+      className="journal-spread reflection-spread glass-scope"
       aria-label="Weekly and monthly reflections"
     >
       <div className="spread-page reflection-intro">
         <JournalActions onContents={onContents} onCover={onCover} />
         <div className="reflection-editorial-copy" aria-hidden="true">
-          <p className="reflection-kicker">Mind · reflections</p>
+          <p className="reflection-kicker glass-panel-fit glass-panel-fit-kicker">
+            Mind · reflections
+          </p>
           <div
             id="reflection-title"
             className="reflection-title"
@@ -20789,12 +20882,12 @@ function IntegrationsPage({
   }
   return (
     <section
-      className="journal-spread integrations-spread"
+      className="journal-spread integrations-spread glass-scope"
       aria-labelledby="integrations-title"
     >
       <div className="spread-page integrations-intro">
         <JournalActions onContents={onContents} onCover={onCover} />
-        <p className="page-kicker">utilities · integrations</p>
+        <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">utilities · integrations</p>
         <h2 id="integrations-title">
           Choose what
           <br />
@@ -20889,12 +20982,12 @@ function UtilitiesPage({
 }) {
   return (
     <section
-      className="journal-spread utilities-spread"
+      className="journal-spread utilities-spread glass-scope"
       aria-labelledby="utilities-title"
     >
       <div className="spread-page utilities-intro">
         <JournalActions onContents={onContents} onCover={onCover} />
-        <p className="page-kicker">shared tools</p>
+        <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">shared tools</p>
         <h2 id="utilities-title">
           Quick access,
           <br />
@@ -21022,13 +21115,13 @@ function AnnualPortraitPage({
 
   return (
     <section
-      className="journal-spread annual-portrait-spread"
+      className="journal-spread annual-portrait-spread glass-scope"
       aria-labelledby="portrait-title"
     >
       <div className="spread-page portrait-copy-page">
         <JournalActions onContents={onContents} onCover={onCover} />
         <div className="portrait-editorial-surface">
-          <p className="page-kicker">fitness · annual portrait</p>
+          <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">fitness · annual portrait</p>
           <h2 id="portrait-title">
             A year of
             <br />

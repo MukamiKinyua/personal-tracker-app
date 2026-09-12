@@ -507,23 +507,83 @@ button:focus-visible {
   line-height: 1.7;
   margin: 1.6rem 0 2rem;
 }
+.cover-action-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+  max-width: 280px;
+}
+
 .cover-button {
-  background: #fff8fc;
-  color: #301d49;
   border-radius: 999px;
-  padding: 0.9rem 1.15rem 0.9rem 1.35rem;
+  padding: 0.95rem 1.25rem;
   font-weight: 700;
-  box-shadow: 0 14px 32px rgba(12, 5, 22, 0.32);
+  font-size: 0.95rem;
   transition:
     transform 160ms var(--ease-out, ease-out),
-    box-shadow 160ms var(--ease-out, ease-out);
+    box-shadow 160ms var(--ease-out, ease-out),
+    background 160ms var(--ease-out, ease-out),
+    color 160ms var(--ease-out, ease-out);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  outline: 2px solid transparent;
+  outline-offset: 2px;
 }
-.cover-button:hover {
+
+.cover-button:focus-visible {
+  outline-color: #fff8fc;
+  outline-offset: 4px;
+}
+
+.cover-button-primary {
+  background: #fff8fc;
+  color: #301d49;
+  box-shadow: 0 14px 32px rgba(12, 5, 22, 0.32);
+}
+
+.cover-button-primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 18px 35px rgba(12, 5, 22, 0.45);
+  box-shadow: 0 20px 40px rgba(12, 5, 22, 0.48);
+  background: #fffbfe;
 }
-.cover-button:active {
+
+.cover-button-primary:active {
   transform: scale(0.97);
+}
+
+.cover-button-secondary {
+  background: transparent;
+  color: #fff8fc;
+  border: 1.5px solid rgba(255, 248, 255, 0.48);
+  box-shadow: none;
+}
+
+.cover-button-secondary:hover {
+  border-color: #fff8fc;
+  background: rgba(255, 248, 255, 0.06);
+  transform: translateY(-1px);
+}
+
+.cover-button-secondary:active {
+  transform: scale(0.98);
+}
+
+.cover-offline-notice {
+  margin-top: 1.5rem;
+  padding: 0.65rem 1rem;
+  background: rgba(255, 193, 7, 0.15);
+  border: 1px solid rgba(255, 193, 7, 0.3);
+  border-radius: 8px;
+  color: #ffd54f;
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  backdrop-filter: blur(4px);
 }
 .cover-rhythm-index {
   margin-top: 2.1rem;
@@ -17715,22 +17775,28 @@ button:focus-visible {
    because its rule below is positional and far more specific. Same
    treatment for the kicker, so the pill's copy is white on every page. */
 #root
-  .journal-stage:not([data-journal-view="cover"]):not(
-    [data-journal-view="contents"]
-  ):not([data-journal-view="portraits"])
+  .journal-stage:not([data-journal-view="cover"])
   .journal-spread
   > .spread-page:first-child
   :is(.page-kicker, .reflection-kicker) {
   color: rgba(255, 255, 255, 0.94) !important;
   -webkit-text-fill-color: rgba(255, 255, 255, 0.94) !important;
   -webkit-text-stroke: 0 !important;
+  /* Nutrition (and likely others) also reset background on this element via
+     an !important page-specific pass. Restated here rather than tracked down
+     per page: this selector carries an id, so it outranks any all-class
+     selector regardless of !important, on every page at once. */
+  background: rgba(255, 255, 255, 0.2) !important;
+  backdrop-filter: blur(3px) !important;
+  -webkit-backdrop-filter: blur(3px) !important;
+  box-shadow:
+    0 6px 16px rgba(0, 0, 0, 0.22),
+    0 0 22px rgba(0, 0, 0, 0.1) !important;
 }
 
 /* --- nav pills ---------------------------------------------------------- */
 #root
-  .journal-stage:not([data-journal-view="cover"]):not(
-    [data-journal-view="contents"]
-  ):not([data-journal-view="portraits"])
+  .journal-stage:not([data-journal-view="cover"])
   .journal-spread
   > .spread-page:first-child
   .journal-action {
@@ -17744,16 +17810,12 @@ button:focus-visible {
 
 /* --- headline ----------------------------------------------------------- */
 #root
-  .journal-stage:not([data-journal-view="cover"]):not(
-    [data-journal-view="contents"]
-  ):not([data-journal-view="portraits"])
+  .journal-stage:not([data-journal-view="cover"])
   .journal-spread
   > .spread-page:first-child
   h2,
 #root
-  .journal-stage:not([data-journal-view="cover"]):not(
-    [data-journal-view="contents"]
-  ):not([data-journal-view="portraits"])
+  .journal-stage:not([data-journal-view="cover"])
   .journal-spread
   > .spread-page:first-child
   h2
@@ -17777,9 +17839,7 @@ button:focus-visible {
    the thick rim is what holds the sentence against a bright painting, so it
    is kept deliberately rather than inherited by accident). */
 #root
-  .journal-stage:not([data-journal-view="cover"]):not(
-    [data-journal-view="contents"]
-  ):not([data-journal-view="portraits"])
+  .journal-stage:not([data-journal-view="cover"])
   .journal-spread
   > .spread-page:first-child
   .page-intro {
@@ -17811,18 +17871,14 @@ button:focus-visible {
    element filters its own backdrop a child's backdrop-filter has nothing
    left to sample and renders nothing at all. */
 #root
-  .journal-stage:not([data-journal-view="cover"]):not(
-    [data-journal-view="contents"]
-  ):not([data-journal-view="portraits"])
+  .journal-stage:not([data-journal-view="cover"])
   .journal-spread
   > .spread-page:first-child
   > div:not(.journal-actions):not(.editorial-contrast-panel):not(
     .reflection-editorial-copy
   ):not(.portrait-editorial-surface),
 #root
-  .journal-stage:not([data-journal-view="cover"]):not(
-    [data-journal-view="contents"]
-  ):not([data-journal-view="portraits"])
+  .journal-stage:not([data-journal-view="cover"])
   .journal-spread
   > .spread-page:first-child
   .editorial-contrast-panel
@@ -17854,9 +17910,7 @@ button:focus-visible {
    same string. Stating 700 changes nothing about how the heavy chips render
    and brings the light ones up to match them. */
 #root
-  .journal-stage:not([data-journal-view="cover"]):not(
-    [data-journal-view="contents"]
-  ):not([data-journal-view="portraits"])
+  .journal-stage:not([data-journal-view="cover"])
   .journal-spread
   > .spread-page:first-child
   > div:not(.journal-actions):not(.editorial-contrast-panel):not(
@@ -17864,9 +17918,7 @@ button:focus-visible {
   ):not(.portrait-editorial-surface)
   :is(span, b, small, p, strong),
 #root
-  .journal-stage:not([data-journal-view="cover"]):not(
-    [data-journal-view="contents"]
-  ):not([data-journal-view="portraits"])
+  .journal-stage:not([data-journal-view="cover"])
   .journal-spread
   > .spread-page:first-child
   .editorial-contrast-panel
@@ -17883,9 +17935,7 @@ button:focus-visible {
    is meant to sit back from the line above it. It keeps 400 so the pair
    still reads as heading-then-detail rather than two equal lines. */
 #root
-  .journal-stage:not([data-journal-view="cover"]):not(
-    [data-journal-view="contents"]
-  ):not([data-journal-view="portraits"])
+  .journal-stage:not([data-journal-view="cover"])
   .journal-spread
   > .spread-page:first-child
   > div:not(.journal-actions):not(.editorial-contrast-panel):not(
@@ -17893,9 +17943,7 @@ button:focus-visible {
   ):not(.portrait-editorial-surface)
   small,
 #root
-  .journal-stage:not([data-journal-view="cover"]):not(
-    [data-journal-view="contents"]
-  ):not([data-journal-view="portraits"])
+  .journal-stage:not([data-journal-view="cover"])
   .journal-spread
   > .spread-page:first-child
   .editorial-contrast-panel
@@ -17980,9 +18028,7 @@ button:focus-visible {
    to sample. One clean frosted pill on every page rather than two behaviours
    depending on button width. */
 #root
-  .journal-stage:not([data-journal-view="cover"]):not(
-    [data-journal-view="contents"]
-  ):not([data-journal-view="portraits"])
+  .journal-stage:not([data-journal-view="cover"])
   .journal-spread
   > .spread-page:first-child
   .ink-button {
@@ -17997,9 +18043,7 @@ button:focus-visible {
     0 0 20px rgba(0, 0, 0, 0.1) !important;
 }
 #root
-  .journal-stage:not([data-journal-view="cover"]):not(
-    [data-journal-view="contents"]
-  ):not([data-journal-view="portraits"])
+  .journal-stage:not([data-journal-view="cover"])
   .journal-spread
   > .spread-page:first-child
   .ink-button::after {
@@ -18013,9 +18057,7 @@ button:focus-visible {
     inset -1px -1px 1px 1px rgba(255, 255, 255, 0.5);
 }
 #root
-  .journal-stage:not([data-journal-view="cover"]):not(
-    [data-journal-view="contents"]
-  ):not([data-journal-view="portraits"])
+  .journal-stage:not([data-journal-view="cover"])
   .journal-spread
   > .spread-page:first-child
   .ink-button:hover {
