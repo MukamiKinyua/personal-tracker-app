@@ -113,6 +113,8 @@ export type RecordUndoPayload =
       kind: "revert";
       recordId: string;
       body: Record<string, unknown>;
+      /** Present when the edit also moved the record in time. */
+      period?: { start: string; end?: string };
       revision: number;
     };
 

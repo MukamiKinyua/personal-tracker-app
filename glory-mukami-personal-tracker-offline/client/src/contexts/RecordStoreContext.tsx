@@ -134,7 +134,8 @@ type RecordStoreValue = {
   edit: (
     id: string,
     changes: Record<string, unknown>,
-    undoLabel?: string
+    undoLabel?: string,
+    period?: { start: string; end?: string }
   ) => AnyRecord | null;
   remove: (id: string, undoLabel?: string) => void;
 
@@ -527,9 +528,17 @@ export function RecordStoreProvider({ children }: { children: ReactNode }) {
   );
 
   const edit = useCallback(
-    (id: string, changes: Record<string, unknown>, undoLabel = "Edited") => {
+    (
+      id: string,
+      changes: Record<string, unknown>,
+      undoLabel = "Edited",
+      period?: { start: string; end?: string }
+    ) => {
       if (!storeRef.current.records[id]) return null;
-      const result = editInStore(storeRef.current, id, changes, { undoLabel });
+      const result = editInStore(storeRef.current, id, changes, {
+        undoLabel,
+        period,
+      });
       commit(result.store);
       dispatchSave({ type: "edited" });
       offerUndo(undoLabel, result.undoId);

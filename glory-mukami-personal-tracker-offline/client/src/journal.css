@@ -20600,6 +20600,26 @@ body {
   gap: 0.55rem;
   margin-top: 1rem;
 }
+.workout-session-notes {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 0.3rem;
+  padding-top: 0.55rem;
+  border-top: 1px solid rgba(255, 250, 242, 0.28);
+}
+.workout-session-notes article {
+  display: grid;
+  gap: 0.12rem;
+}
+.workout-session-notes article b {
+  color: #fffaf2;
+  font-size: 0.6rem;
+}
+.workout-session-notes article small {
+  color: rgba(255, 250, 242, 0.78);
+  font-size: 0.56rem;
+  line-height: 1.4;
+}
 .workout-log label {
   display: grid;
   gap: 0.25rem;

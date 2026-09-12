@@ -18,6 +18,7 @@ export function ScissorKicksMotionDemo({
   const videoRef = useRef<HTMLVideoElement>(null);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
   const [showStill, setShowStill] = useState(true);
+  const [videoFailed, setVideoFailed] = useState(false);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -59,11 +60,13 @@ export function ScissorKicksMotionDemo({
     void video.play().catch(() => undefined);
   };
 
-  const status = prefersReducedMotion
-    ? "Reduced motion is on — the low-hover scissor position is shown."
-    : paused
-      ? "Demonstration paused."
-      : "Demonstration playing.";
+  const status = videoFailed
+    ? "Video demonstration unavailable — showing the scissor position instead."
+    : prefersReducedMotion
+      ? "Reduced motion is on — the low-hover scissor position is shown."
+      : paused
+        ? "Demonstration paused."
+        : "Demonstration playing. Silent — no audio track.";
 
   return (
     <figure
@@ -82,6 +85,10 @@ export function ScissorKicksMotionDemo({
           poster={scissorKicksStill}
           aria-describedby="scissor-kicks-form-cue"
           onPlaying={() => setShowStill(false)}
+          onError={() => {
+            setVideoFailed(true);
+            setShowStill(true);
+          }}
           data-playing={showStill ? "false" : "true"}
         >
           <source src={scissorKicksVideo} type="video/mp4" />
@@ -102,7 +109,7 @@ export function ScissorKicksMotionDemo({
         <p className="workout-video-status" aria-live="polite">
           {status}
         </p>
-        {!prefersReducedMotion && (
+        {!prefersReducedMotion && !videoFailed && (
           <div className="workout-video-controls">
             <button type="button" onClick={onTogglePause} aria-pressed={paused}>
               {paused ? "Play" : "Pause"}

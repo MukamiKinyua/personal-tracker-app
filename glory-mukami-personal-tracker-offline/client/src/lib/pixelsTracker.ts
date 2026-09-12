@@ -73,3 +73,35 @@ export function setPixelCell(
 export function countFilledPixels(cells: PixelCells) {
   return Object.keys(cells).length;
 }
+
+/**
+ * Colours that pages once painted automatically but that never appeared in
+ * the tracker's legend, mapped to the legend key they most honestly meant.
+ * Applied on hydrate so stored years keep their history and gain a label.
+ */
+export const legacyPixelColors: Record<string, Record<string, string>> = {
+  water: { "#16a8a8": "#8fd4e7" }, // "Some water" — goal status unknown
+  learning: { "#8b5cf6": "#c94894" }, // "Practised" — the only auto path
+};
+
+export function migratePixelRecords(
+  records: Record<string, PixelCells>
+): Record<string, PixelCells> {
+  let changed = false;
+  const next: Record<string, PixelCells> = {};
+  for (const [tracker, cells] of Object.entries(records)) {
+    const mapping = legacyPixelColors[tracker];
+    if (!mapping) {
+      next[tracker] = cells;
+      continue;
+    }
+    const migrated: PixelCells = {};
+    for (const [key, color] of Object.entries(cells)) {
+      const replacement = mapping[color];
+      if (replacement) changed = true;
+      migrated[key] = replacement ?? color;
+    }
+    next[tracker] = migrated;
+  }
+  return changed ? next : records;
+}

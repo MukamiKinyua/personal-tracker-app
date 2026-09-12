@@ -59,6 +59,7 @@ import {
 } from "../lib/journalMotion";
 import { portraitDayAnchors, portraitDayRegion } from "../lib/portraitScene";
 import {
+  migratePixelRecords,
   pixelsCellKey,
   pixelsDaysInMonth,
   pixelsMonthNames,
@@ -557,8 +558,10 @@ const pixelsProfiles = {
   movement: {
     title: "Movement Pixels",
     eyebrow: "fitness · shared with workout studio",
-    source: "Days fill in when you save a Workout Studio note, or by hand here.",
+    source:
+      "A day fills in as “Session logged” when you save a Workout Studio note. Strength, Mobility and Rest are set by hand here.",
     statuses: [
+      { label: "Session logged", color: "#06b6d4" },
       { label: "Strength", color: "#d94889" },
       { label: "Mobility", color: "#29a8ad" },
       { label: "Rest", color: "#efb93d" },
@@ -681,14 +684,18 @@ function PixelsGrid({
       ),
     [profile]
   );
-  const countsByStatus = useMemo(() => {
+  const { countsByStatus, unlabelledCount } = useMemo(() => {
     const counts = new Map<string, number>();
+    let unlabelled = 0;
     for (const color of Object.values(cells)) {
       const status = statusByColor.get(color);
-      if (!status) continue;
+      if (!status) {
+        unlabelled += 1;
+        continue;
+      }
       counts.set(status.label, (counts.get(status.label) ?? 0) + 1);
     }
-    return counts;
+    return { countsByStatus: counts, unlabelledCount: unlabelled };
   }, [cells, statusByColor]);
   const textStyle = inkText
     ? {
@@ -714,9 +721,15 @@ function PixelsGrid({
       <p style={textStyle} className="pixels-summary">
         {Object.keys(cells).length === 0
           ? "Nothing logged yet — every day starts blank."
-          : profile.statuses
-              .map(status => `${countsByStatus.get(status.label) ?? 0} ${status.label}`)
-              .join(" · ")}
+          : [
+              ...profile.statuses.map(
+                status =>
+                  `${countsByStatus.get(status.label) ?? 0} ${status.label}`
+              ),
+              ...(unlabelledCount > 0
+                ? [`${unlabelledCount} marked with a retired colour`]
+                : []),
+            ].join(" · ")}
       </p>
       <div className="pixels-key" aria-label={`${profile.title} status key`}>
         {profile.statuses.map((status: PixelsStatus) => (
@@ -765,7 +778,9 @@ function PixelsGrid({
               const fullMonth = pixelsMonthNames[monthIndex];
               const label = status
                 ? `${fullMonth} ${day}, ${status.label} logged`
-                : `${fullMonth} ${day}, not logged`;
+                : fill
+                  ? `${fullMonth} ${day}, logged with a retired colour — tap to relabel`
+                  : `${fullMonth} ${day}, not logged`;
               return (
                 <button
                   type="button"
@@ -988,7 +1003,7 @@ export default function Home() {
     if (Array.isArray(payload.localReminders))
       setLocalReminders(payload.localReminders as LocalReminder[]);
     if (payload.pixelRecords && typeof payload.pixelRecords === "object")
-      setPixelRecords(payload.pixelRecords);
+      setPixelRecords(migratePixelRecords(payload.pixelRecords));
     if (
       payload.contentsPreferences &&
       typeof payload.contentsPreferences === "object"
@@ -1054,7 +1069,7 @@ export default function Home() {
       if (Array.isArray(payload.localReminders))
         setLocalReminders(payload.localReminders as LocalReminder[]);
       if (payload.pixelRecords && typeof payload.pixelRecords === "object")
-        setPixelRecords(payload.pixelRecords);
+        setPixelRecords(migratePixelRecords(payload.pixelRecords));
       if (
         payload.contentsPreferences &&
         typeof payload.contentsPreferences === "object"
@@ -2625,12 +2640,20 @@ function WorkoutPage({
   const [rest, setRest] = useState(45);
   const [effort, setEffort] = useState("Moderate");
   const [note, setNote] = useState("");
+  type WorkoutSessionNote = {
+    at: string;
+    routineId: WorkoutRoutine["id"];
+    effort: string;
+    note: string;
+    completedCount: number;
+  };
+  const [sessionNotes, setSessionNotes] = useState<WorkoutSessionNote[]>([]);
   const [motionPaused, setMotionPaused] = useState(false);
   const routine = workoutRoutineById(routineId);
   const completedCount = workoutCompletedCount(completed, routine);
   useMongoJournalScope({
     scope: "workout-studio",
-    payload: { completed, completedAt, routineId, effort },
+    payload: { completed, completedAt, routineId, effort, sessionNotes },
     hydrate: payload => {
       if (payload.completed && typeof payload.completed === "object")
         setCompleted(payload.completed as Record<string, boolean>);
@@ -2642,8 +2665,40 @@ function WorkoutPage({
       )
         setRoutineId(payload.routineId as WorkoutRoutine["id"]);
       if (typeof payload.effort === "string") setEffort(payload.effort);
+      if (Array.isArray(payload.sessionNotes))
+        setSessionNotes(payload.sessionNotes as WorkoutSessionNote[]);
     },
   });
+
+  function saveSessionNote() {
+    const trimmed = note.trim();
+    setSessionNotes(current =>
+      [
+        {
+          at: new Date().toISOString(),
+          routineId,
+          effort,
+          note: trimmed,
+          completedCount,
+        },
+        ...current,
+      ].slice(0, 30)
+    );
+    setStarted(false);
+    setNote("");
+    const monthIndex = new Date().getMonth();
+    const day = new Date().getDate();
+    // "Session logged" is the automatic mark; a Strength/Mobility/Rest key the
+    // user set by hand for today is left alone.
+    const existing =
+      pixelStore?.records.movement?.[pixelsCellKey(monthIndex, day)];
+    if (!existing) pixelStore?.set("movement", monthIndex, day, "#06b6d4");
+    toast(
+      trimmed
+        ? "Session note saved"
+        : "Session logged — no note this time"
+    );
+  }
 
   function toggleExerciseComplete(exerciseId: string, exerciseName: string) {
     const willComplete = !completed[exerciseId];
@@ -3661,18 +3716,31 @@ function WorkoutPage({
               placeholder="Energy, form, or a small win"
             />
           </label>
-          <button
-            type="button"
-            onClick={() => {
-              setStarted(false);
-              setNote("");
-              const monthIndex = new Date().getMonth();
-              const day = new Date().getDate();
-              pixelStore?.set("movement", monthIndex, day, "#06b6d4");
-            }}
-          >
-            Save local workout note
+          <button type="button" onClick={saveSessionNote}>
+            Save session {note.trim() ? "note" : "log"}
           </button>
+          {sessionNotes.length > 0 && (
+            <div className="workout-session-notes">
+              <span>Recent sessions</span>
+              {sessionNotes.slice(0, 3).map(entry => (
+                <article key={entry.at}>
+                  <b>
+                    {new Date(entry.at).toLocaleDateString([], {
+                      weekday: "short",
+                      month: "short",
+                      day: "numeric",
+                    })}{" "}
+                    · {workoutRoutineById(entry.routineId).label} ·{" "}
+                    {entry.effort}
+                  </b>
+                  <small>
+                    {entry.completedCount} moves complete
+                    {entry.note ? ` · ${entry.note}` : ""}
+                  </small>
+                </article>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </section>
@@ -4627,7 +4695,9 @@ function LearningPage({
     setExpandedHistory(skillId);
     const monthIndex = new Date().getMonth();
     const day = new Date().getDate();
-    pixelStore?.set("learning", monthIndex, day, "#8b5cf6");
+    const existing =
+      pixelStore?.records.learning?.[pixelsCellKey(monthIndex, day)];
+    if (!existing) pixelStore?.set("learning", monthIndex, day, "#c94894");
   }
   return (
     <section
@@ -18278,9 +18348,6 @@ function ProductivityPage({
     };
     setSessions(current => [session, ...current]);
     onRecordSession(minutes, activeTask.label);
-    const monthIndex = new Date().getMonth();
-    const day = new Date().getDate();
-    pixelStore?.set("focus", monthIndex, day, "#8b5cf6");
     const now = new Date();
     pixelStore?.set(
       "focus",
@@ -19088,16 +19155,17 @@ function SleepPage({
       note,
     };
 
-    if (editingId) {
-      journal.edit(editingId, body, "Sleep updated");
-    } else {
-      const start = sleepNightStart(wakeDate, bedtime, wakeTime);
-      const end = new Date(start.getTime() + hours * 3_600_000);
+    const start = sleepNightStart(wakeDate, bedtime, wakeTime);
+    const end = new Date(start.getTime() + hours * 3_600_000);
+    const period = { start: start.toISOString(), end: end.toISOString() };
 
+    if (editingId) {
+      journal.edit(editingId, body, "Sleep updated", period);
+    } else {
       journal.add({
         scope: "sleep",
         body,
-        period: { start: start.toISOString(), end: end.toISOString() },
+        period,
         undoLabel: `Saved ${formatSleepDuration(hours)} of sleep`,
       });
     }
@@ -20305,12 +20373,9 @@ function NutritionPage({
     0,
     4
   );
-  const todayKey = new Date().toDateString();
-  const todayCount = journal
-    .inScope("meal")
-    .filter(
-      record => new Date(record.period.start).toDateString() === todayKey
-    ).length;
+  // Same "today" the rest of the store uses — the user's timezone preference,
+  // not the machine clock.
+  const todayCount = journal.onDay("meal", journal.today).length;
   function addMeal(text = note) {
     const trimmed = text.trim();
     if (!trimmed) return;
@@ -20897,6 +20962,18 @@ function WaterIntakePage({
                 for (const entry of entries) {
                   journal.remove(entry.id, `Removed ${entry.amount} ml`);
                 }
+                // The grid has no "clear" — tapping a cell with its own
+                // colour toggles it off, so do exactly that.
+                const now = new Date();
+                const key = pixelsCellKey(now.getMonth(), now.getDate());
+                const painted = pixelStore?.records.water?.[key];
+                if (painted)
+                  pixelStore?.update(
+                    "water",
+                    now.getMonth(),
+                    now.getDate(),
+                    painted
+                  );
               }}
             >
               Clear today

@@ -20,6 +20,7 @@ import {
   updateRecord,
   type CreateRecordInput,
   type RecordId,
+  type RecordPeriod,
   type TrackerRecord,
 } from "./record";
 import {
@@ -123,12 +124,17 @@ export function editRecord(
   store: RecordStore,
   id: RecordId,
   changes: Record<string, unknown>,
-  options: { undoLabel: string; now?: Date } = { undoLabel: "Edited" }
+  options: { undoLabel: string; now?: Date; period?: RecordPeriod } = {
+    undoLabel: "Edited",
+  }
 ): MutationResult {
   const existing = store.records[id];
   if (!existing) throw new Error(`No record ${id} to edit.`);
 
-  const record = updateRecord(existing, changes, { now: options.now });
+  const record = updateRecord(existing, changes, {
+    now: options.now,
+    period: options.period,
+  });
   const undoId = `undo_${id}_${record.revision}`;
 
   return {
@@ -140,11 +146,13 @@ export function editRecord(
         id: undoId,
         label: options.undoLabel,
         scope: record.scope,
-        // The previous body, so undo restores the values rather than guessing.
+        // The previous body (and period, if the edit moved the record in
+        // time), so undo restores the values rather than guessing.
         payload: {
           kind: "revert",
           recordId: id,
           body: existing.body,
+          ...(options.period ? { period: existing.period } : {}),
           revision: existing.revision,
         },
       }),
@@ -242,7 +250,10 @@ export function applyUndo(
       const target = withStack.records[payload.recordId];
       if (!target) return { store: withStack, applied: false };
       // Replaced, not merged: fields the edit introduced have to go away again.
-      const record = setRecordBody(target, payload.body);
+      const reverted = setRecordBody(target, payload.body);
+      const record = payload.period
+        ? { ...reverted, period: payload.period }
+        : reverted;
       return {
         store: {
           ...withStack,

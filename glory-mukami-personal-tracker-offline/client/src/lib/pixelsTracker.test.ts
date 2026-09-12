@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   countFilledPixels,
+  migratePixelRecords,
   pixelsCellKey,
   pixelsDaysInMonth,
   pixelsMonths,
@@ -31,6 +32,24 @@ describe("Pixels tracker helpers", () => {
     expect(setPixelCell({ "8-14": "#4b79b8" }, 7, 14, "#4b79b8")).toEqual({
       "8-14": "#4b79b8",
     });
+  });
+
+  it("relabels colours that old auto-fills painted outside the legend", () => {
+    const stored = {
+      water: { "3-4": "#16a8a8", "3-5": "#32a7cf" },
+      learning: { "1-1": "#8b5cf6" },
+      movement: { "2-2": "#d94889" },
+    };
+    expect(migratePixelRecords(stored)).toEqual({
+      water: { "3-4": "#8fd4e7", "3-5": "#32a7cf" },
+      learning: { "1-1": "#c94894" },
+      movement: { "2-2": "#d94889" },
+    });
+  });
+
+  it("returns the same object when nothing needs migrating", () => {
+    const stored = { water: { "3-5": "#32a7cf" } };
+    expect(migratePixelRecords(stored)).toBe(stored);
   });
 
   it("never offers a date that can't exist, like Feb 30 or a 31-day April", () => {

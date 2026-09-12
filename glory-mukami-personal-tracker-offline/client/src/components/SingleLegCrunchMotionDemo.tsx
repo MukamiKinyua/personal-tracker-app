@@ -19,6 +19,7 @@ export function SingleLegCrunchMotionDemo({
   const videoRef = useRef<HTMLVideoElement>(null);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
   const [showStill, setShowStill] = useState(true);
+  const [videoFailed, setVideoFailed] = useState(false);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -60,11 +61,13 @@ export function SingleLegCrunchMotionDemo({
     void video.play().catch(() => undefined);
   };
 
-  const status = prefersReducedMotion
-    ? "Reduced motion is on — the extended-leg start position is shown."
-    : paused
-      ? "Demonstration paused."
-      : "Demonstration playing.";
+  const status = videoFailed
+    ? "Video demonstration unavailable — showing the start position instead."
+    : prefersReducedMotion
+      ? "Reduced motion is on — the extended-leg start position is shown."
+      : paused
+        ? "Demonstration paused."
+        : "Demonstration playing. Silent — no audio track.";
 
   return (
     <figure
@@ -83,6 +86,10 @@ export function SingleLegCrunchMotionDemo({
           poster={singleLegCrunchStill}
           aria-describedby="single-leg-crunch-form-cue"
           onPlaying={() => setShowStill(false)}
+          onError={() => {
+            setVideoFailed(true);
+            setShowStill(true);
+          }}
           data-playing={showStill ? "false" : "true"}
         >
           <source src={singleLegCrunchVideo} type="video/mp4" />
@@ -103,7 +110,7 @@ export function SingleLegCrunchMotionDemo({
         <p className="workout-video-status" aria-live="polite">
           {status}
         </p>
-        {!prefersReducedMotion && (
+        {!prefersReducedMotion && !videoFailed && (
           <div className="workout-video-controls">
             <button type="button" onClick={onTogglePause} aria-pressed={paused}>
               {paused ? "Play" : "Pause"}

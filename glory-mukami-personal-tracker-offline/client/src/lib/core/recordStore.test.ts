@@ -80,6 +80,29 @@ describe("correcting and reversing a water entry", () => {
     // The reversal is itself a recorded change, not a rewrite of history.
     expect(reverted.store.records[ids[0]].revision).toBe(3);
   });
+
+  it("can move a record in time on edit, and undo moves it back", () => {
+    const { store, ids } = storeWithWater();
+    const originalPeriod = store.records[ids[0]].period;
+    const moved = editRecord(
+      store,
+      ids[0],
+      { amount: 250 },
+      {
+        undoLabel: "Moved to after midnight",
+        // 22:00 UTC is 01:00 the next day in Nairobi, so the day grouping
+        // has to follow the new period, not the old one.
+        period: { start: "2026-03-14T22:00:00.000Z" },
+      }
+    );
+    expect(moved.record.period.start).toBe("2026-03-14T22:00:00.000Z");
+    expect(recordsOnDay(moved.store, "water", "2026-03-14")).toHaveLength(1);
+    expect(recordsOnDay(moved.store, "water", "2026-03-15")).toHaveLength(2);
+
+    const reverted = applyUndo(moved.store, moved.undoId);
+    expect(reverted.store.records[ids[0]].period).toEqual(originalPeriod);
+    expect(recordsOnDay(reverted.store, "water", "2026-03-14")).toHaveLength(2);
+  });
 });
 
 describe("task completion, undo, and restore", () => {
