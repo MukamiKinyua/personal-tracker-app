@@ -17991,6 +17991,14 @@ button:focus-visible {
      samples up to 100px around a 23px-tall pill, so it also just re-paints
      the neighbourhood - and it is inert anyway once the element filters its
      own backdrop. */
+  /* A site-wide "auto-contrast" rule paints the painting into every glyph
+     (background-clip:text) and then invert(1) grayscale(1) contrast(1000)
+     thresholds it to pure black or white - sampled with
+     background-attachment:fixed, so the result changes with the viewport.
+     On a translucent pill it inverts the whole box. Neutralised here. */
+  filter: none !important;
+  background-clip: border-box !important;
+  -webkit-background-clip: border-box !important;
   background: rgba(255, 255, 255, 0.28) !important;
   backdrop-filter: blur(16px) saturate(118%) !important;
   -webkit-backdrop-filter: blur(16px) saturate(118%) !important;
@@ -18017,6 +18025,14 @@ button:focus-visible {
      wins over `color` for rendering; `color` alone left it near-black. */
   -webkit-text-fill-color: rgba(255, 255, 255, 0.94) !important;
   -webkit-text-stroke: 0 !important;
+  /* A site-wide "auto-contrast" rule paints the painting into every glyph
+     (background-clip:text) and then invert(1) grayscale(1) contrast(1000)
+     thresholds it to pure black or white - sampled with
+     background-attachment:fixed, so the result changes with the viewport.
+     On a translucent pill it inverts the whole box. Neutralised here. */
+  filter: none !important;
+  background-clip: border-box !important;
+  -webkit-background-clip: border-box !important;
   border-color: rgba(255, 255, 255, 0.4) !important;
   /* Same frosted-on-the-element treatment as the kicker, for the same reason. */
   background: rgba(255, 255, 255, 0.28) !important;
@@ -18065,6 +18081,9 @@ button:focus-visible {
   em {
   color: rgba(255, 255, 255, 0.45) !important;
   -webkit-text-fill-color: rgba(255, 255, 255, 0.45) !important;
+  background: none !important;
+  background-clip: border-box !important;
+  -webkit-background-clip: border-box !important;
   -webkit-text-stroke: 1.4px rgba(255, 255, 255, 0.9) !important;
   paint-order: stroke fill !important;
   text-shadow: none !important;
@@ -18094,6 +18113,9 @@ button:focus-visible {
   line-height: 1.58 !important;
   color: rgba(255, 255, 255, 0.5) !important;
   -webkit-text-fill-color: rgba(255, 255, 255, 0.5) !important;
+  background: none !important;
+  background-clip: border-box !important;
+  -webkit-background-clip: border-box !important;
   -webkit-text-stroke: 0 !important;
   text-shadow:
     0 0 1px rgba(255, 255, 255, 1),
@@ -18171,6 +18193,10 @@ button:focus-visible {
   -webkit-text-fill-color: rgba(255, 255, 255, 0.94) !important;
   -webkit-text-stroke: 0 !important;
   text-shadow: none !important;
+  filter: none !important;
+  background: none !important;
+  background-clip: border-box !important;
+  -webkit-background-clip: border-box !important;
 }
 
 /* One exception to the 700: a chip's <small> is its second line - Workout
@@ -18323,6 +18349,9 @@ button:focus-visible {
   :is(span, em) {
   color: rgba(255, 255, 255, 0.45) !important;
   -webkit-text-fill-color: rgba(255, 255, 255, 0.45) !important;
+  background: none !important;
+  background-clip: border-box !important;
+  -webkit-background-clip: border-box !important;
   -webkit-text-stroke: 1.4px rgba(255, 255, 255, 0.9) !important;
   paint-order: stroke fill !important;
   text-shadow: none !important;
@@ -18340,6 +18369,9 @@ button:focus-visible {
   line-height: 1.58 !important;
   color: rgba(255, 255, 255, 0.5) !important;
   -webkit-text-fill-color: rgba(255, 255, 255, 0.5) !important;
+  background: none !important;
+  background-clip: border-box !important;
+  -webkit-background-clip: border-box !important;
   -webkit-text-stroke: 0 !important;
   text-shadow:
     0 0 1px rgba(255, 255, 255, 1),
@@ -18389,6 +18421,10 @@ button:focus-visible {
   -webkit-text-fill-color: rgba(255, 255, 255, 0.94) !important;
   -webkit-text-stroke: 0 !important;
   text-shadow: none !important;
+  filter: none !important;
+  background: none !important;
+  background-clip: border-box !important;
+  -webkit-background-clip: border-box !important;
 }
 
 /* Placeholder text was unreadable across the journal, not on one page: a
@@ -19003,6 +19039,98 @@ button:focus-visible {
   color: #311333;
   font-family: "Playfair Display", serif;
   font-size: 1.08rem;
+}
+.sleep-date-field {
+  display: grid;
+  gap: 0.28rem;
+  color: #3a193b;
+  font-size: 0.6rem;
+  font-weight: 840;
+  letter-spacing: 0.065em;
+  text-transform: uppercase;
+}
+.sleep-date-field input {
+  min-height: 2.45rem;
+  width: 100%;
+  border: 1px solid rgba(69, 24, 54, 0.28);
+  border-radius: 8px;
+  padding: 0.45rem 0.55rem;
+  color: #2d1534;
+  background: rgba(255, 255, 255, 0.78);
+  font: inherit;
+  font-size: 0.72rem;
+}
+.sleep-date-field small,
+.sleep-duration-help,
+.sleep-duration-check,
+.sleep-history-hint {
+  display: block;
+  color: #6b4a6c;
+  font-size: 0.56rem;
+  font-weight: 500;
+  line-height: 1.45;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.sleep-duration-help {
+  margin-top: -0.2rem;
+}
+.sleep-duration-check {
+  padding: 0.4rem 0.55rem;
+  border-radius: 8px;
+  color: #4a2a4c;
+  background: rgba(255, 245, 239, 0.9);
+}
+.sleep-duration-check.is-warning {
+  color: #5c2a12;
+  background: rgba(255, 229, 204, 0.9);
+  border: 1px solid rgba(180, 96, 40, 0.35);
+}
+.sleep-hours-override {
+  display: grid;
+  gap: 0.28rem;
+  color: #3a193b;
+  font-size: 0.6rem;
+  font-weight: 840;
+  letter-spacing: 0.065em;
+  text-transform: uppercase;
+}
+.sleep-hours-override > span {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.sleep-hours-override input {
+  width: 5.2rem;
+  min-height: 2.1rem;
+  border: 1px solid rgba(69, 24, 54, 0.28);
+  border-radius: 8px;
+  padding: 0.35rem 0.5rem;
+  color: #2d1534;
+  background: rgba(255, 255, 255, 0.78);
+  font: inherit;
+  font-size: 0.72rem;
+}
+.sleep-hours-override small {
+  color: #6b4a6c;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.sleep-hours-override button {
+  margin-left: auto;
+  border: 1px solid rgba(69, 24, 54, 0.28);
+  border-radius: 999px;
+  padding: 0.28rem 0.5rem;
+  color: #3a193b;
+  background: transparent;
+  font-size: 0.54rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.sleep-history-hint {
+  margin: 0.3rem 0 0.4rem;
 }
 .journal-stage[data-journal-view="sleep"] .sleep-quality {
   gap: 0.38rem;

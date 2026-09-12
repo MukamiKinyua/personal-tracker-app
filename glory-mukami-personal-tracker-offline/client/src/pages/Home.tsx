@@ -70,8 +70,11 @@ import {
 import {
   formatSleepDuration,
   replaceSleepLog,
+  sleepDateInputValue,
   sleepDurationBand,
+  sleepDurationCheck,
   sleepDurationHours,
+  sleepNightStart,
 } from "../lib/sleepTracker";
 import { addCycleContextTag, toggleCycleContextTag } from "../lib/cycleContext";
 import {
@@ -19012,6 +19015,10 @@ function SleepPage({
   const pixelStore = useContext(PixelsTrackerContext);
   const [bedtime, setBedtime] = useState("23:15");
   const [wakeTime, setWakeTime] = useState("07:10");
+  const [wakeDate, setWakeDate] = useState(() =>
+    sleepDateInputValue(new Date())
+  );
+  const [hoursOverride, setHoursOverride] = useState("");
   const [quality, setQuality] = useState("Restful");
   const [windDown, setWindDown] = useState(true);
   const [note, setNote] = useState("");
@@ -19035,6 +19042,12 @@ function SleepPage({
         month: "short",
         day: "numeric",
       }),
+      wakeDate:
+        typeof record.body.wakeDate === "string"
+          ? record.body.wakeDate
+          : sleepDateInputValue(
+              new Date(record.period.end ?? record.period.start)
+            ),
       bedtime: String(record.body.bedtime ?? ""),
       wakeTime: String(record.body.wakeTime ?? ""),
       hours: Number(record.body.hours) || 0,
@@ -19043,27 +19056,42 @@ function SleepPage({
       note: String(record.body.note ?? ""),
     }));
   const qualityOptions = ["Restless", "Light", "Restful", "Deep"];
-  const hours = sleepDurationHours(bedtime, wakeTime);
+  const computedHours = sleepDurationHours(bedtime, wakeTime);
+  const overrideValue = Number(hoursOverride);
+  const hours =
+    hoursOverride.trim() !== "" && Number.isFinite(overrideValue)
+      ? Math.min(24, Math.max(0, overrideValue))
+      : computedHours;
+  const durationCheck = sleepDurationCheck(bedtime, wakeTime, computedHours);
+  const canSave = durationCheck.kind !== "missing" && hours > 0;
+  const todayValue = sleepDateInputValue(new Date());
   const lastNight = logs[0] || { hours, quality };
+
+  function resetForm() {
+    setEditingId(null);
+    setNote("");
+    setHoursOverride("");
+    setWakeDate(todayValue);
+  }
+
   function saveSleep() {
-    const now = new Date();
-    const editing = editingId
-      ? logs.find(log => log.id === editingId)
-      : undefined;
+    if (!canSave) return;
     // Bedtime and wake time become a real period, so a night that crosses
     // midnight is one record spanning two days rather than two half-nights.
-    const body = { bedtime, wakeTime, hours, quality, windDown, note };
+    const body = {
+      bedtime,
+      wakeTime,
+      wakeDate,
+      hours,
+      quality,
+      windDown,
+      note,
+    };
 
     if (editingId) {
       journal.edit(editingId, body, "Sleep updated");
     } else {
-      const start = new Date(now);
-      const [bedHour, bedMinute] = bedtime.split(":").map(Number);
-      start.setHours(bedHour, bedMinute, 0, 0);
-      // A bedtime later than now belongs to the night before.
-      if (hours > 0 && start.getTime() > now.getTime()) {
-        start.setDate(start.getDate() - 1);
-      }
+      const start = sleepNightStart(wakeDate, bedtime, wakeTime);
       const end = new Date(start.getTime() + hours * 3_600_000);
 
       journal.add({
@@ -19074,13 +19102,12 @@ function SleepPage({
       });
     }
 
-    setEditingId(null);
-    pixelStore?.set(
-      "sleep",
-      now.getMonth(),
-      now.getDate(),
-      sleepDurationBand(hours).color
-    );
+    // The year grid files a night under the morning it ended — the date the
+    // user chose, not whatever day they happen to be typing on.
+    const [year, month, day] = wakeDate.split("-").map(Number);
+    if (year && month && day) {
+      pixelStore?.set("sleep", month - 1, day, sleepDurationBand(hours).color);
+    }
     if (!editingId) {
       onRecord({
         module: "Sleep",
@@ -19088,15 +19115,23 @@ function SleepPage({
         label: `${formatSleepDuration(hours)} · ${quality} sleep log`,
       });
     }
-    setNote("");
+    resetForm();
   }
   function editSleepLog(log: (typeof logs)[number]) {
     setEditingId(log.id);
     setBedtime(log.bedtime);
     setWakeTime(log.wakeTime);
+    setWakeDate(log.wakeDate);
     setQuality(log.quality);
     setWindDown(log.windDown);
     setNote(log.note);
+    // Surface a stored total that differs from the clock arithmetic, so the
+    // user sees the correction they made rather than losing it on save.
+    const clockHours = sleepDurationHours(log.bedtime, log.wakeTime);
+    setHoursOverride(
+      Math.abs(clockHours - log.hours) > 0.01 ? String(log.hours) : ""
+    );
+    bedtimeInputRef.current?.focus();
   }
   return (
     <section
@@ -19133,6 +19168,20 @@ function SleepPage({
           </small>
         </section>
         <section className="sleep-capture">
+          <label className="sleep-date-field">
+            Morning of
+            <input
+              type="date"
+              value={wakeDate}
+              max={todayValue}
+              onChange={event => setWakeDate(event.target.value)}
+              aria-describedby="sleep-date-help"
+            />
+            <small id="sleep-date-help">
+              The day you woke up. Change it to log or correct an earlier
+              night; a bedtime after the wake time counts as the night before.
+            </small>
+          </label>
           <div className="sleep-time-fields">
             <label>
               Bedtime
@@ -19153,9 +19202,49 @@ function SleepPage({
             </label>
           </div>
           <p className="sleep-duration">
-            <span>Calculated rest</span>
+            <span>
+              {hoursOverride.trim() ? "Corrected rest" : "Calculated rest"}
+            </span>
             <b>{formatSleepDuration(hours)}</b>
           </p>
+          <small className="sleep-duration-help">
+            Wake time minus bedtime by the clock, crossing midnight when it
+            needs to. On a clock-change night this can be an hour out — correct
+            it here if so.
+          </small>
+          {durationCheck.kind !== "ok" && (
+            <small
+              className={cn(
+                "sleep-duration-check",
+                durationCheck.kind === "implausible" && "is-warning"
+              )}
+              role="status"
+            >
+              {durationCheck.message}
+            </small>
+          )}
+          <label className="sleep-hours-override">
+            Correct the total
+            <span>
+              <input
+                type="number"
+                min="0"
+                max="24"
+                step="0.25"
+                inputMode="decimal"
+                value={hoursOverride}
+                onChange={event => setHoursOverride(event.target.value)}
+                placeholder={computedHours.toFixed(2)}
+                aria-label="Hours slept, if the calculated total is wrong"
+              />
+              <small>hours</small>
+              {hoursOverride.trim() !== "" && (
+                <button type="button" onClick={() => setHoursOverride("")}>
+                  Use calculated
+                </button>
+              )}
+            </span>
+          </label>
           <div className="sleep-quality">
             <span>How did it feel?</span>
             <div>
@@ -19193,18 +19282,20 @@ function SleepPage({
             />
           </label>
           <div className="tracker-action-row">
-            <Button type="button" className="ink-button" onClick={saveSleep}>
-              {editingId ? "Save edited log" : "Save last night"}
+            <Button
+              type="button"
+              className="ink-button"
+              onClick={saveSleep}
+              disabled={!canSave}
+            >
+              {editingId
+                ? "Save edited log"
+                : wakeDate === todayValue
+                  ? "Save last night"
+                  : "Save this night"}
             </Button>
             {editingId ? (
-              <button
-                type="button"
-                className="local-undo"
-                onClick={() => {
-                  setEditingId(null);
-                  setNote("");
-                }}
-              >
+              <button type="button" className="local-undo" onClick={resetForm}>
                 Cancel edit
               </button>
             ) : null}
@@ -19218,10 +19309,17 @@ function SleepPage({
             <span>Recent rest</span>
             <b>{logs.length} saved</b>
           </div>
+          {logs.length > 7 && (
+            <small className="sleep-history-hint">
+              Showing the last 7. To fix an older night, set its date in
+              “Morning of” above and save — it replaces nothing, so remove the
+              old entry if there is one.
+            </small>
+          )}
           {logs.length === 0 ? (
             <small>Your private sleep rhythm will appear here.</small>
           ) : (
-            logs.slice(0, 4).map(log => (
+            logs.slice(0, 7).map(log => (
               <article key={log.id}>
                 <div>
                   <b>

@@ -22,6 +22,61 @@ export function formatSleepDuration(hours: number) {
   return `${Math.floor(totalMinutes / 60)} h ${totalMinutes % 60} min`;
 }
 
+/** Local calendar date as a `<input type="date">` value. Not toISOString(),
+ * which would shift the day for anyone east or west of UTC late at night. */
+export function sleepDateInputValue(date: Date) {
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+/** A night is filed under the morning it ends. Bedtime at or after the wake
+ * clock time means it began the previous calendar day. */
+export function sleepCrossesMidnight(bedtime: string, wakeTime: string) {
+  return bedtime >= wakeTime;
+}
+
+export function sleepNightStart(
+  wakeDate: string,
+  bedtime: string,
+  wakeTime: string
+) {
+  const [year, month, day] = wakeDate.split("-").map(Number);
+  const [bedHour, bedMinute] = bedtime.split(":").map(Number);
+  const start = new Date(year, month - 1, day, bedHour, bedMinute, 0, 0);
+  if (sleepCrossesMidnight(bedtime, wakeTime)) {
+    start.setDate(start.getDate() - 1);
+  }
+  return start;
+}
+
+export type SleepDurationCheck =
+  | { kind: "ok" }
+  | { kind: "missing"; message: string }
+  | { kind: "implausible"; message: string };
+
+/** Catches the two ways clock arithmetic produces a confident wrong answer:
+ * a blank field (reads as 0 h) and swapped fields (reads as ~23 h). */
+export function sleepDurationCheck(
+  bedtime: string,
+  wakeTime: string,
+  hours: number
+): SleepDurationCheck {
+  if (!bedtime || !wakeTime) {
+    return {
+      kind: "missing",
+      message: "Enter both a bedtime and a wake time to work out the total.",
+    };
+  }
+  if (hours > 16) {
+    return {
+      kind: "implausible",
+      message: `That comes to ${formatSleepDuration(hours)}. If the times are the wrong way round, swap them — or correct the total below.`,
+    };
+  }
+  return { kind: "ok" };
+}
+
 export type SleepLogRecord = {
   id: string;
   date: string;
