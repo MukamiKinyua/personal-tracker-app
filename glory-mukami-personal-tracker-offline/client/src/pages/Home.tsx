@@ -554,6 +554,7 @@ const pixelsProfiles = {
   movement: {
     title: "Movement Pixels",
     eyebrow: "fitness · shared with workout studio",
+    source: "Days fill in when you save a Workout Studio note, or by hand here.",
     statuses: [
       { label: "Strength", color: "#d94889" },
       { label: "Mobility", color: "#29a8ad" },
@@ -563,6 +564,7 @@ const pixelsProfiles = {
   mood: {
     title: "Mood Pixels",
     eyebrow: "wellbeing · daily check-in",
+    source: "Days fill in from your daily check-in, or by hand here.",
     statuses: [
       { label: "Happy", color: "#e65c97" },
       { label: "Calm", color: "#3a9ba0" },
@@ -573,6 +575,7 @@ const pixelsProfiles = {
   water: {
     title: "Hydration Pixels",
     eyebrow: "water · daily rhythm",
+    source: "Days fill in when you log water, or by hand here.",
     statuses: [
       { label: "Goal met", color: "#32a7cf" },
       { label: "Some water", color: "#8fd4e7" },
@@ -582,8 +585,11 @@ const pixelsProfiles = {
   nutrition: {
     title: "Nourishment Pixels",
     eyebrow: "nutrition · meal rhythm",
+    source:
+      "A day fills in as “Meal noted” when you log a meal. The other keys are optional notes you add by hand — none of them is a score.",
     statuses: [
-      { label: "Balanced", color: "#e35d48" },
+      { label: "Meal noted", color: "#ec4899" },
+      { label: "Fruit / veg", color: "#e35d48" },
       { label: "Comfort", color: "#d34c93" },
       { label: "Something new", color: "#249a9e" },
     ],
@@ -591,6 +597,7 @@ const pixelsProfiles = {
   sleep: {
     title: "Rest Pixels",
     eyebrow: "sleep · hours per night",
+    source: "Days fill in when you log a night's sleep, or by hand here.",
     statuses: [
       { label: "Under 5 h", color: "#df7c9e" },
       { label: "5–6 h 59", color: "#8e7ac0" },
@@ -601,6 +608,7 @@ const pixelsProfiles = {
   habits: {
     title: "Habit Pixels",
     eyebrow: "habits · daily rhythm",
+    source: "Days fill in from your habit check-ins, or by hand here.",
     statuses: [
       { label: "Complete", color: "#e75e93" },
       { label: "Partial", color: "#e3a83a" },
@@ -611,6 +619,7 @@ const pixelsProfiles = {
   focus: {
     title: "Focus Pixels",
     eyebrow: "productivity · practice rhythm",
+    source: "Days fill in when you finish a focus session, or by hand here.",
     statuses: [
       { label: "Deep focus", color: "#5b63b9" },
       { label: "Gentle focus", color: "#d64496" },
@@ -620,6 +629,7 @@ const pixelsProfiles = {
   learning: {
     title: "Practice Pixels",
     eyebrow: "learning · skill rhythm",
+    source: "Days fill in when you log practice, or by hand here.",
     statuses: [
       { label: "Practised", color: "#c94894" },
       { label: "Reviewed", color: "#2a9fa2" },
@@ -773,7 +783,7 @@ function PixelsGrid({
       </div>
       <p style={textStyle} className="pixels-help">
         Choose a key, then tap a day to fill it. Tap the same colour again to
-        clear it. Logged manually — no automatic import.
+        clear it. {profile.source}
       </p>
     </section>
   );
@@ -20197,6 +20207,12 @@ function NutritionPage({
     0,
     4
   );
+  const todayKey = new Date().toDateString();
+  const todayCount = journal
+    .inScope("meal")
+    .filter(
+      record => new Date(record.period.start).toDateString() === todayKey
+    ).length;
   function addMeal(text = note) {
     const trimmed = text.trim();
     if (!trimmed) return;
@@ -20210,7 +20226,10 @@ function NutritionPage({
     setTags([]);
     const monthIndex = new Date().getMonth();
     const day = new Date().getDate();
-    pixelStore?.set("nutrition", monthIndex, day, "#ec4899");
+    // Only the generic "Meal noted" mark is automatic; never paint over a
+    // key the user chose by hand for today.
+    const existing = pixelStore?.records.nutrition?.[pixelsCellKey(monthIndex, day)];
+    if (!existing) pixelStore?.set("nutrition", monthIndex, day, "#ec4899");
   }
   /**
    * Sends one thing from a meal to the shopping list.
@@ -20361,6 +20380,10 @@ function NutritionPage({
             <span>
               What showed up? <small>optional, no score</small>
             </span>
+            <small className="nutrition-no-count">
+              No calories, portions, or targets here — that’s on purpose. A
+              note and a few tags are the whole entry.
+            </small>
             <div>
               {tagsAvailable.map(tag => (
                 <button
@@ -20406,8 +20429,12 @@ function NutritionPage({
         </section>
         <section className="nutrition-section meal-rhythm">
           <div className="nutrition-section-heading">
-            <span>Today’s rhythm</span>
-            <b>{meals.length} moments</b>
+            <span>Meals noted</span>
+            <b>
+              {meals.length === 0
+                ? "Nothing yet"
+                : `${todayCount} today · ${meals.length} in all`}
+            </b>
           </div>
           {meals.length === 0 ? (
             <small className="nutrition-empty">
