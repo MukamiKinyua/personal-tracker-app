@@ -60,6 +60,8 @@ import {
 import { portraitDayAnchors, portraitDayRegion } from "../lib/portraitScene";
 import {
   pixelsCellKey,
+  pixelsDaysInMonth,
+  pixelsMonthNames,
   pixelsMonths,
   setPixelCell,
   type PixelCells,
@@ -659,6 +661,22 @@ function PixelsGrid({
     profile.statuses[0].color
   );
   const cells = store.records[tracker] || {};
+  const statusByColor = useMemo(
+    () =>
+      new Map<string, PixelsStatus>(
+        profile.statuses.map(status => [status.color as string, status])
+      ),
+    [profile]
+  );
+  const countsByStatus = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const color of Object.values(cells)) {
+      const status = statusByColor.get(color);
+      if (!status) continue;
+      counts.set(status.label, (counts.get(status.label) ?? 0) + 1);
+    }
+    return counts;
+  }, [cells, statusByColor]);
   const textStyle = inkText
     ? {
         color: "#000000",
@@ -680,6 +698,13 @@ function PixelsGrid({
         </div>
         <b style={textStyle}>{Object.keys(cells).length} marked</b>
       </div>
+      <p style={textStyle} className="pixels-summary">
+        {Object.keys(cells).length === 0
+          ? "Nothing logged yet — every day starts blank."
+          : profile.statuses
+              .map(status => `${countsByStatus.get(status.label) ?? 0} ${status.label}`)
+              .join(" · ")}
+      </p>
       <div className="pixels-key" aria-label={`${profile.title} status key`}>
         {profile.statuses.map((status: PixelsStatus) => (
           <button
@@ -688,6 +713,7 @@ function PixelsGrid({
             className={cn(selectedColor === status.color && "selected")}
             onClick={() => setSelectedColor(status.color)}
             key={status.label}
+            aria-pressed={selectedColor === status.color}
           >
             <i style={{ background: status.color }} />
             <span style={textStyle}>{status.label}</span>
@@ -698,7 +724,11 @@ function PixelsGrid({
         <div className="pixels-month-row">
           <i aria-hidden="true" />
           {pixelsMonths.map((month, monthIndex) => (
-            <span style={textStyle} key={`${month}-${monthIndex}`}>
+            <span
+              style={textStyle}
+              key={`${month}-${monthIndex}`}
+              title={pixelsMonthNames[monthIndex]}
+            >
               {month}
             </span>
           ))}
@@ -707,14 +737,29 @@ function PixelsGrid({
           <div className="pixels-day-row" role="row" key={day}>
             <b style={textStyle}>{day}</b>
             {pixelsMonths.map((month, monthIndex) => {
+              if (day > pixelsDaysInMonth(monthIndex)) {
+                return (
+                  <span
+                    aria-hidden="true"
+                    className="pixels-day-empty"
+                    key={`${monthIndex}-${day}`}
+                  />
+                );
+              }
               const key = pixelsCellKey(monthIndex, day);
               const fill = cells[key];
+              const status = fill ? statusByColor.get(fill) : undefined;
+              const fullMonth = pixelsMonthNames[monthIndex];
+              const label = status
+                ? `${fullMonth} ${day}, ${status.label} logged`
+                : `${fullMonth} ${day}, not logged`;
               return (
                 <button
                   type="button"
                   role="gridcell"
                   key={`${monthIndex}-${day}`}
-                  aria-label={`${month} ${day}`}
+                  aria-label={label}
+                  title={label}
                   aria-pressed={Boolean(fill)}
                   style={fill ? { background: fill } : undefined}
                   onClick={() =>
@@ -728,7 +773,7 @@ function PixelsGrid({
       </div>
       <p style={textStyle} className="pixels-help">
         Choose a key, then tap a day to fill it. Tap the same colour again to
-        clear it.
+        clear it. Logged manually — no automatic import.
       </p>
     </section>
   );
@@ -21503,6 +21548,7 @@ function FitnessOverview({
   const [recovery, setRecovery] = useState("Steady");
   const [minutes, setMinutes] = useState(38);
   const [workouts, setWorkouts] = useState(2);
+  const [weeklyGoal, setWeeklyGoal] = useState(3);
   const [note, setNote] = useState("");
   const recommendation =
     focus === "Strength"
@@ -21542,15 +21588,46 @@ function FitnessOverview({
         </article>
       </div>
       <div className="fitness-progress">
-        <span>Weekly movement goal</span>
-        <b>{workouts}/3 sessions</b>
+        <div className="fitness-goal-row">
+          <span>Weekly movement goal</span>
+          <div
+            className="fitness-goal-stepper"
+            role="group"
+            aria-label="Set weekly movement goal in sessions"
+          >
+            <button
+              type="button"
+              onClick={() => setWeeklyGoal(value => Math.max(1, value - 1))}
+              aria-label="Decrease weekly goal"
+              disabled={weeklyGoal <= 1}
+            >
+              −
+            </button>
+            <b>{weeklyGoal}</b>
+            <button
+              type="button"
+              onClick={() => setWeeklyGoal(value => Math.min(14, value + 1))}
+              aria-label="Increase weekly goal"
+              disabled={weeklyGoal >= 14}
+            >
+              +
+            </button>
+          </div>
+        </div>
+        <b>
+          {workouts}/{weeklyGoal} sessions
+        </b>
         <i>
-          <em style={{ width: `${Math.min(100, (workouts / 3) * 100)}%` }} />
+          <em
+            style={{
+              width: `${Math.min(100, (workouts / weeklyGoal) * 100)}%`,
+            }}
+          />
         </i>
         <small>
-          {workouts >= 3
+          {workouts >= weeklyGoal
             ? "Weekly movement milestone reached."
-            : `${3 - workouts} session${3 - workouts === 1 ? "" : "s"} to the next milestone.`}
+            : `${weeklyGoal - workouts} session${weeklyGoal - workouts === 1 ? "" : "s"} to the next milestone.`}
         </small>
       </div>
       <div className="fitness-plan">

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   countFilledPixels,
   pixelsCellKey,
+  pixelsDaysInMonth,
   pixelsMonths,
   setPixelCell,
   updatePixelCell,
@@ -30,5 +31,12 @@ describe("Pixels tracker helpers", () => {
     expect(setPixelCell({ "8-14": "#4b79b8" }, 7, 14, "#4b79b8")).toEqual({
       "8-14": "#4b79b8",
     });
+  });
+
+  it("never offers a date that can't exist, like Feb 30 or a 31-day April", () => {
+    expect(pixelsDaysInMonth(0)).toBe(31); // January
+    expect(pixelsDaysInMonth(1)).toBe(28); // February
+    expect(pixelsDaysInMonth(3)).toBe(30); // April
+    expect(pixelsDaysInMonth(11)).toBe(31); // December
   });
 });
