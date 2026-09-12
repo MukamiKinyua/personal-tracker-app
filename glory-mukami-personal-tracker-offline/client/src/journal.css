@@ -3182,6 +3182,36 @@ button:focus-visible {
   color: #fff;
   background: #247e8b;
 }
+.water-actions button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.water-actions button.is-just-added {
+  opacity: 1;
+  color: #fff;
+  background: #1c5f69;
+  border-color: #1c5f69;
+  transform: scale(0.97);
+  transition: transform 120ms ease-out;
+}
+.water-actions button:focus-visible {
+  outline: 2px solid #1c5f69;
+  outline-offset: 2px;
+}
+.water-undo-hint,
+.water-rollover-note,
+.water-beyond-note {
+  display: block;
+  margin-top: 0.4rem;
+  color: #759299;
+  font-size: 0.56rem;
+  line-height: 1.45;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.water-rollover-note {
+  margin: 0.3rem 0 0.2rem;
+}
 .water-history {
   width: min(370px, 100%);
   margin-top: 1.1rem;
@@ -18002,6 +18032,23 @@ button:focus-visible {
   > .spread-page:first-child
   .journal-action::before {
   display: none !important;
+}
+
+/* The pill's label is a span, which the auto-contrast rule lists by tag. */
+#root
+  .journal-stage:not([data-journal-view="cover"])
+  .journal-spread
+  > .spread-page:first-child
+  .journal-action
+  :is(span, b, small, i, em) {
+  color: rgba(255, 255, 255, 0.94) !important;
+  -webkit-text-fill-color: rgba(255, 255, 255, 0.94) !important;
+  -webkit-text-stroke: 0 !important;
+  text-shadow: none !important;
+  filter: none !important;
+  background: none !important;
+  background-clip: border-box !important;
+  -webkit-background-clip: border-box !important;
 }
 
 /* --- headline ----------------------------------------------------------- */

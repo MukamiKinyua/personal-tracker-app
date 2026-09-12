@@ -20596,17 +20596,49 @@ function WaterIntakePage({
     }));
   const progress = waterProgress(intake, goal);
   const remaining = waterRemaining(intake, goal);
+  const beyondGoal = Math.max(0, intake - goal);
+  const timezone = journal.preferences.timezone;
+
+  // A second tap inside this window is almost always a bounce, not a second
+  // glass; the button shows what it just did and ignores the repeat.
+  const [justAdded, setJustAdded] = useState<number | null>(null);
+  const justAddedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (justAddedTimer.current) clearTimeout(justAddedTimer.current);
+    },
+    []
+  );
+
+  function paintWaterDay(totalMl: number) {
+    const now = new Date();
+    pixelStore?.set(
+      "water",
+      now.getMonth(),
+      now.getDate(),
+      totalMl >= goal ? "#32a7cf" : "#8fd4e7"
+    );
+  }
+
   function addWater(amount: number) {
     if (!Number.isFinite(amount) || amount <= 0) return;
+    if (justAdded !== null) return;
 
+    const rounded = Math.round(amount);
     journal.add({
       scope: "water",
-      body: { amountMl: Math.round(amount) },
-      undoLabel: `Added ${Math.round(amount)} ml`,
+      body: { amountMl: rounded },
+      undoLabel: `Added ${rounded} ml`,
     });
+    paintWaterDay(intake + rounded);
 
-    const now = new Date();
-    pixelStore?.set("water", now.getMonth(), now.getDate(), "#16a8a8");
+    setJustAdded(rounded);
+    justAddedTimer.current = setTimeout(() => setJustAdded(null), 700);
+  }
+
+  function removeWater(id: string, amount: number) {
+    journal.remove(id, `Removed ${amount} ml`);
+    paintWaterDay(Math.max(0, intake - amount));
   }
 
   return (
@@ -20643,10 +20675,12 @@ function WaterIntakePage({
             <div>
               <span>today</span>
               <b>{intake} ml</b>
-              <small>{progress}% complete</small>
+              <small>
+                {goal > 0 ? Math.round((intake / goal) * 100) : 0}% of goal
+              </small>
             </div>
           </div>
-          <div className="water-progress-copy">
+          <div className="water-progress-copy" aria-live="polite">
             <span>Today’s water</span>
             <b>
               {intake} ml <small>of {goal} ml</small>
@@ -20654,21 +20688,36 @@ function WaterIntakePage({
             <strong>
               {remaining > 0
                 ? `${remaining} ml remaining`
-                : "Goal met for today"}
+                : beyondGoal > 0
+                  ? `Goal met · ${beyondGoal} ml beyond it`
+                  : "Goal met for today"}
             </strong>
+            {beyondGoal > 0 && (
+              <small className="water-beyond-note">
+                Going past the goal is fine — it’s a floor, not a ceiling. Keep
+                logging if you like; nothing here penalises it.
+              </small>
+            )}
           </div>
         </section>
         <section className="water-log-panel" aria-label="Log water">
           <div className="water-actions">
-            <button type="button" onClick={() => addWater(250)}>
-              +250 ml
-            </button>
-            <button type="button" onClick={() => addWater(350)}>
-              +350 ml
-            </button>
-            <button type="button" onClick={() => addWater(500)}>
-              +500 ml
-            </button>
+            {[250, 350, 500].map(amount => (
+              <button
+                type="button"
+                key={amount}
+                onClick={() => addWater(amount)}
+                disabled={justAdded !== null}
+                className={cn(justAdded === amount && "is-just-added")}
+                aria-label={
+                  justAdded === amount
+                    ? `Added ${amount} millilitres`
+                    : `Add ${amount} millilitres`
+                }
+              >
+                {justAdded === amount ? `Added ${amount} ml ✓` : `+${amount} ml`}
+              </button>
+            ))}
           </div>
           <div className="water-entry">
             <label>
@@ -20686,6 +20735,7 @@ function WaterIntakePage({
             </label>
             <button
               type="button"
+              disabled={justAdded !== null}
               onClick={() => {
                 addWater(Number(customAmount));
                 setCustomAmount("");
@@ -20694,6 +20744,10 @@ function WaterIntakePage({
               Add
             </button>
           </div>
+          <small className="water-undo-hint">
+            Every entry can be undone from the message that appears after
+            you add it, or removed from today’s list below.
+          </small>
         </section>
         <section className="water-setup">
           <div className="water-goal-control">
@@ -20750,6 +20804,10 @@ function WaterIntakePage({
               Clear today
             </button>
           </div>
+          <small className="water-rollover-note">
+            “Today” resets at midnight in {timezone}. Earlier days stay in the
+            year grid above.
+          </small>
           {entries.length === 0 ? (
             <small>No water logged yet today.</small>
           ) : (
@@ -20760,9 +20818,7 @@ function WaterIntakePage({
                 <b>+{entry.amount} ml</b>
                 <button
                   type="button"
-                  onClick={() => {
-                    journal.remove(entry.id, `Removed ${entry.amount} ml`);
-                  }}
+                  onClick={() => removeWater(entry.id, entry.amount)}
                   aria-label={`Remove ${entry.amount} ml at ${entry.time}`}
                 >
                   Remove
