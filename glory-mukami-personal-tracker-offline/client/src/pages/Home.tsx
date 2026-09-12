@@ -2608,6 +2608,7 @@ function WorkoutPage({
   const [started, setStarted] = useState(false);
   const [routineId, setRoutineId] = useState<WorkoutRoutine["id"]>("core");
   const [completed, setCompleted] = useState<Record<string, boolean>>({});
+  const [completedAt, setCompletedAt] = useState<Record<string, number>>({});
   const [rest, setRest] = useState(45);
   const [effort, setEffort] = useState("Moderate");
   const [note, setNote] = useState("");
@@ -2616,10 +2617,12 @@ function WorkoutPage({
   const completedCount = workoutCompletedCount(completed, routine);
   useMongoJournalScope({
     scope: "workout-studio",
-    payload: { completed, routineId, effort },
+    payload: { completed, completedAt, routineId, effort },
     hydrate: payload => {
       if (payload.completed && typeof payload.completed === "object")
         setCompleted(payload.completed as Record<string, boolean>);
+      if (payload.completedAt && typeof payload.completedAt === "object")
+        setCompletedAt(payload.completedAt as Record<string, number>);
       if (
         typeof payload.routineId === "string" &&
         workoutRoutines.some(item => item.id === payload.routineId)
@@ -2628,6 +2631,24 @@ function WorkoutPage({
       if (typeof payload.effort === "string") setEffort(payload.effort);
     },
   });
+
+  function toggleExerciseComplete(exerciseId: string, exerciseName: string) {
+    const willComplete = !completed[exerciseId];
+    setCompleted(current => ({ ...current, [exerciseId]: willComplete }));
+    setCompletedAt(current => {
+      if (!willComplete) {
+        const next = { ...current };
+        delete next[exerciseId];
+        return next;
+      }
+      return { ...current, [exerciseId]: Date.now() };
+    });
+    toast(
+      willComplete
+        ? `${exerciseName} marked complete`
+        : `${exerciseName} completion undone`
+    );
+  }
   return (
     <section
       className="journal-spread workout-spread glass-scope"
@@ -3579,10 +3600,7 @@ function WorkoutPage({
                     type="button"
                     className="workout-complete-toggle"
                     onClick={() =>
-                      setCompleted(current => ({
-                        ...current,
-                        [exercise.id]: !current[exercise.id],
-                      }))
+                      toggleExerciseComplete(exercise.id, exercise.name)
                     }
                     aria-pressed={Boolean(completed[exercise.id])}
                   >
@@ -3591,6 +3609,15 @@ function WorkoutPage({
                       ? "Marked complete"
                       : "Mark complete"}
                   </button>
+                  {completed[exercise.id] && completedAt[exercise.id] && (
+                    <small className="workout-complete-timestamp">
+                      Completed at{" "}
+                      {new Date(completedAt[exercise.id]).toLocaleTimeString(
+                        [],
+                        { hour: "numeric", minute: "2-digit" }
+                      )}
+                    </small>
+                  )}
                 </div>
               </article>
             );

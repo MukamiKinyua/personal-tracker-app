@@ -25,6 +25,7 @@ export function WorkoutVideoDemo({
 }: WorkoutVideoDemoProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+  const [videoFailed, setVideoFailed] = useState(false);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -36,34 +37,36 @@ export function WorkoutVideoDemo({
 
   useEffect(() => {
     const video = videoRef.current;
-    if (!video) return;
+    if (!video || videoFailed) return;
     if (paused || prefersReducedMotion) {
       video.pause();
       return;
     }
     void video.play().catch(() => undefined);
-  }, [paused, prefersReducedMotion]);
+  }, [paused, prefersReducedMotion, videoFailed]);
 
   const replay = () => {
     const video = videoRef.current;
-    if (!video || prefersReducedMotion) return;
+    if (!video || prefersReducedMotion || videoFailed) return;
     video.currentTime = 0;
     onReplay();
     void video.play().catch(() => undefined);
   };
 
-  const status = prefersReducedMotion
-    ? "Reduced motion is on — the instructional still is shown."
-    : paused
-      ? "Demonstration paused."
-      : "Demonstration playing.";
+  const status = videoFailed
+    ? "Video demonstration unavailable — showing the reference image instead."
+    : prefersReducedMotion
+      ? "Reduced motion is on — the instructional still is shown."
+      : paused
+        ? "Demonstration paused."
+        : "Demonstration playing. Silent — no audio track.";
 
   return (
     <figure
       className={`workout-video-demo${className ? ` ${className}` : ""}`}
       aria-label={`${label} detailed character demonstration`}
     >
-      <div className="workout-video-media">
+      <div className="workout-video-media" data-failed={videoFailed}>
         <video
           ref={videoRef}
           className="workout-video"
@@ -74,6 +77,7 @@ export function WorkoutVideoDemo({
           preload="metadata"
           poster={posterUrl}
           aria-describedby={`${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-form-cue`}
+          onError={() => setVideoFailed(true)}
         >
           <source src={videoUrl} type="video/mp4" />
         </video>
@@ -87,7 +91,7 @@ export function WorkoutVideoDemo({
         <p className="workout-video-status" aria-live="polite">
           {status}
         </p>
-        {!prefersReducedMotion && (
+        {!prefersReducedMotion && !videoFailed && (
           <div className="workout-video-controls">
             <button type="button" onClick={onTogglePause} aria-pressed={paused}>
               {paused ? "Play" : "Pause"}

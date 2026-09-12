@@ -26371,6 +26371,13 @@ body {
   color: #201228;
   background: #f4c766;
 }
+.workout-complete-timestamp {
+  display: block;
+  margin-top: 0.3rem;
+  color: #8a7a8f;
+  font-size: 0.5rem;
+  letter-spacing: 0.02em;
+}
 .workout-motion-demo {
   position: relative;
   width: 80px;
@@ -26904,6 +26911,18 @@ body {
   #root .journal-stage[data-journal-view="workouts"] .workout-video-still {
     display: block;
   }
+}
+#root
+  .journal-stage[data-journal-view="workouts"]
+  .workout-video-media[data-failed="true"]
+  .workout-video {
+  display: none;
+}
+#root
+  .journal-stage[data-journal-view="workouts"]
+  .workout-video-media[data-failed="true"]
+  .workout-video-still {
+  display: block;
 }
 @media (max-width: 720px) {
   #root .journal-stage[data-journal-view="workouts"] .workout-video-demo {
@@ -28222,6 +28241,18 @@ body {
   #root .journal-stage[data-journal-view="workouts"] .workout-video-still {
     display: block;
   }
+}
+#root
+  .journal-stage[data-journal-view="workouts"]
+  .workout-video-media[data-failed="true"]
+  .workout-video {
+  display: none;
+}
+#root
+  .journal-stage[data-journal-view="workouts"]
+  .workout-video-media[data-failed="true"]
+  .workout-video-still {
+  display: block;
 }
 @media (max-width: 720px) {
   #root .journal-stage[data-journal-view="workouts"] .workout-video-demo {
