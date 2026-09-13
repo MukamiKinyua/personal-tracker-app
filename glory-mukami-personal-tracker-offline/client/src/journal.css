@@ -31346,6 +31346,53 @@ body {
   background-blend-mode: normal !important;
 }
 
+/* The generic decorative motif (::before star/diamond/shape) and diagram
+   overlay (::after) were designed to sit on the old painting-wash right
+   page. On these 20 flat solid-colour workbenches they just read as a
+   stray shape - drop both so the background stays plain. */
+#root .journal-stage[data-journal-view="dashboard"] .journal-spread > .spread-page:last-child::before,
+#root .journal-stage[data-journal-view="dashboard"] .journal-spread > .spread-page:last-child::after,
+#root .journal-stage[data-journal-view="personalGrowth"] .journal-spread > .spread-page:last-child::before,
+#root .journal-stage[data-journal-view="personalGrowth"] .journal-spread > .spread-page:last-child::after,
+#root .journal-stage[data-journal-view="achievements"] .journal-spread > .spread-page:last-child::before,
+#root .journal-stage[data-journal-view="achievements"] .journal-spread > .spread-page:last-child::after,
+#root .journal-stage[data-journal-view="experiences"] .journal-spread > .spread-page:last-child::before,
+#root .journal-stage[data-journal-view="experiences"] .journal-spread > .spread-page:last-child::after,
+#root .journal-stage[data-journal-view="hobbies"] .journal-spread > .spread-page:last-child::before,
+#root .journal-stage[data-journal-view="hobbies"] .journal-spread > .spread-page:last-child::after,
+#root .journal-stage[data-journal-view="family"] .journal-spread > .spread-page:last-child::before,
+#root .journal-stage[data-journal-view="family"] .journal-spread > .spread-page:last-child::after,
+#root .journal-stage[data-journal-view="social"] .journal-spread > .spread-page:last-child::before,
+#root .journal-stage[data-journal-view="social"] .journal-spread > .spread-page:last-child::after,
+#root .journal-stage[data-journal-view="history"] .journal-spread > .spread-page:last-child::before,
+#root .journal-stage[data-journal-view="history"] .journal-spread > .spread-page:last-child::after,
+#root .journal-stage[data-journal-view="exportData"] .journal-spread > .spread-page:last-child::before,
+#root .journal-stage[data-journal-view="exportData"] .journal-spread > .spread-page:last-child::after,
+#root .journal-stage[data-journal-view="notifications"] .journal-spread > .spread-page:last-child::before,
+#root .journal-stage[data-journal-view="notifications"] .journal-spread > .spread-page:last-child::after,
+#root .journal-stage[data-journal-view="internships"] .journal-spread > .spread-page:last-child::before,
+#root .journal-stage[data-journal-view="internships"] .journal-spread > .spread-page:last-child::after,
+#root .journal-stage[data-journal-view="cv"] .journal-spread > .spread-page:last-child::before,
+#root .journal-stage[data-journal-view="cv"] .journal-spread > .spread-page:last-child::after,
+#root .journal-stage[data-journal-view="certifications"] .journal-spread > .spread-page:last-child::before,
+#root .journal-stage[data-journal-view="certifications"] .journal-spread > .spread-page:last-child::after,
+#root .journal-stage[data-journal-view="projects"] .journal-spread > .spread-page:last-child::before,
+#root .journal-stage[data-journal-view="projects"] .journal-spread > .spread-page:last-child::after,
+#root .journal-stage[data-journal-view="portfolio"] .journal-spread > .spread-page:last-child::before,
+#root .journal-stage[data-journal-view="portfolio"] .journal-spread > .spread-page:last-child::after,
+#root .journal-stage[data-journal-view="career"] .journal-spread > .spread-page:last-child::before,
+#root .journal-stage[data-journal-view="career"] .journal-spread > .spread-page:last-child::after,
+#root .journal-stage[data-journal-view="responsibilities"] .journal-spread > .spread-page:last-child::before,
+#root .journal-stage[data-journal-view="responsibilities"] .journal-spread > .spread-page:last-child::after,
+#root .journal-stage[data-journal-view="purchases"] .journal-spread > .spread-page:last-child::before,
+#root .journal-stage[data-journal-view="purchases"] .journal-spread > .spread-page:last-child::after,
+#root .journal-stage[data-journal-view="environment"] .journal-spread > .spread-page:last-child::before,
+#root .journal-stage[data-journal-view="environment"] .journal-spread > .spread-page:last-child::after,
+#root .journal-stage[data-journal-view="security"] .journal-spread.security-spread > .spread-page.security-workspace-page::before,
+#root .journal-stage[data-journal-view="security"] .journal-spread.security-spread > .spread-page.security-workspace-page::after {
+  display: none !important;
+}
+
 /* Shared by the notebook-style pages: achievements, experiences, hobbies,
    family, social. */
 .notebook-date {
@@ -31716,4 +31763,37 @@ button.attention-row:focus-visible {
 }
 .fitness-overview .local-undo {
   margin-top: 0.5rem;
+}
+
+/* Workout Studio: in-progress note under the Begin button, and a Remove
+   control on each logged session. */
+.workout-session-state {
+  display: block;
+  margin-top: 0.45rem;
+  font-size: 0.6rem;
+  line-height: 1.4;
+  opacity: 0.85;
+}
+.workout-session-notes article {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  column-gap: 0.5rem;
+}
+.workout-session-notes article b,
+.workout-session-notes article small {
+  grid-column: 1;
+}
+.workout-session-notes article > button {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  border: 1px solid rgba(255, 250, 242, 0.35);
+  border-radius: 7px;
+  padding: 0.26rem 0.48rem;
+  font-size: 0.56rem;
+  font-weight: 700;
+  color: #fffaf2;
+  background: transparent;
+}
+.workout-log .local-undo {
+  justify-self: start;
 }

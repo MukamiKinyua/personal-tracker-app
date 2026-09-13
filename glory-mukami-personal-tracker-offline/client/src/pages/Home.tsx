@@ -2881,13 +2881,26 @@ function WorkoutPage({
     completedCount: number;
   };
   const [sessionNotes, setSessionNotes] = useState<WorkoutSessionNote[]>([]);
+  // One snapshot behind, so saving a session (which clears the ticks) or
+  // removing a logged session can be taken back.
+  const [lastStudio, setLastStudio] = useState<{
+    completed: Record<string, boolean>;
+    completedAt: Record<string, number>;
+    sessionNotes: WorkoutSessionNote[];
+  } | null>(null);
   const [motionPaused, setMotionPaused] = useState(false);
   const routine = workoutRoutineById(routineId);
   const completedCount = workoutCompletedCount(completed, routine);
   useMongoJournalScope({
     scope: "workout-studio",
-    payload: { completed, completedAt, routineId, effort, sessionNotes },
+    payload: { completed, completedAt, routineId, effort, sessionNotes, rest },
     hydrate: payload => {
+      if (
+        typeof payload.rest === "number" &&
+        Number.isInteger(payload.rest) &&
+        payload.rest >= 15
+      )
+        setRest(payload.rest);
       if (payload.completed && typeof payload.completed === "object")
         setCompleted(payload.completed as Record<string, boolean>);
       if (payload.completedAt && typeof payload.completedAt === "object")
@@ -2905,6 +2918,11 @@ function WorkoutPage({
 
   function saveSessionNote() {
     const trimmed = note.trim();
+    if (completedCount === 0 && !trimmed) {
+      toast("Mark a move complete or add a note before saving a session");
+      return;
+    }
+    setLastStudio({ completed, completedAt, sessionNotes });
     setSessionNotes(current =>
       [
         {
@@ -2917,6 +2935,10 @@ function WorkoutPage({
         ...current,
       ].slice(0, 30)
     );
+    // The ticks belong to the session just logged; a fresh routine starts
+    // blank rather than opening already "5/5 complete" tomorrow.
+    setCompleted({});
+    setCompletedAt({});
     setStarted(false);
     setNote("");
     const monthIndex = new Date().getMonth();
@@ -2927,11 +2949,37 @@ function WorkoutPage({
       pixelStore?.records.movement?.[pixelsCellKey(monthIndex, day)];
     if (!existing) pixelStore?.set("movement", monthIndex, day, "#06b6d4");
     toast(
-      trimmed
-        ? "Session note saved"
-        : "Session logged — no note this time"
+      `${trimmed ? "Session note saved" : "Session logged"} · ${completedCount} move${completedCount === 1 ? "" : "s"} · ticks cleared for next time`
     );
   }
+
+  function removeSessionNote(entry: WorkoutSessionNote) {
+    setLastStudio({ completed, completedAt, sessionNotes });
+    setSessionNotes(current => current.filter(item => item.at !== entry.at));
+    toast("Session removed — Undo last brings it back");
+  }
+
+  function undoStudio() {
+    if (!lastStudio) return;
+    setCompleted(lastStudio.completed);
+    setCompletedAt(lastStudio.completedAt);
+    setSessionNotes(lastStudio.sessionNotes);
+    setLastStudio(null);
+    toast("Workout Studio restored");
+  }
+
+  const formatCompletedAt = (timestamp: number) => {
+    const at = new Date(timestamp);
+    const sameDay = localCalendarDay(at) === localCalendarDay(new Date());
+    return sameDay
+      ? at.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
+      : at.toLocaleString([], {
+          day: "numeric",
+          month: "short",
+          hour: "numeric",
+          minute: "2-digit",
+        });
+  };
 
   function toggleExerciseComplete(exerciseId: string, exerciseName: string) {
     const willComplete = !completed[exerciseId];
@@ -2985,8 +3033,14 @@ function WorkoutPage({
             onClick={() => setStarted(value => !value)}
           >
             <Play size={15} fill="currentColor" />{" "}
-            {started ? "Session in progress" : "Begin selected routine"}
+            {started ? "Stop session" : "Begin selected routine"}
           </Button>
+          {started ? (
+            <small className="workout-session-state" aria-live="polite">
+              Session in progress · tick moves as you finish them, then save
+              below.
+            </small>
+          ) : null}
         </div>
       </div>
       <div className="spread-page exercise-list workout-library-page">
@@ -3912,11 +3966,7 @@ function WorkoutPage({
                   </button>
                   {completed[exercise.id] && completedAt[exercise.id] && (
                     <small className="workout-complete-timestamp">
-                      Completed at{" "}
-                      {new Date(completedAt[exercise.id]).toLocaleTimeString(
-                        [],
-                        { hour: "numeric", minute: "2-digit" }
-                      )}
+                      Completed {formatCompletedAt(completedAt[exercise.id])}
                     </small>
                   )}
                 </div>
@@ -3952,24 +4002,41 @@ function WorkoutPage({
           <button type="button" onClick={saveSessionNote}>
             Save session {note.trim() ? "note" : "log"}
           </button>
+          {lastStudio ? (
+            <button type="button" className="local-undo" onClick={undoStudio}>
+              Undo last
+            </button>
+          ) : null}
           {sessionNotes.length > 0 && (
             <div className="workout-session-notes">
-              <span>Recent sessions</span>
+              <span>
+                Recent sessions · {sessionNotes.length} kept
+              </span>
               {sessionNotes.slice(0, 3).map(entry => (
                 <article key={entry.at}>
                   <b>
-                    {new Date(entry.at).toLocaleDateString([], {
+                    {new Date(entry.at).toLocaleString([], {
                       weekday: "short",
                       month: "short",
                       day: "numeric",
+                      hour: "numeric",
+                      minute: "2-digit",
                     })}{" "}
                     · {workoutRoutineById(entry.routineId).label} ·{" "}
                     {entry.effort}
                   </b>
                   <small>
-                    {entry.completedCount} moves complete
+                    {entry.completedCount} move
+                    {entry.completedCount === 1 ? "" : "s"} complete
                     {entry.note ? ` · ${entry.note}` : ""}
                   </small>
+                  <button
+                    type="button"
+                    onClick={() => removeSessionNote(entry)}
+                    aria-label={`Remove session from ${new Date(entry.at).toLocaleString()}`}
+                  >
+                    Remove
+                  </button>
                 </article>
               ))}
             </div>
