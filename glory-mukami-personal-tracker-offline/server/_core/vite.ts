@@ -58,7 +58,21 @@ export function serveStatic(app: Express) {
     );
   }
 
-  app.use(express.static(distPath));
+  app.use(
+    express.static(distPath, {
+      setHeaders(res, filePath) {
+        // The worker and the shell must never be served stale: a cached
+        // sw.js would keep every device on an old build until the browser's
+        // own 24-hour check. Hashed assets are immutable and can be cached
+        // for as long as anyone likes.
+        if (/[\\/](sw\.js|index\.html|manifest\.webmanifest)$/.test(filePath)) {
+          res.setHeader("Cache-Control", "no-cache");
+        } else if (/[\\/]assets[\\/]/.test(filePath)) {
+          res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+        }
+      },
+    })
+  );
 
   // fall through to index.html if the file doesn't exist
   app.use("*", (_req, res) => {

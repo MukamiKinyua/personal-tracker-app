@@ -10,7 +10,12 @@
     "check": "tsc --noEmit",
     "format": "prettier --write .",
     "test": "vitest run",
-    "db:push": "drizzle-kit generate && drizzle-kit migrate"
+    "db:push": "drizzle-kit generate && drizzle-kit migrate",
+    "icons": "node scripts/make-icons.mjs",
+    "android:sync": "vite build && cap sync android",
+    "android:debug": "npm run android:sync && cd android && gradlew assembleDebug",
+    "android:release": "npm run android:sync && cd android && gradlew assembleRelease",
+    "android:open": "cap open android"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.693.0",
