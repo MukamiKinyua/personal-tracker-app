@@ -31384,3 +31384,63 @@ body {
 .session-history article time {
   font-variant-numeric: tabular-nums;
 }
+
+/* ==========================================================================
+   Dashboard right page: uniform dark glass over the new solid fill
+   ==========================================================================
+   .today-panel, .dashboard-card and .dashboard-bottom-bar were built with
+   dark ink (a stack of site-wide "force dark text on the right page" passes,
+   assuming the bright painting-plus-light-wash background every page used to
+   have there). Against the new solid #15121B fill, most of that text either
+   read as a flat grey block (inside the 45%-white .today-panel) or was
+   nearly invisible outright (.dashboard-heading and the card labels/values,
+   which sat directly on the page background with no card behind them at
+   all). Same fix as the rest of this file's dark-mode passes: translucent
+   dark glass + white text, so the card provides its own contrast rather
+   than depending on what the base colour happens to be. */
+#root .journal-stage[data-journal-view="dashboard"] .today-panel {
+  background: rgba(0, 0, 0, 0.42) !important;
+  backdrop-filter: blur(18px) saturate(118%) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(118%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+}
+#root .journal-stage[data-journal-view="dashboard"] .today-panel :is(p, b, span, small, button) {
+  color: rgba(255, 255, 255, 0.94) !important;
+  -webkit-text-fill-color: rgba(255, 255, 255, 0.94) !important;
+}
+#root .journal-stage[data-journal-view="dashboard"] .today-panel small {
+  color: rgba(255, 255, 255, 0.68) !important;
+  -webkit-text-fill-color: rgba(255, 255, 255, 0.68) !important;
+}
+#root .journal-stage[data-journal-view="dashboard"] .dashboard-heading p,
+#root .journal-stage[data-journal-view="dashboard"] .dashboard-heading .quick-add-button {
+  color: rgba(255, 255, 255, 0.94) !important;
+  -webkit-text-fill-color: rgba(255, 255, 255, 0.94) !important;
+}
+#root .journal-stage[data-journal-view="dashboard"] .dashboard-card {
+  background: rgba(0, 0, 0, 0.42) !important;
+  backdrop-filter: blur(18px) saturate(118%) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(118%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+}
+#root .journal-stage[data-journal-view="dashboard"] .dashboard-card :is(span, b, p, strong) {
+  color: rgba(255, 255, 255, 0.94) !important;
+  -webkit-text-fill-color: rgba(255, 255, 255, 0.94) !important;
+}
+#root .journal-stage[data-journal-view="dashboard"] .dashboard-card small {
+  color: rgba(255, 255, 255, 0.68) !important;
+  -webkit-text-fill-color: rgba(255, 255, 255, 0.68) !important;
+}
+#root .journal-stage[data-journal-view="dashboard"] .attention-row {
+  border-bottom-color: rgba(255, 255, 255, 0.14) !important;
+}
+#root .journal-stage[data-journal-view="dashboard"] .dashboard-bottom-bar {
+  background: rgba(0, 0, 0, 0.42) !important;
+  backdrop-filter: blur(18px) saturate(118%) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(118%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+}
+#root .journal-stage[data-journal-view="dashboard"] .dashboard-bottom-bar span {
+  color: rgba(255, 255, 255, 0.94) !important;
+  -webkit-text-fill-color: rgba(255, 255, 255, 0.94) !important;
+}
