@@ -988,13 +988,20 @@ button:focus-visible {
   gap: 0.5rem;
 }
 .contents-quick-chip {
-  border: 1px solid var(--journal-line);
-  background: rgba(255, 255, 255, 0.5);
+  /* Contents is a dark painted spread; this chip was styled for a light
+     surface (opaque-ish white fill, near-black ink) and never got a
+     dark-mode pass, so its label read as dark text on a barely-lighter
+     pill. Matched to the same frosted-glass recipe as the nav pills right
+     above it: translucent white fill + blur, white text. */
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.28);
+  backdrop-filter: blur(16px) saturate(118%);
+  -webkit-backdrop-filter: blur(16px) saturate(118%);
   border-radius: 999px;
   padding: 0.4rem 0.85rem;
   font-size: 0.76rem;
   font-weight: 600;
-  color: var(--journal-ink);
+  color: rgba(255, 255, 255, 0.94);
   cursor: pointer;
   transition:
     background 160ms ease,
@@ -1004,7 +1011,7 @@ button:focus-visible {
   outline-offset: 1px;
 }
 .contents-quick-chip:hover {
-  background: #fff;
+  background: rgba(255, 255, 255, 0.4);
   transform: translateY(-1px);
 }
 .contents-quick-chip:focus-visible {
