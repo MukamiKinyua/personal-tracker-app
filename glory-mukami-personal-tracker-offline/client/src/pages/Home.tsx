@@ -6514,14 +6514,60 @@ function HobbiesPage({
   onCover: () => void;
 }) {
   type Hobby = {
+    id?: string;
     title: string;
     project: string;
     rhythm: string;
     supplies: string;
     inspiration: string;
     reflection: string;
+    createdAt?: string;
+    updatedAt?: string;
   };
   const [hobbies, setHobbies] = useState<Hobby[]>([]);
+  const [lastHobbys, setLastHobbys] = useState<Hobby[] | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const today = sleepDateInputValue(new Date());
+  const formatDay = (value?: string) =>
+    value && /^\d{4}-\d{2}-\d{2}$/.test(value)
+      ? new Date(`${value}T12:00:00`).toLocaleDateString(undefined, {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        })
+      : null;
+  function dateLabel(value: string) {
+    if (!value) return null;
+    const detail = assignmentDueDetail(value, today);
+    const days = detail.daysAway ?? 0;
+    const abs = Math.abs(days);
+    const rel =
+      detail.kind === "today"
+        ? "today"
+        : detail.kind === "tomorrow"
+          ? "tomorrow"
+          : days < 0
+            ? `${abs} day${abs === 1 ? "" : "s"} ago`
+            : `in ${days} days`;
+    return { text: `${detail.exact} · ${rel}`, kind: detail.kind };
+  }
+  function editHobby(hobby: Hobby) {
+    setEditingId(hobby.id ?? null);
+    setDraft({
+      title: hobby.title,
+      project: hobby.project,
+      rhythm: hobby.rhythm,
+      supplies: hobby.supplies,
+      inspiration: hobby.inspiration,
+      reflection: hobby.reflection,
+    });
+  }
+  function removeHobby(hobby: Hobby) {
+    setLastHobbys(hobbies);
+    setHobbies(current => current.filter(entry => entry.id !== hobby.id));
+    if (editingId === hobby.id) setEditingId(null);
+    toast(`Removed “${hobby.title}”`);
+  }
   const [draft, setDraft] = useState<Hobby>({
     title: "",
     project: "",
@@ -6535,16 +6581,33 @@ function HobbiesPage({
     payload: { hobbies },
     hydrate: payload => {
       if (Array.isArray(payload.hobbies))
-        setHobbies(payload.hobbies as Hobby[]);
+        setHobbies(
+          (payload.hobbies as Hobby[]).map((entry, index) => ({
+            ...entry,
+            id: entry.id ?? `hobby-${index}-${entry.title}`,
+          }))
+        );
     },
   });
   function addHobby(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!draft.title.trim()) return;
-    setHobbies(current => [
-      ...current,
-      { ...draft, title: draft.title.trim() },
-    ]);
+    const fields = { ...draft, title: draft.title.trim() };
+    if (editingId) {
+      setHobbies(current =>
+        current.map(entry =>
+          entry.id === editingId ? { ...entry, ...fields, updatedAt: today } : entry
+        )
+      );
+      toast("Updated");
+    } else {
+      setHobbies(current => [
+        ...current,
+        { ...fields, id: `hobby-${Date.now()}`, createdAt: today },
+      ]);
+      toast(`“${fields.title}” saved`);
+    }
+    setEditingId(null);
     setDraft({
       title: "",
       project: "",
@@ -6659,14 +6722,49 @@ function HobbiesPage({
               placeholder="How did this feel or what do you want to try?"
             />
           </label>
-          <Button className="ink-button" type="submit">
-            <Plus size={15} /> Save hobby space
-          </Button>
+          <div className="career-form-actions">
+            <Button type="submit" className="ink-button">
+              <Plus size={15} /> {editingId ? "Save changes" : "Save hobby space"}
+            </Button>
+            {editingId ? (
+              <button
+                type="button"
+                className="local-undo"
+                onClick={() => {
+                  setEditingId(null);
+                  setDraft({
+      title: "",
+      project: "",
+      rhythm: "When I have time",
+      supplies: "",
+      inspiration: "",
+      reflection: "",
+                  });
+                }}
+              >
+                Cancel edit
+              </button>
+            ) : null}
+          </div>
         </form>
         <div className="hobby-list">
           <div>
             <span>creative notebook</span>
-            <b>{hobbies.length} interests</b>
+            <b>
+              {hobbies.length} interests
+              {lastHobbys && (
+                <button
+                  type="button"
+                  className="local-undo"
+                  onClick={() => {
+                    setHobbies(lastHobbys);
+                    setLastHobbys(null);
+                  }}
+                >
+                  Undo remove
+                </button>
+              )}
+            </b>
           </div>
           {hobbies.length === 0 ? (
             <small>
@@ -6674,8 +6772,8 @@ function HobbiesPage({
               briefly.
             </small>
           ) : (
-            hobbies.map((hobby, index) => (
-              <article key={`${hobby.title}-${index}`}>
+            hobbies.map(hobby => (
+              <article key={hobby.id} className={cn(editingId === hobby.id && "is-editing")}>
                 <i>{hobby.title.slice(0, 1)}</i>
                 <p>
                   <b>{hobby.title}</b>
@@ -6685,6 +6783,25 @@ function HobbiesPage({
                   <em>Supplies: {hobby.supplies || "Noted when useful"}</em>
                   <em>Inspiration: {hobby.inspiration || "Add a spark"}</em>
                   <em>Reflection: {hobby.reflection || "Add a small note"}</em>
+                  <small className="career-stamp">
+                    {formatDay(hobby.updatedAt)
+                      ? `Updated ${formatDay(hobby.updatedAt)}`
+                      : formatDay(hobby.createdAt)
+                        ? `Saved ${formatDay(hobby.createdAt)}`
+                        : "Saved before dates were kept"}
+                  </small>
+                  <span className="career-actions">
+                    <button type="button" onClick={() => editHobby(hobby)}>
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeHobby(hobby)}
+                      aria-label={`Remove ${hobby.title}`}
+                    >
+                      Remove
+                    </button>
+                  </span>
                 </p>
               </article>
             ))
