@@ -7003,6 +7003,7 @@ function InternshipsPage({
                   onClick={() => {
                     setApplications(lastApplications);
                     setLastApplications(null);
+                    toast("Application restored");
                   }}
                 >
                   Undo remove
