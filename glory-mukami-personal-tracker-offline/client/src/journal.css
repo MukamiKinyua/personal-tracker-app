@@ -31189,3 +31189,113 @@ body {
   text-decoration: underline;
   cursor: pointer;
 }
+
+/* Solid right-page fills, replacing the bled-through painting on the
+   workbench/list half for a set of pages. The existing rule for that half
+   (`.journal-stage[...]:not(cover) .journal-spread > .spread-page:last-child`)
+   already carries !important on a three-layer background including
+   var(--scene-image), so beating it needs #root's id-tier specificity, not
+   just !important - matches the pattern used throughout this file for the
+   same reason. background-image:none and background-blend-mode:normal are
+   restated alongside the flat colour so no trace of the layered gradient or
+   painting survives underneath it. */
+#root .journal-stage[data-journal-view="dashboard"] .journal-spread > .spread-page:last-child {
+  background: #15121B !important;
+  background-image: none !important;
+  background-blend-mode: normal !important;
+}
+#root .journal-stage[data-journal-view="personalGrowth"] .journal-spread > .spread-page:last-child {
+  background: #2A2A2A !important;
+  background-image: none !important;
+  background-blend-mode: normal !important;
+}
+#root .journal-stage[data-journal-view="achievements"] .journal-spread > .spread-page:last-child {
+  background: #333A3F !important;
+  background-image: none !important;
+  background-blend-mode: normal !important;
+}
+#root .journal-stage[data-journal-view="experiences"] .journal-spread > .spread-page:last-child {
+  background: #443E3B !important;
+  background-image: none !important;
+  background-blend-mode: normal !important;
+}
+#root .journal-stage[data-journal-view="hobbies"] .journal-spread > .spread-page:last-child {
+  background: #4E9ED4 !important;
+  background-image: none !important;
+  background-blend-mode: normal !important;
+}
+#root .journal-stage[data-journal-view="family"] .journal-spread > .spread-page:last-child {
+  background: #141110 !important;
+  background-image: none !important;
+  background-blend-mode: normal !important;
+}
+#root .journal-stage[data-journal-view="social"] .journal-spread > .spread-page:last-child {
+  background: #371612 !important;
+  background-image: none !important;
+  background-blend-mode: normal !important;
+}
+#root .journal-stage[data-journal-view="history"] .journal-spread > .spread-page:last-child {
+  background: #A29283 !important;
+  background-image: none !important;
+  background-blend-mode: normal !important;
+}
+#root .journal-stage[data-journal-view="exportData"] .journal-spread > .spread-page:last-child {
+  background: #8C724E !important;
+  background-image: none !important;
+  background-blend-mode: normal !important;
+}
+#root .journal-stage[data-journal-view="notifications"] .journal-spread > .spread-page:last-child {
+  background: #6E7273 !important;
+  background-image: none !important;
+  background-blend-mode: normal !important;
+}
+#root .journal-stage[data-journal-view="internships"] .journal-spread > .spread-page:last-child {
+  background: #0E0B0D !important;
+  background-image: none !important;
+  background-blend-mode: normal !important;
+}
+#root .journal-stage[data-journal-view="cv"] .journal-spread > .spread-page:last-child {
+  background: #1D5096 !important;
+  background-image: none !important;
+  background-blend-mode: normal !important;
+}
+#root .journal-stage[data-journal-view="certifications"] .journal-spread > .spread-page:last-child {
+  background: #7D8EA8 !important;
+  background-image: none !important;
+  background-blend-mode: normal !important;
+}
+#root .journal-stage[data-journal-view="projects"] .journal-spread > .spread-page:last-child {
+  background: #7E6551 !important;
+  background-image: none !important;
+  background-blend-mode: normal !important;
+}
+#root .journal-stage[data-journal-view="portfolio"] .journal-spread > .spread-page:last-child {
+  background: #2B2424 !important;
+  background-image: none !important;
+  background-blend-mode: normal !important;
+}
+#root .journal-stage[data-journal-view="career"] .journal-spread > .spread-page:last-child {
+  background: #324647 !important;
+  background-image: none !important;
+  background-blend-mode: normal !important;
+}
+#root .journal-stage[data-journal-view="responsibilities"] .journal-spread > .spread-page:last-child {
+  background: #74857B !important;
+  background-image: none !important;
+  background-blend-mode: normal !important;
+}
+#root .journal-stage[data-journal-view="purchases"] .journal-spread > .spread-page:last-child {
+  background: #523D57 !important;
+  background-image: none !important;
+  background-blend-mode: normal !important;
+}
+#root .journal-stage[data-journal-view="environment"] .journal-spread > .spread-page:last-child {
+  background: #332B29 !important;
+  background-image: none !important;
+  background-blend-mode: normal !important;
+}
+#root .journal-stage[data-journal-view="security"] .journal-spread > .spread-page:last-child {
+  background: #1D1B17 !important;
+  background-image: none !important;
+  background-blend-mode: normal !important;
+}
