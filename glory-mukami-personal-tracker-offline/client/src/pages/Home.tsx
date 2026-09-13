@@ -11383,14 +11383,60 @@ function SocialLifePage({
   onCover: () => void;
 }) {
   type ConnectionPlan = {
+    id?: string;
     person: string;
     plan: string;
     date: string;
     followThrough: string;
     note: string;
     reminder: string;
+    createdAt?: string;
+    updatedAt?: string;
   };
   const [plans, setPlans] = useState<ConnectionPlan[]>([]);
+  const [lastConnectionPlans, setLastConnectionPlans] = useState<ConnectionPlan[] | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const today = sleepDateInputValue(new Date());
+  const formatDay = (value?: string) =>
+    value && /^\d{4}-\d{2}-\d{2}$/.test(value)
+      ? new Date(`${value}T12:00:00`).toLocaleDateString(undefined, {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        })
+      : null;
+  function dateLabel(value: string) {
+    if (!value) return null;
+    const detail = assignmentDueDetail(value, today);
+    const days = detail.daysAway ?? 0;
+    const abs = Math.abs(days);
+    const rel =
+      detail.kind === "today"
+        ? "today"
+        : detail.kind === "tomorrow"
+          ? "tomorrow"
+          : days < 0
+            ? `${abs} day${abs === 1 ? "" : "s"} ago`
+            : `in ${days} days`;
+    return { text: `${detail.exact} · ${rel}`, kind: detail.kind };
+  }
+  function editConnectionPlan(plan: ConnectionPlan) {
+    setEditingId(plan.id ?? null);
+    setDraft({
+      person: plan.person,
+      plan: plan.plan,
+      date: plan.date,
+      followThrough: plan.followThrough,
+      note: plan.note,
+      reminder: plan.reminder,
+    });
+  }
+  function removeConnectionPlan(plan: ConnectionPlan) {
+    setLastConnectionPlans(plans);
+    setPlans(current => current.filter(entry => entry.id !== plan.id));
+    if (editingId === plan.id) setEditingId(null);
+    toast(`Removed “${plan.person}”`);
+  }
   const [draft, setDraft] = useState<ConnectionPlan>({
     person: "",
     plan: "",
@@ -11404,16 +11450,33 @@ function SocialLifePage({
     payload: { plans },
     hydrate: payload => {
       if (Array.isArray(payload.plans))
-        setPlans(payload.plans as ConnectionPlan[]);
+        setPlans(
+          (payload.plans as ConnectionPlan[]).map((entry, index) => ({
+            ...entry,
+            id: entry.id ?? `social-${index}-${entry.person}`,
+          }))
+        );
     },
   });
   function addPlan(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!draft.person.trim() || !draft.plan.trim()) return;
-    setPlans(current => [
-      ...current,
-      { ...draft, person: draft.person.trim(), plan: draft.plan.trim() },
-    ]);
+    const fields = { ...draft, person: draft.person.trim(), plan: draft.plan.trim() };
+    if (editingId) {
+      setPlans(current =>
+        current.map(entry =>
+          entry.id === editingId ? { ...entry, ...fields, updatedAt: today } : entry
+        )
+      );
+      toast("Updated");
+    } else {
+      setPlans(current => [
+        ...current,
+        { ...fields, id: `social-${Date.now()}`, createdAt: today },
+      ]);
+      toast(`“${fields.person}” saved`);
+    }
+    setEditingId(null);
     setDraft({
       person: "",
       plan: "",
@@ -11485,7 +11548,8 @@ function SocialLifePage({
               />
             </label>
             <label>
-              Optional reminder
+              Optional reminder{" "}
+              <small>a note to yourself — this page doesn’t send reminders</small>
               <select
                 value={draft.reminder}
                 onChange={event =>
@@ -11524,34 +11588,96 @@ function SocialLifePage({
               placeholder="What would you like to remember?"
             />
           </label>
-          <Button className="ink-button" type="submit">
-            <Plus size={15} /> Save connection plan
-          </Button>
+          <div className="career-form-actions">
+            <Button type="submit" className="ink-button">
+              <Plus size={15} /> {editingId ? "Save changes" : "Save connection plan"}
+            </Button>
+            {editingId ? (
+              <button
+                type="button"
+                className="local-undo"
+                onClick={() => {
+                  setEditingId(null);
+                  setDraft({
+      person: "",
+      plan: "",
+      date: "",
+      followThrough: "",
+      note: "",
+      reminder: "No reminder",
+                  });
+                }}
+              >
+                Cancel edit
+              </button>
+            ) : null}
+          </div>
         </form>
         <div className="social-list">
           <div>
             <span>connection notebook</span>
-            <b>{plans.length} plans</b>
+            <b>
+              {plans.length} plans
+              {lastConnectionPlans && (
+                <button
+                  type="button"
+                  className="local-undo"
+                  onClick={() => {
+                    setPlans(lastConnectionPlans);
+                    setLastConnectionPlans(null);
+                  }}
+                >
+                  Undo remove
+                </button>
+              )}
+            </b>
           </div>
           {plans.length === 0 ? (
             <small>
               Start with a person or group you would like to make space for.
             </small>
           ) : (
-            plans.map((plan, index) => (
-              <article key={`${plan.person}-${index}`}>
+            plans.map(plan => (
+              <article key={plan.id} className={cn(editingId === plan.id && "is-editing")}>
                 <i>{plan.person.slice(0, 1)}</i>
                 <p>
                   <b>{plan.person}</b>
                   <small>
                     {plan.plan}
-                    {plan.date ? ` · ${plan.date}` : ""} · {plan.reminder}
+                    {plan.date ? (
+                      <>
+                        {" · "}
+                        <span className={cn("notebook-date", `is-${dateLabel(plan.date)!.kind}`)}>
+                          {dateLabel(plan.date)!.text}
+                        </span>
+                      </>
+                    ) : null}{" "}
+                    · {plan.reminder}
                   </small>
                   <em>
                     Next:{" "}
                     {plan.followThrough || "Choose a small follow-through"}
                   </em>
                   <em>Note: {plan.note || "Add a note whenever you want"}</em>
+                  <small className="career-stamp">
+                    {formatDay(plan.updatedAt)
+                      ? `Updated ${formatDay(plan.updatedAt)}`
+                      : formatDay(plan.createdAt)
+                        ? `Saved ${formatDay(plan.createdAt)}`
+                        : "Saved before dates were kept"}
+                  </small>
+                  <span className="career-actions">
+                    <button type="button" onClick={() => editConnectionPlan(plan)}>
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeConnectionPlan(plan)}
+                      aria-label={`Remove ${plan.person}`}
+                    >
+                      Remove
+                    </button>
+                  </span>
                 </p>
               </article>
             ))
