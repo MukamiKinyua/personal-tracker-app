@@ -31544,3 +31544,91 @@ button.attention-row:focus-visible {
   font-weight: 700;
   opacity: 0.85;
 }
+
+/* .export-scope / .export-note / .export-manifest / .export-ownership were
+   each built as a self-contained light "green nature" theme (near-white
+   backgrounds, dark sage/green ink) - fine as an independent design, but it
+   sat alongside everything else on this same right page (the JSON export
+   button, the CSV dropdown, the area select) which already uses this file's
+   dark glass. Converting these four to match, rather than leaving one
+   corner of the page in a different material. */
+#root .journal-stage[data-journal-view="exportData"] .export-scope > span {
+  color: rgba(255, 255, 255, 0.7) !important;
+  -webkit-text-fill-color: rgba(255, 255, 255, 0.7) !important;
+}
+#root .journal-stage[data-journal-view="exportData"] .export-scope label {
+  background: rgba(0, 0, 0, 0.35) !important;
+  backdrop-filter: blur(14px) saturate(118%) !important;
+  -webkit-backdrop-filter: blur(14px) saturate(118%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+}
+#root .journal-stage[data-journal-view="exportData"] .export-scope b {
+  color: rgba(255, 255, 255, 0.94) !important;
+  -webkit-text-fill-color: rgba(255, 255, 255, 0.94) !important;
+}
+#root .journal-stage[data-journal-view="exportData"] .export-scope small {
+  color: rgba(255, 255, 255, 0.68) !important;
+  -webkit-text-fill-color: rgba(255, 255, 255, 0.68) !important;
+}
+#root .journal-stage[data-journal-view="exportData"] .export-note {
+  background: rgba(0, 0, 0, 0.35) !important;
+  backdrop-filter: blur(14px) saturate(118%) !important;
+  -webkit-backdrop-filter: blur(14px) saturate(118%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+}
+#root .journal-stage[data-journal-view="exportData"] .export-note b {
+  color: rgba(255, 255, 255, 0.94) !important;
+  -webkit-text-fill-color: rgba(255, 255, 255, 0.94) !important;
+}
+#root .journal-stage[data-journal-view="exportData"] .export-note small,
+#root .journal-stage[data-journal-view="exportData"] .export-confirmation {
+  color: rgba(255, 255, 255, 0.68) !important;
+  -webkit-text-fill-color: rgba(255, 255, 255, 0.68) !important;
+}
+#root .journal-stage[data-journal-view="exportData"] .export-manifest {
+  background: rgba(0, 0, 0, 0.35) !important;
+  backdrop-filter: blur(14px) saturate(118%) !important;
+  -webkit-backdrop-filter: blur(14px) saturate(118%) !important;
+  border-left: 2px solid rgba(255, 255, 255, 0.4) !important;
+}
+#root .journal-stage[data-journal-view="exportData"] .export-manifest b {
+  color: rgba(255, 255, 255, 0.94) !important;
+  -webkit-text-fill-color: rgba(255, 255, 255, 0.94) !important;
+}
+#root .journal-stage[data-journal-view="exportData"] .export-manifest small {
+  color: rgba(255, 255, 255, 0.68) !important;
+  -webkit-text-fill-color: rgba(255, 255, 255, 0.68) !important;
+}
+#root .journal-stage[data-journal-view="exportData"] .export-csv label {
+  color: rgba(255, 255, 255, 0.7) !important;
+  -webkit-text-fill-color: rgba(255, 255, 255, 0.7) !important;
+}
+#root .journal-stage[data-journal-view="exportData"] .export-csv select,
+#root .journal-stage[data-journal-view="exportData"] .export-csv button {
+  background: rgba(0, 0, 0, 0.35) !important;
+  color: rgba(255, 255, 255, 0.94) !important;
+  -webkit-text-fill-color: rgba(255, 255, 255, 0.94) !important;
+  border-color: rgba(255, 255, 255, 0.3) !important;
+}
+#root .journal-stage[data-journal-view="exportData"] .export-ownership {
+  background: rgba(0, 0, 0, 0.35) !important;
+  backdrop-filter: blur(14px) saturate(118%) !important;
+  -webkit-backdrop-filter: blur(14px) saturate(118%) !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+}
+#root .journal-stage[data-journal-view="exportData"] .export-ownership > span {
+  color: rgba(255, 255, 255, 0.7) !important;
+  -webkit-text-fill-color: rgba(255, 255, 255, 0.7) !important;
+}
+#root .journal-stage[data-journal-view="exportData"] .export-ownership li {
+  color: rgba(255, 255, 255, 0.85) !important;
+  -webkit-text-fill-color: rgba(255, 255, 255, 0.85) !important;
+}
+#root .journal-stage[data-journal-view="exportData"] .export-ownership li b {
+  color: rgba(255, 255, 255, 0.94) !important;
+  -webkit-text-fill-color: rgba(255, 255, 255, 0.94) !important;
+}
+#root .journal-stage[data-journal-view="exportData"] .export-inline-link {
+  color: rgba(210, 235, 225, 0.95) !important;
+  -webkit-text-fill-color: rgba(210, 235, 225, 0.95) !important;
+}
