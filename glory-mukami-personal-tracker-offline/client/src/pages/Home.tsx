@@ -22972,50 +22972,115 @@ function AnnualPortraitPage({
   onCover: () => void;
   onRecord: (activity: Omit<InsightActivity, "id" | "createdAt">) => void;
 }) {
-  const [portraitYear, setPortraitYear] = useState(2026);
-  const [selectedMonth, setSelectedMonth] = useState(7);
+  type PortraitTheme = (typeof portraitThemes)[number]["id"];
+  type PortraitFills = Record<string, string>;
+  const today = new Date();
+  const [portraitYear, setPortraitYear] = useState(today.getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(today.getMonth());
   const [selectedColor, setSelectedColor] = useState(colorKey[2].value);
-  const [theme, setTheme] = useState<(typeof portraitThemes)[number]["id"]>(
-    () => {
-      const requestedTheme = new URLSearchParams(window.location.search).get(
-        "portraitTheme"
-      );
-      return portraitThemes.some(option => option.id === requestedTheme)
-        ? (requestedTheme as (typeof portraitThemes)[number]["id"])
-        : "undersea";
-    }
-  );
-  const [fills, setFills] = useState<Record<string, string>>({
-    "7-2": "#d238a4",
-    "7-4": "#1987b9",
-    "7-7": "#f1b633",
+  const [theme, setTheme] = useState<PortraitTheme>(() => {
+    const requestedTheme = new URLSearchParams(window.location.search).get(
+      "portraitTheme"
+    );
+    return portraitThemes.some(option => option.id === requestedTheme)
+      ? (requestedTheme as PortraitTheme)
+      : "undersea";
   });
-  const [lastFills, setLastFills] = useState<Record<string, string> | null>(
-    null
+  // Fills are kept per year so stepping the year shows that year's marks,
+  // not the same twelve months again under a different heading.
+  const [fillsByYear, setFillsByYear] = useState<Record<string, PortraitFills>>(
+    {}
   );
+  const [lastFillsByYear, setLastFillsByYear] = useState<Record<
+    string,
+    PortraitFills
+  > | null>(null);
   const [scale, setScale] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [startPoint, setStartPoint] = useState({ x: 0, y: 0 });
   const [startOffset, setStartOffset] = useState({ x: 0, y: 0 });
+  const yearKey = String(portraitYear);
+  const fills = fillsByYear[yearKey] ?? {};
   const portraitMonths = useMemo(
     () => portraitMonthsForYear(portraitYear),
     [portraitYear]
   );
   const [monthName, daysInMonth] = portraitMonths[selectedMonth];
+  const filledCount = Object.keys(fills).length;
+  const colorNameFor = (value: string) =>
+    colorKey.find(color => color.value === value)?.name ?? "a retired colour";
 
-  function updateFill(monthIndex: number, day: number) {
+  useMongoJournalScope({
+    scope: "annual-portrait",
+    payload: { fillsByYear, theme, selectedColor, portraitYear },
+    hydrate: payload => {
+      if (payload.fillsByYear && typeof payload.fillsByYear === "object")
+        setFillsByYear(payload.fillsByYear as Record<string, PortraitFills>);
+      if (
+        typeof payload.theme === "string" &&
+        portraitThemes.some(option => option.id === payload.theme)
+      )
+        setTheme(payload.theme as PortraitTheme);
+      if (
+        typeof payload.selectedColor === "string" &&
+        colorKey.some(color => color.value === payload.selectedColor)
+      )
+        setSelectedColor(payload.selectedColor);
+      if (
+        typeof payload.portraitYear === "number" &&
+        Number.isInteger(payload.portraitYear)
+      )
+        setPortraitYear(payload.portraitYear);
+    },
+  });
+
+  function updateFill(year: number, monthIndex: number, day: number) {
     const key = `${monthIndex}-${day}`;
-    const monthName = portraitMonths[monthIndex]?.[0] || "Portrait";
-    setLastFills(fills);
-    setFills(current =>
-      toggleAnnualSlotFill(current, monthIndex, day, selectedColor)
-    );
+    const targetYear = String(year);
+    const current = fillsByYear[targetYear] ?? {};
+    const monthLabel = portraitMonthsForYear(year)[monthIndex]?.[0] ?? "Portrait";
+    const wasFilled = Boolean(current[key]);
+    setLastFillsByYear(fillsByYear);
+    setFillsByYear(all => ({
+      ...all,
+      [targetYear]: toggleAnnualSlotFill(
+        all[targetYear] ?? {},
+        monthIndex,
+        day,
+        selectedColor
+      ),
+    }));
     onRecord({
       module: "Portrait",
       amount: 1,
-      label: `${monthName} ${day} ${fills[key] ? "cleared" : "filled"}`,
+      label: `${monthLabel} ${day} ${year} ${wasFilled ? "cleared" : `filled · ${colorNameFor(selectedColor)}`}`,
     });
+    toast(
+      wasFilled
+        ? `${monthLabel} ${day} cleared`
+        : `${monthLabel} ${day} filled · ${colorNameFor(selectedColor)}`
+    );
+  }
+
+  function logToday() {
+    const now = new Date();
+    if (now.getFullYear() !== portraitYear) setPortraitYear(now.getFullYear());
+    setSelectedMonth(now.getMonth());
+    updateFill(now.getFullYear(), now.getMonth(), now.getDate());
+  }
+
+  function clearYear() {
+    if (filledCount === 0) {
+      toast(`${portraitYear} is already blank`);
+      return;
+    }
+    setLastFillsByYear(fillsByYear);
+    setFillsByYear(all => {
+      const { [yearKey]: _cleared, ...rest } = all;
+      return rest;
+    });
+    toast(`${portraitYear} cleared — Undo last brings it back`);
   }
 
   function beginPan(event: React.PointerEvent<HTMLDivElement>) {
@@ -23033,6 +23098,11 @@ function AnnualPortraitPage({
     });
   }
 
+  const todayLabel = today.toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "short",
+  });
+
   return (
     <section
       className="journal-spread annual-portrait-spread glass-scope"
@@ -23048,16 +23118,10 @@ function AnnualPortraitPage({
             <em>movement</em>
           </h2>
           <p className="page-intro">
-            All twelve months live inside one painted world. Select a year,
+            All twelve months live inside one painted world. Pick a year,
             choose your movement colour, then fill or clear any dated slot.
+            Marks are set by hand here and kept per year.
           </p>
-          <button
-            type="button"
-            className="ink-button"
-            onClick={() => setTheme(portraitThemes[0].id)}
-          >
-            <Plus size={15} /> Create portrait
-          </button>
           <div className="portrait-year-select">
             <span>Portrait year</span>
             <button
@@ -23075,6 +23139,11 @@ function AnnualPortraitPage({
             >
               +
             </button>
+            <small aria-live="polite">
+              {filledCount === 0
+                ? "No days marked yet"
+                : `${filledCount} day${filledCount === 1 ? "" : "s"} marked`}
+            </small>
           </div>
           <div className="portrait-theme-selector" aria-label="Portrait theme">
             {portraitThemes.map(option => (
@@ -23083,19 +23152,21 @@ function AnnualPortraitPage({
                 type="button"
                 onClick={() => setTheme(option.id)}
                 className={cn(theme === option.id && "selected")}
+                aria-pressed={theme === option.id}
               >
                 <b>{option.label}</b>
                 <small>{option.note}</small>
               </button>
             ))}
           </div>
-          <div className="color-key" aria-label="Workout colour key">
+          <div className="color-key" aria-label="Movement colour key">
             {colorKey.map(color => (
               <button
                 type="button"
                 key={color.value}
                 onClick={() => setSelectedColor(color.value)}
                 className={cn(selectedColor === color.value && "selected")}
+                aria-pressed={selectedColor === color.value}
               >
                 <i style={{ background: color.value }} />
                 <span>{color.name}</span>
@@ -23103,35 +23174,24 @@ function AnnualPortraitPage({
             ))}
           </div>
           <div className="portrait-tools">
-            <button
-              type="button"
-              onClick={() => {
-                setLastFills(fills);
-                setFills({});
-              }}
-            >
-              Clear year
+            <button type="button" onClick={clearYear}>
+              Clear {portraitYear}
             </button>
             <button
               type="button"
-              onClick={() =>
-                updateFill(
-                  selectedMonth,
-                  new Date().getDate() > daysInMonth
-                    ? daysInMonth
-                    : new Date().getDate()
-                )
-              }
+              onClick={logToday}
+              title={`Marks ${todayLabel} ${today.getFullYear()} with ${colorNameFor(selectedColor)}`}
             >
-              Log today <ArrowRight size={14} />
+              Mark today ({todayLabel}) <ArrowRight size={14} />
             </button>
-            {lastFills ? (
+            {lastFillsByYear ? (
               <button
                 type="button"
                 className="local-undo"
                 onClick={() => {
-                  setFills(lastFills);
-                  setLastFills(null);
+                  setFillsByYear(lastFillsByYear);
+                  setLastFillsByYear(null);
+                  toast("Portrait restored");
                 }}
               >
                 Undo last
@@ -23193,7 +23253,7 @@ function AnnualPortraitPage({
               className="annual-scene-svg"
               viewBox="0 0 500 640"
               role="img"
-              aria-label={`${portraitThemes.find(option => option.id === theme)?.label} annual movement portrait with all twelve monthly daily regions`}
+              aria-label={`${portraitThemes.find(option => option.id === theme)?.label} annual movement portrait for ${portraitYear} with all twelve monthly daily regions`}
             >
               <PortraitSceneBackdrop theme={theme} />
               {portraitMonths.map(([name, dayCount], monthIndex) => (
@@ -23206,8 +23266,9 @@ function AnnualPortraitPage({
                   position={portraitMonthPositions[monthIndex]!}
                   isSelected={selectedMonth === monthIndex}
                   fills={fills}
+                  colorNameFor={colorNameFor}
                   onSelect={() => setSelectedMonth(monthIndex)}
-                  onFill={day => updateFill(monthIndex, day)}
+                  onFill={day => updateFill(portraitYear, monthIndex, day)}
                 />
               ))}
             </svg>
@@ -23235,35 +23296,134 @@ function FitnessOverview({
 }: {
   onRecord: (activity: Omit<InsightActivity, "id" | "createdAt">) => void;
 }) {
+  type FitnessSession = {
+    id: string;
+    at: string;
+    day: string;
+    focus: string;
+    minutes: number;
+    note: string;
+  };
+  type RecoveryCheck = { value: string; day: string };
+  const pixelStore = useContext(PixelsTrackerContext);
   const [focus, setFocus] = useState("Mobility");
   const [time, setTime] = useState("18 min");
-  const [recovery, setRecovery] = useState("Steady");
-  const [minutes, setMinutes] = useState(38);
-  const [workouts, setWorkouts] = useState(2);
+  const [recoveryCheck, setRecoveryCheck] = useState<RecoveryCheck | null>(
+    null
+  );
+  const [sessions, setSessions] = useState<FitnessSession[]>([]);
+  const [lastSessions, setLastSessions] = useState<FitnessSession[] | null>(
+    null
+  );
   const [weeklyGoal, setWeeklyGoal] = useState(3);
   const [note, setNote] = useState("");
+  const today = localCalendarDay(new Date());
+  const weekStart = shiftDayKey(today, -6);
+
+  useMongoJournalScope({
+    scope: "fitness-overview",
+    payload: { sessions, weeklyGoal, recoveryCheck, focus, time },
+    hydrate: payload => {
+      if (Array.isArray(payload.sessions))
+        setSessions(
+          (payload.sessions as FitnessSession[]).filter(
+            session => session && typeof session.day === "string"
+          )
+        );
+      if (
+        typeof payload.weeklyGoal === "number" &&
+        payload.weeklyGoal >= 1 &&
+        payload.weeklyGoal <= 14
+      )
+        setWeeklyGoal(payload.weeklyGoal);
+      if (
+        payload.recoveryCheck &&
+        typeof payload.recoveryCheck === "object" &&
+        typeof (payload.recoveryCheck as RecoveryCheck).day === "string"
+      )
+        setRecoveryCheck(payload.recoveryCheck as RecoveryCheck);
+      if (typeof payload.focus === "string") setFocus(payload.focus);
+      if (typeof payload.time === "string") setTime(payload.time);
+    },
+  });
+
+  // "Past 7 days" rather than a calendar week: it reads the same on a Monday
+  // as on a Sunday, and never shows a zero just because the week rolled over.
+  const recent = sessions.filter(
+    session => session.day >= weekStart && session.day <= today
+  );
+  const minutes = recent.reduce((total, session) => total + session.minutes, 0);
+  const workouts = recent.length;
+  const recovery =
+    recoveryCheck && recoveryCheck.day === today ? recoveryCheck.value : null;
   const recommendation =
     focus === "Strength"
       ? "Glute bridge + side plank foundation"
       : focus === "Core"
         ? "Bicycle crunches + side plank reach"
         : "Gentle mobility and lower-body flow";
+
   function logSession() {
     const addedMinutes = Number.parseInt(time, 10) || 15;
-    setMinutes(value => value + addedMinutes);
-    setWorkouts(value => value + 1);
+    const now = new Date();
+    const trimmed = note.trim();
+    setLastSessions(sessions);
+    setSessions(current =>
+      [
+        {
+          id: `fitness-${now.getTime()}`,
+          at: now.toISOString(),
+          day: localCalendarDay(now),
+          focus,
+          minutes: addedMinutes,
+          note: trimmed,
+        },
+        ...current,
+      ].slice(0, 200)
+    );
+    // Same automatic mark Workout Studio makes; a key set by hand today wins.
+    const existing =
+      pixelStore?.records.movement?.[
+        pixelsCellKey(now.getMonth(), now.getDate())
+      ];
+    if (!existing)
+      pixelStore?.set("movement", now.getMonth(), now.getDate(), "#06b6d4");
     onRecord({
       module: "Portrait",
       amount: 1,
-      label: `${focus} session logged · ${addedMinutes} min${note ? ` · ${note}` : ""}`,
+      label: `${focus} session logged · ${addedMinutes} min${trimmed ? ` · ${trimmed}` : ""}`,
     });
     setNote("");
+    toast(`${focus} session logged · ${addedMinutes} min`);
   }
+
+  function removeSession(session: FitnessSession) {
+    setLastSessions(sessions);
+    setSessions(current => current.filter(item => item.id !== session.id));
+    toast("Session removed — Undo last brings it back");
+  }
+
+  function setRecovery(value: string) {
+    setRecoveryCheck(current =>
+      current && current.day === today && current.value === value
+        ? null
+        : { value, day: today }
+    );
+  }
+
+  const formatWhen = (session: FitnessSession) =>
+    new Date(session.at).toLocaleString(undefined, {
+      day: "numeric",
+      month: "short",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+
   return (
     <section className="fitness-overview" aria-label="Fitness overview">
       <div className="fitness-overview-heading">
         <span>Fitness overview</span>
-        <b>This week</b>
+        <b>Past 7 days</b>
       </div>
       <div className="fitness-summary">
         <article>
@@ -23272,25 +23432,25 @@ function FitnessOverview({
         </article>
         <article>
           <b>{workouts}</b>
-          <small>workouts</small>
+          <small>{workouts === 1 ? "session" : "sessions"}</small>
         </article>
         <article>
-          <b>{recovery}</b>
-          <small>recovery</small>
+          <b>{recovery ?? "—"}</b>
+          <small>{recovery ? "recovery today" : "recovery not checked"}</small>
         </article>
       </div>
       <div className="fitness-progress">
         <div className="fitness-goal-row">
-          <span>Weekly movement goal</span>
+          <span>Movement goal · 7 days</span>
           <div
             className="fitness-goal-stepper"
             role="group"
-            aria-label="Set weekly movement goal in sessions"
+            aria-label="Set movement goal in sessions per 7 days"
           >
             <button
               type="button"
               onClick={() => setWeeklyGoal(value => Math.max(1, value - 1))}
-              aria-label="Decrease weekly goal"
+              aria-label="Decrease goal"
               disabled={weeklyGoal <= 1}
             >
               −
@@ -23299,7 +23459,7 @@ function FitnessOverview({
             <button
               type="button"
               onClick={() => setWeeklyGoal(value => Math.min(14, value + 1))}
-              aria-label="Increase weekly goal"
+              aria-label="Increase goal"
               disabled={weeklyGoal >= 14}
             >
               +
@@ -23317,9 +23477,11 @@ function FitnessOverview({
           />
         </i>
         <small>
-          {workouts >= weeklyGoal
-            ? "Weekly movement milestone reached."
-            : `${weeklyGoal - workouts} session${weeklyGoal - workouts === 1 ? "" : "s"} to the next milestone.`}
+          {workouts === 0
+            ? "Nothing logged in the past 7 days yet."
+            : workouts >= weeklyGoal
+              ? "Movement goal reached for the past 7 days."
+              : `${weeklyGoal - workouts} session${weeklyGoal - workouts === 1 ? "" : "s"} to go.`}
         </small>
       </div>
       <div className="fitness-plan">
@@ -23344,7 +23506,7 @@ function FitnessOverview({
         </label>
       </div>
       <div className="fitness-recovery">
-        <span>How does recovery feel?</span>
+        <span>How does recovery feel today?</span>
         <div>
           {["Low", "Steady", "Energised"].map(option => (
             <button
@@ -23352,6 +23514,7 @@ function FitnessOverview({
               key={option}
               onClick={() => setRecovery(option)}
               className={cn(recovery === option && "selected")}
+              aria-pressed={recovery === option}
             >
               {option}
             </button>
@@ -23377,6 +23540,43 @@ function FitnessOverview({
       <button type="button" className="fitness-log-button" onClick={logSession}>
         <Dumbbell size={15} /> Log this session
       </button>
+      {recent.length > 0 ? (
+        <ul className="fitness-session-list" aria-label="Sessions in the past 7 days">
+          {recent.slice(0, 5).map(session => (
+            <li key={session.id}>
+              <div>
+                <b>
+                  {session.focus} · {session.minutes} min
+                </b>
+                <small>
+                  {formatWhen(session)}
+                  {session.note ? ` · ${session.note}` : ""}
+                </small>
+              </div>
+              <button
+                type="button"
+                onClick={() => removeSession(session)}
+                aria-label={`Remove ${session.focus} session from ${formatWhen(session)}`}
+              >
+                Remove
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {lastSessions ? (
+        <button
+          type="button"
+          className="local-undo"
+          onClick={() => {
+            setSessions(lastSessions);
+            setLastSessions(null);
+            toast("Sessions restored");
+          }}
+        >
+          Undo last
+        </button>
+      ) : null}
     </section>
   );
 }
@@ -23540,6 +23740,7 @@ function AnnualMonthObject({
   position,
   isSelected,
   fills,
+  colorNameFor,
   onSelect,
   onFill,
 }: {
@@ -23550,6 +23751,7 @@ function AnnualMonthObject({
   position: readonly [number, number, number];
   isSelected: boolean;
   fills: Record<string, string>;
+  colorNameFor: (value: string) => string;
   onSelect: () => void;
   onFill: (day: number) => void;
 }) {
@@ -23626,7 +23828,7 @@ function AnnualMonthObject({
               }}
               role="button"
               tabIndex={0}
-              aria-label={`${name} ${day}, ${fills[region.key] ? "filled" : "unfilled"}`}
+              aria-label={`${name} ${day}, ${fills[region.key] ? `filled · ${colorNameFor(fills[region.key])}` : "unfilled"}`}
             />
           );
         })}
