@@ -38,3 +38,12 @@ describe("securityTracker", () => {
     ]);
   });
 });
+
+describe("next review scheduling", () => {
+  it("advances by the cadence from the review day and clamps month ends", async () => {
+    const { nextSecurityReviewDate } = await import("./securityTracker");
+    expect(nextSecurityReviewDate("Every 3 months", new Date(2026, 8, 13))).toBe("2026-12-13");
+    expect(nextSecurityReviewDate("Monthly", new Date(2026, 0, 31))).toBe("2026-02-28");
+    expect(nextSecurityReviewDate("Yearly", new Date(2026, 8, 13))).toBe("2027-09-13");
+  });
+});

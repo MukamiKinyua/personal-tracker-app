@@ -178,6 +178,7 @@ import {
 } from "../lib/goalTracker";
 import {
   appendSecurityReviewLog,
+  nextSecurityReviewDate,
   securityReviewStatus,
   securityReviewSummary,
   type SecurityReviewStatus,
@@ -12290,9 +12291,14 @@ function SecurityReviewWorkspacePage({
     sharingPermissions: false,
   });
   const [records, setRecords] = useState<SecurityRecord[]>([]);
+  const [lastRecords, setLastRecords] = useState<SecurityRecord[] | null>(null);
   const [draft, setDraft] = useState(emptyDraft);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [archiveOpen, setArchiveOpen] = useState(false);
+  const securityToday = sleepDateInputValue(new Date());
+  function reviewWhen(reviewDate: string) {
+    return reviewDate ? assignmentDueDetail(reviewDate, securityToday) : null;
+  }
   useMongoJournalScope({
     scope: "security",
     payload: { records },
@@ -12373,12 +12379,23 @@ function SecurityReviewWorkspacePage({
   }
   function markReviewed(record: SecurityRecord) {
     const history = appendSecurityReviewLog(record.reviewHistory, record.note);
+    const nextDate = nextSecurityReviewDate(record.cadence);
     updateRecord(record.id, item => ({
       ...item,
       state: "Reviewed",
       completedAt: history[history.length - 1].date,
       reviewHistory: history,
+      // The cadence finally does something: the next review is scheduled
+      // from today, so the record comes back on its own.
+      reviewDate: nextDate,
     }));
+    toast(`${record.label} reviewed · next review ${reviewWhen(nextDate)?.exact ?? nextDate}`);
+  }
+  function removeRecord(record: SecurityRecord) {
+    setLastRecords(records);
+    setRecords(current => current.filter(item => item.id !== record.id));
+    if (editingId === record.id) resetDraft();
+    toast(`Removed ${record.label}`);
   }
   function RecordCard({ record }: { record: SecurityRecord }) {
     const status = securityReviewStatus(record.reviewDate);
@@ -12410,10 +12427,26 @@ function SecurityReviewWorkspacePage({
           </button>
         </div>
         <p className="security-date">
-          <b>{status}</b>
-          {record.reviewDate
-            ? ` · ${record.reviewDate}`
-            : " · no review date added"}
+          <b>
+            {record.state === "Reviewed"
+              ? status === "Later"
+                ? "Next review"
+                : "Due again"
+              : status}
+          </b>
+          {record.reviewDate ? (
+            <>
+              {" · "}
+              <time dateTime={record.reviewDate}>
+                {reviewWhen(record.reviewDate)?.exact}
+              </time>
+              {reviewWhen(record.reviewDate)
+                ? ` (${reviewWhen(record.reviewDate)!.label.toLowerCase()})`
+                : ""}
+            </>
+          ) : (
+            " · no review date added"
+          )}
         </p>
         {record.nextAction ? (
           <div className="security-action-cue">
@@ -12452,8 +12485,9 @@ function SecurityReviewWorkspacePage({
           </div>
         ) : null}
         <small>
-          Local cadence · {record.cadence}. This page does not verify settings
-          or send reminders.
+          Cadence · {record.cadence}: marking a review done schedules the next
+          one from that day. This page does not verify settings or send
+          reminders.
         </small>
         <div className="security-card-actions">
           {record.state === "Review now" ? (
@@ -12515,11 +12549,8 @@ function SecurityReviewWorkspacePage({
           <button
             type="button"
             className="remove"
-            onClick={() =>
-              setRecords(current =>
-                current.filter(item => item.id !== record.id)
-              )
-            }
+            onClick={() => removeRecord(record)}
+            aria-label={`Remove ${record.label}`}
           >
             Remove
           </button>
@@ -12607,7 +12638,21 @@ function SecurityReviewWorkspacePage({
         <section className="security-review-summary">
           <div>
             <span>Review, factually</span>
-            <b>{summary.reviewNow} to consider now</b>
+            <b>
+              {summary.reviewNow} to consider now
+              {lastRecords && (
+                <button
+                  type="button"
+                  className="local-undo"
+                  onClick={() => {
+                    setRecords(lastRecords);
+                    setLastRecords(null);
+                  }}
+                >
+                  Undo remove
+                </button>
+              )}
+            </b>
           </div>
           <p>
             {records.length

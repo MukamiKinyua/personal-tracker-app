@@ -12,7 +12,26 @@ export type SecurityReviewRecord = {
 export type SecurityReviewLog = { date: string; note: string };
 
 function localDateKey(date: Date) {
-  return date.toISOString().slice(0, 10);
+  // The local calendar day; toISOString() would name yesterday for anyone
+  // east of UTC before their midnight reached Greenwich.
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+const cadenceMonths: Record<string, number> = {
+  Monthly: 1,
+  "Every 3 months": 3,
+  "Every 6 months": 6,
+  Yearly: 12,
+};
+
+/** The next review date implied by a cadence, counted from the day the
+ * review happened — so a late review doesn't compound into the next one. */
+export function nextSecurityReviewDate(cadence: string, from = new Date()) {
+  const months = cadenceMonths[cadence] ?? 3;
+  const next = new Date(from.getFullYear(), from.getMonth() + months, from.getDate(), 12);
+  // Clamp a 31st to the target month's last day rather than rolling over.
+  if (next.getDate() !== from.getDate()) next.setDate(0);
+  return localDateKey(next);
 }
 
 export function securityReviewStatus(
