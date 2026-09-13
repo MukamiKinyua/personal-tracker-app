@@ -16588,6 +16588,36 @@ function GoalsWorkspacePage({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [currentGoalId, setCurrentGoalId] = useState<string | null>(null);
   const [reviewText, setReviewText] = useState("");
+  const [lastGoals, setLastGoals] = useState<GoalRecord[] | null>(null);
+  const goalsToday = sleepDateInputValue(new Date());
+  function deadlineDetail(goal: GoalRecord) {
+    if (!goal.deadline) return null;
+    const detail = assignmentDueDetail(goal.deadline, goalsToday);
+    const settled = goal.state === "completed" || goal.state === "archived";
+    return {
+      kind: settled ? "settled" : detail.kind,
+      exact: detail.exact,
+      label: settled
+        ? detail.exact
+        : detail.kind === "overdue"
+          ? `${detail.exact} · ${Math.abs(detail.daysAway ?? 0)} day${Math.abs(detail.daysAway ?? 0) === 1 ? "" : "s"} past`
+          : detail.kind === "today"
+            ? `${detail.exact} · today`
+            : detail.kind === "tomorrow"
+              ? `${detail.exact} · tomorrow`
+              : `${detail.exact} · ${detail.daysAway} days`,
+    };
+  }
+  function setGoalState(goal: GoalRecord, state: GoalState, word: string) {
+    updateGoal(goal.id, item => ({ ...item, state }));
+    toast(`“${goal.title}” ${word}`);
+  }
+  function removeGoal(goal: GoalRecord) {
+    setLastGoals(goals);
+    setGoals(items => items.filter(item => item.id !== goal.id));
+    if (editingId === goal.id) resetEditor();
+    toast(`Removed “${goal.title}”`);
+  }
   useMongoJournalScope({
     scope: "goals",
     payload: { goals, currentGoalId },
@@ -16720,9 +16750,10 @@ function GoalsWorkspacePage({
         <p className="goal-card-why">
           {goal.why || "Why this matters can be added whenever you are ready."}
         </p>
-        {goal.deadline ? (
-          <small className="goal-date">
-            Review or target date · {goal.deadline}
+        {goal.deadline && deadlineDetail(goal) ? (
+          <small className={cn("goal-date", `is-${deadlineDetail(goal)!.kind}`)}>
+            Review or target date ·{" "}
+            <time dateTime={goal.deadline}>{deadlineDetail(goal)!.label}</time>
           </small>
         ) : (
           <small className="goal-date">
@@ -16816,9 +16847,7 @@ function GoalsWorkspacePage({
               </button>
               <button
                 type="button"
-                onClick={() =>
-                  updateGoal(goal.id, item => ({ ...item, state: "completed" }))
-                }
+                onClick={() => setGoalState(goal, "completed", "marked complete")}
               >
                 Complete
               </button>
@@ -16827,17 +16856,13 @@ function GoalsWorkspacePage({
             <>
               <button
                 type="button"
-                onClick={() =>
-                  updateGoal(goal.id, item => ({ ...item, state: "active" }))
-                }
+                onClick={() => setGoalState(goal, "active", "is active again")}
               >
                 Continue
               </button>
               <button
                 type="button"
-                onClick={() =>
-                  updateGoal(goal.id, item => ({ ...item, state: "archived" }))
-                }
+                onClick={() => setGoalState(goal, "archived", "archived — find it under review")}
               >
                 Archive
               </button>
@@ -16846,9 +16871,8 @@ function GoalsWorkspacePage({
           <button
             type="button"
             className="remove"
-            onClick={() =>
-              setGoals(items => items.filter(item => item.id !== goal.id))
-            }
+            onClick={() => removeGoal(goal)}
+            aria-label={`Remove ${goal.title}`}
           >
             Remove
           </button>
@@ -16894,6 +16918,18 @@ function GoalsWorkspacePage({
           <span>
             {summary.active} active intention{summary.active === 1 ? "" : "s"} ·{" "}
             {summary.completed} complete
+            {lastGoals && (
+              <button
+                type="button"
+                className="local-undo goal-undo"
+                onClick={() => {
+                  setGoals(lastGoals);
+                  setLastGoals(null);
+                }}
+              >
+                Undo remove
+              </button>
+            )}
           </span>
         </div>
       </div>

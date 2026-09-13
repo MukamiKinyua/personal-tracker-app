@@ -31166,3 +31166,26 @@ body {
 .internship-deadline.is-tomorrow {
   color: #a8481f;
 }
+
+.goal-date time {
+  font-variant-numeric: tabular-nums;
+}
+.goal-date.is-overdue {
+  color: #7d2946;
+  font-weight: 800;
+}
+.goal-date.is-today,
+.goal-date.is-tomorrow {
+  color: #a8481f;
+  font-weight: 800;
+}
+.goal-spark .goal-undo {
+  margin-left: 0.5rem;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  background: none;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
