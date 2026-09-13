@@ -13,6 +13,9 @@ const queryClient = new QueryClient();
 const redirectToLoginIfUnauthorized = (error: unknown) => {
   if (!(error instanceof TRPCClientError)) return;
   if (typeof window === "undefined") return;
+  // The Manus portal is optional. Without it, "signed out" is a state the
+  // account panel handles — not a redirect to "undefined/app-auth".
+  if (!import.meta.env.VITE_OAUTH_PORTAL_URL) return;
 
   const isUnauthorized = error.message === UNAUTHED_ERR_MSG;
 
@@ -71,6 +74,19 @@ const trpcClient = trpc.createClient({
     }),
   ],
 });
+
+/*
+ * Registered only for production builds: in development Vite serves modules
+ * live, and a worker caching them would hand back yesterday's code. Failure is
+ * not fatal — the app runs identically, it just cannot open offline.
+ */
+if (import.meta.env.PROD && "serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker
+      .register("/sw.js")
+      .catch(error => console.warn("[offline] service worker not registered", error));
+  });
+}
 
 createRoot(document.getElementById("root")!).render(
   <trpc.Provider client={trpcClient} queryClient={queryClient}>

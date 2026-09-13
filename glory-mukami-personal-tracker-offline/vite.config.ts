@@ -150,7 +150,53 @@ function vitePluginManusDebugCollector(): Plugin {
   };
 }
 
-const plugins = [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector()];
+/**
+ * Emits the service worker with the build's real asset list baked in.
+ *
+ * Vite hashes every filename, so the precache list cannot live in the worker
+ * source. The template in client/sw/ carries a `__PRECACHE__` placeholder and
+ * this fills it from the bundle it just produced, plus a version derived from
+ * those names so a new build always installs a new worker.
+ */
+function vitePluginServiceWorker(): Plugin {
+  const template = path.join(PROJECT_ROOT, "client", "sw", "service-worker.js");
+  return {
+    name: "service-worker",
+    apply: "build",
+    generateBundle(_options, bundle) {
+      const assets = Object.keys(bundle)
+        .filter(name => name.startsWith("assets/"))
+        // Page artwork and exercise video are fetched on demand and cached
+        // then; precaching hundreds of megabytes on first open is worse than
+        // a missing picture offline.
+        .filter(name => !/\.(mp4|webm|png|jpe?g|gif|webp)$/i.test(name))
+        .map(name => `/${name}`);
+
+      const precache = [
+        "/",
+        "/index.html",
+        "/manifest.webmanifest",
+        "/icons/icon-192.png",
+        "/icons/icon-512.png",
+        ...assets,
+      ];
+
+      let version = 0;
+      for (const char of precache.join("|")) {
+        version = (version * 31 + char.charCodeAt(0)) >>> 0;
+      }
+
+      const source = fs
+        .readFileSync(template, "utf-8")
+        .replace("__PRECACHE__", JSON.stringify(precache))
+        .replace("__VERSION__", version.toString(36));
+
+      this.emitFile({ type: "asset", fileName: "sw.js", source });
+    },
+  };
+}
+
+const plugins = [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector(), vitePluginServiceWorker()];
 
 export default defineConfig({
   plugins,
