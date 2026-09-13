@@ -8762,6 +8762,14 @@ button:focus-visible {
   background: rgba(43, 22, 33, 0.06);
 }
 
+/* .today-recap's own <b> and the <small> that follows it (recap.isEmpty's
+   message) were both inline by default with nothing forcing a line break
+   between them, so "Today so far" and its message ran together on one line
+   rather than stacking as label-then-detail like every other chip in the
+   app. */
+.today-recap b {
+  display: block;
+}
 .today-recap ul {
   margin: 0.35rem 0 0;
   padding-left: 1.1rem;
@@ -31412,11 +31420,14 @@ body {
   color: rgba(255, 255, 255, 0.68) !important;
   -webkit-text-fill-color: rgba(255, 255, 255, 0.68) !important;
 }
-#root .journal-stage[data-journal-view="dashboard"] .dashboard-heading p,
-#root .journal-stage[data-journal-view="dashboard"] .dashboard-heading .quick-add-button {
+#root .journal-stage[data-journal-view="dashboard"] .dashboard-heading p {
   color: rgba(255, 255, 255, 0.94) !important;
   -webkit-text-fill-color: rgba(255, 255, 255, 0.94) !important;
 }
+/* .quick-add-button is deliberately excluded above: it already carries its
+   own opaque light pill (#fff6fb) with dark ink, the same convention as
+   "Log water"/"Start focus" - correct regardless of the page background,
+   and forcing white text onto it would have put white-on-near-white. */
 #root .journal-stage[data-journal-view="dashboard"] .dashboard-card {
   background: rgba(0, 0, 0, 0.42) !important;
   backdrop-filter: blur(18px) saturate(118%) !important;
