@@ -7817,6 +7817,7 @@ function ProjectsPage({
                   onClick={() => {
                     setProjects(lastProjects);
                     setLastProjects(null);
+                    toast("Project restored");
                   }}
                 >
                   Undo remove
