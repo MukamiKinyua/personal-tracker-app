@@ -29,16 +29,18 @@ import {
   MAX_PRIORITIES,
   type Priority,
 } from "@/lib/core/priorities";
-import { REMINDER_COPY, type ReminderKind } from "@/lib/core/notifications";
-import { useRef, useState } from "react";
-
-const REMINDERS: ReminderKind[] = [
-  "water",
-  "mood",
-  "sleep",
-  "habit",
-  "journal",
-];
+import {
+  MAX_IGNORED_BEFORE_PAUSE,
+  REMINDER_COPY,
+  markActedOn,
+  type ReminderSetting,
+} from "@/lib/core/notifications";
+import {
+  isNative,
+  notificationsPermitted,
+  requestNotificationPermission,
+} from "@/lib/native";
+import { useEffect, useRef, useState } from "react";
 
 export function SettingsPanel() {
   const journal = useRecordStore();
@@ -50,6 +52,29 @@ export function SettingsPanel() {
   const [restoreMode, setRestoreMode] = useState<RestoreMode>("merge");
   const [restoreProblems, setRestoreProblems] = useState<string[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [permitted, setPermitted] = useState<boolean>();
+
+  useEffect(() => {
+    void notificationsPermitted().then(setPermitted);
+  }, []);
+
+  function setReminder(kind: ReminderSetting["kind"], patch: Partial<ReminderSetting>) {
+    journal.updatePreferences({
+      reminders: preferences.reminders.map(reminder =>
+        reminder.kind === kind ? { ...reminder, ...patch } : reminder
+      ),
+    });
+  }
+
+  async function enableReminders(enabled: boolean) {
+    if (enabled && permitted !== true) {
+      // Asked at the moment it matters, on the user's own action, rather
+      // than on first open — which is when permission prompts get refused.
+      const granted = await requestNotificationPermission();
+      setPermitted(granted);
+    }
+    journal.updatePreferences({ notifications: { enabled } });
+  }
 
   /*
    * Priorities and memory are records, so they reach the user's other devices.
@@ -232,11 +257,7 @@ export function SettingsPanel() {
           <input
             type="checkbox"
             checked={preferences.notifications.enabled}
-            onChange={event =>
-              journal.updatePreferences({
-                notifications: { enabled: event.target.checked },
-              })
-            }
+            onChange={event => void enableReminders(event.target.checked)}
           />
           <span>
             <b>Let this app remind me</b>
@@ -249,19 +270,93 @@ export function SettingsPanel() {
         </label>
 
         {preferences.notifications.enabled ? (
-          <ul className="settings-reminders">
-            {REMINDERS.map(kind => (
-              <li key={kind}>
-                <b>{kind}</b>
-                <small>{REMINDER_COPY[kind].body}</small>
-              </li>
-            ))}
-          </ul>
+          <>
+            {permitted === false ? (
+              <p className="settings-error" role="alert">
+                Notifications are blocked for this app on this device, so
+                nothing can be shown until that is allowed in the device
+                settings.
+              </p>
+            ) : null}
+
+            <ul className="settings-reminders">
+              {preferences.reminders.map(reminder => (
+                <li key={reminder.kind}>
+                  <label className="settings-toggle">
+                    <input
+                      type="checkbox"
+                      checked={reminder.enabled}
+                      onChange={event =>
+                        setReminder(reminder.kind, {
+                          enabled: event.target.checked,
+                          // Switching it on again is an answer: the pause
+                          // that ignoring it earned is cleared.
+                          ...(event.target.checked
+                            ? { ignoredCount: 0 }
+                            : {}),
+                        })
+                      }
+                    />
+                    <span>
+                      <b>{REMINDER_COPY[reminder.kind].body}</b>
+                      {reminder.ignoredCount >= MAX_IGNORED_BEFORE_PAUSE ? (
+                        <small>
+                          Paused — it went unanswered {reminder.ignoredCount}{" "}
+                          times.{" "}
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setReminder(reminder.kind, markActedOn(reminder))
+                            }
+                          >
+                            Resume
+                          </button>
+                        </small>
+                      ) : null}
+                    </span>
+                  </label>
+                  <input
+                    type="time"
+                    value={reminder.at}
+                    aria-label={`Time for the ${reminder.kind} reminder`}
+                    disabled={!reminder.enabled}
+                    onChange={event =>
+                      setReminder(reminder.kind, { at: event.target.value })
+                    }
+                  />
+                </li>
+              ))}
+            </ul>
+
+            <label className="settings-quiet">
+              Quiet from
+              <input
+                type="time"
+                value={preferences.notifications.quietHoursStart}
+                onChange={event =>
+                  journal.updatePreferences({
+                    notifications: { quietHoursStart: event.target.value },
+                  })
+                }
+              />
+              until
+              <input
+                type="time"
+                value={preferences.notifications.quietHoursEnd}
+                onChange={event =>
+                  journal.updatePreferences({
+                    notifications: { quietHoursEnd: event.target.value },
+                  })
+                }
+              />
+            </label>
+          </>
         ) : null}
 
         <p className="settings-note">
-          Reminders are not delivered yet. This sets what would be sent and the
-          wording it would use.
+          {isNative()
+            ? "Delivered by your phone at the times set, whether or not the app is open. A reminder set inside quiet hours is not scheduled at all."
+            : "In a browser, a reminder can only be shown while this app is open — it checks once a minute and skips anything you have already recorded. Install the Android app for reminders that arrive with it closed."}
         </p>
       </section>
 

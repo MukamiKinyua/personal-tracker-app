@@ -9,6 +9,7 @@
  */
 
 import { detectTimeZone } from "./datetime";
+import type { ReminderSetting } from "./notifications";
 
 export type VolumeUnit = "ml" | "l" | "oz" | "cup";
 export type MeasurementSystem = "metric" | "imperial";
@@ -55,6 +56,12 @@ export type Preferences = {
     quietHoursStart: string;
     quietHoursEnd: string;
   };
+  /**
+   * Per-reminder switches and times. Kept in preferences rather than records
+   * on purpose: a reminder should fire on the device it was set on, not on
+   * whichever one happens to be awake.
+   */
+  reminders: ReminderSetting[];
   /** Hides personal detail for shared screens (3.1). */
   privacyMode: boolean;
   reducedMotion: "system" | "always" | "never";
@@ -82,6 +89,20 @@ export const DEFAULT_AREAS: TrackedArea[] = [
   "goals",
 ];
 
+/**
+ * Every reminder kind, off, at a sensible hour. Off is the whole point: a
+ * tracker that starts by sending notifications has decided something for the
+ * user that was theirs to decide.
+ */
+export const DEFAULT_REMINDERS: ReminderSetting[] = [
+  { kind: "sleep", enabled: false, at: "08:30", ignoredCount: 0 },
+  { kind: "water", enabled: false, at: "11:00", ignoredCount: 0 },
+  { kind: "mood", enabled: false, at: "14:00", ignoredCount: 0 },
+  { kind: "habit", enabled: false, at: "18:00", ignoredCount: 0 },
+  { kind: "journal", enabled: false, at: "20:30", ignoredCount: 0 },
+  { kind: "review", enabled: false, at: "17:00", ignoredCount: 0 },
+];
+
 export function defaultPreferences(): Preferences {
   return {
     displayName: "",
@@ -99,6 +120,7 @@ export function defaultPreferences(): Preferences {
       quietHoursStart: "22:00",
       quietHoursEnd: "07:00",
     },
+    reminders: DEFAULT_REMINDERS.map(reminder => ({ ...reminder })),
     privacyMode: false,
     reducedMotion: "system",
     onboardingCompleted: false,
@@ -113,6 +135,13 @@ export function resolvePreferences(input: PreferenceInput = {}): Preferences {
     ...input,
     areas: input.areas ?? base.areas,
     notifications: { ...base.notifications, ...input.notifications },
+    // Saved by kind, so a reminder kind added later still appears with its
+    // default rather than vanishing for anyone with older preferences.
+    reminders: base.reminders.map(
+      fallback =>
+        input.reminders?.find(saved => saved.kind === fallback.kind) ??
+        fallback
+    ),
   };
 }
 

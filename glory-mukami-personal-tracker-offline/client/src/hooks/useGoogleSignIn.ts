@@ -13,6 +13,7 @@
  */
 
 import { storeSessionToken } from "@/lib/api";
+import { isNative, nativeGoogleIdToken } from "@/lib/native";
 import { trpc } from "@/lib/trpc";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -159,16 +160,27 @@ export function useGoogleSignIn(clientId?: string): SignInState {
   const signIn = useCallback(async () => {
     setError(undefined);
     try {
+      if (isNative()) {
+        // The phone's own account picker, which needs no script from Google
+        // and works with the browser-facing client id as its audience.
+        if (!resolvedClientId) {
+          throw new Error("Google sign-in is not configured for this build.");
+        }
+        await exchange(await nativeGoogleIdToken(resolvedClientId));
+        return;
+      }
       const google = await ensureInitialised();
       google.accounts.id.prompt();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not sign in.");
     }
-  }, [ensureInitialised]);
+  }, [ensureInitialised, exchange, resolvedClientId]);
 
   const renderButton = useCallback(
     (element: HTMLElement | null) => {
-      if (!element) return;
+      // Google's rendered button is a browser thing; on the phone the plain
+      // sign-in button calls the native picker instead.
+      if (!element || isNative()) return;
       void ensureInitialised()
         .then(google =>
           google.accounts.id.renderButton(element, {

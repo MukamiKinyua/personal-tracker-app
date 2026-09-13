@@ -7,6 +7,7 @@ import { RecordStoreProvider } from "./contexts/RecordStoreContext";
 import { SearchPalette } from "./components/SearchPalette";
 import { TimersProvider } from "./contexts/TimersContext";
 import { TimerBar } from "./components/TimerBar";
+import { NativeBridges } from "./components/NativeBridges";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
 
@@ -43,6 +44,9 @@ function App() {
               {/* Above the router, so a rest timer survives navigating away
                   from the page that started it. */}
               <TimerBar />
+              {/* Reminder schedule and home-screen widget, kept in step with
+                  the journal. Renders nothing. */}
+              <NativeBridges />
               <Router />
             </TooltipProvider>
           </TimersProvider>

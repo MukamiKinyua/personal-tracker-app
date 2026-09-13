@@ -81,12 +81,12 @@ function png(size, pixelAt) {
  * a circle or squircle and anything outside the safe zone is lost; the plain
  * icon leaves rounded corners and transparent margins instead.
  */
-function draw(size, { maskable }) {
+function draw(size, { maskable, shape = maskable ? "square" : "rounded", scale = 1 }) {
   const centre = (size - 1) / 2;
-  const corner = maskable ? 0 : size * 0.18;
-  const ringOuter = size * 0.32;
-  const ringInner = size * 0.24;
-  const dot = size * 0.09;
+  const corner = shape === "rounded" ? size * 0.18 : 0;
+  const ringOuter = size * 0.32 * scale;
+  const ringInner = size * 0.24 * scale;
+  const dot = size * 0.09 * scale;
 
   const coverage = (distance, edge) =>
     Math.max(0, Math.min(1, edge - distance + 0.5));
@@ -96,15 +96,19 @@ function draw(size, { maskable }) {
     const dy = y - centre;
     const radial = Math.hypot(dx, dy);
 
-    // Rounded-square alpha for the non-maskable icon.
+    // The plate: rounded square, circle, full square, or none at all (the
+    // adaptive-icon foreground, where Android supplies the background).
     let alpha = 1;
-    if (!maskable) {
+    if (shape === "rounded") {
       const inner = size / 2 - corner;
       const qx = Math.max(0, Math.abs(dx) - inner);
       const qy = Math.max(0, Math.abs(dy) - inner);
       alpha = coverage(Math.hypot(qx, qy), corner);
+    } else if (shape === "circle") {
+      alpha = coverage(radial, size / 2);
+    } else if (shape === "none") {
+      alpha = 0;
     }
-    if (alpha === 0) return [0, 0, 0, 0];
 
     let colour = INK;
     const ring = coverage(radial, ringOuter) * (1 - coverage(radial, ringInner));
@@ -112,6 +116,12 @@ function draw(size, { maskable }) {
     if (centreDot > 0) colour = blend(INK, GOLD, centreDot);
     else if (ring > 0) colour = blend(INK, CREAM, ring);
 
+    if (shape === "none") {
+      // Only the mark itself is opaque; everything else is transparent.
+      const mark = Math.max(ring, centreDot);
+      return mark > 0 ? [...colour, Math.round(mark * 255)] : [0, 0, 0, 0];
+    }
+    if (alpha === 0) return [0, 0, 0, 0];
     return [...colour, Math.round(alpha * 255)];
   };
 }
@@ -130,4 +140,32 @@ for (const [name, size, options] of [
 ]) {
   writeFileSync(resolve(OUT, name), png(size, draw(size, options)));
   console.log(`wrote icons/${name}`);
+}
+
+/*
+ * Android launcher icons, one set per density. The adaptive foreground is
+ * the mark alone on transparency, drawn at two thirds so it sits inside the
+ * safe zone whatever shape the launcher cuts; the background colour comes
+ * from res/values/ic_launcher_background.xml.
+ */
+const ANDROID_RES = resolve(here, "..", "android", "app", "src", "main", "res");
+const DENSITIES = { mdpi: 1, hdpi: 1.5, xhdpi: 2, xxhdpi: 3, xxxhdpi: 4 };
+for (const [density, factor] of Object.entries(DENSITIES)) {
+  const dir = resolve(ANDROID_RES, `mipmap-${density}`);
+  mkdirSync(dir, { recursive: true });
+  const legacy = Math.round(48 * factor);
+  const adaptive = Math.round(108 * factor);
+  writeFileSync(
+    resolve(dir, "ic_launcher.png"),
+    png(legacy, draw(legacy, { maskable: false, shape: "rounded" }))
+  );
+  writeFileSync(
+    resolve(dir, "ic_launcher_round.png"),
+    png(legacy, draw(legacy, { maskable: false, shape: "circle" }))
+  );
+  writeFileSync(
+    resolve(dir, "ic_launcher_foreground.png"),
+    png(adaptive, draw(adaptive, { maskable: true, shape: "none", scale: 0.66 }))
+  );
+  console.log(`wrote android mipmap-${density}`);
 }

@@ -1,4 +1,5 @@
 import { apiUrl, readSessionToken } from "@/lib/api";
+import { isNative } from "@/lib/native";
 import { trpc } from "@/lib/trpc";
 import { COOKIE_NAME, UNAUTHED_ERR_MSG } from "@shared/const";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -86,7 +87,8 @@ const trpcClient = trpc.createClient({
  * live, and a worker caching them would hand back yesterday's code. Failure is
  * not fatal — the app runs identically, it just cannot open offline.
  */
-if (import.meta.env.PROD && "serviceWorker" in navigator) {
+// Inside the APK the shell is already local, so there is nothing to cache.
+if (import.meta.env.PROD && !isNative() && "serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker
       .register("/sw.js")
