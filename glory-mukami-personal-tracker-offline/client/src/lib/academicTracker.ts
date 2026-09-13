@@ -87,19 +87,6 @@ export type RevisionLog = {
   note: string;
 };
 
-export function examDueStatus(date: string, referenceDate: string): string {
-  if (!date) return "No date set";
-  const examDate = new Date(`${date}T00:00:00`);
-  const reference = new Date(`${referenceDate}T00:00:00`);
-  const difference = Math.ceil(
-    (examDate.getTime() - reference.getTime()) / 86_400_000
-  );
-  if (difference < 0) return "Date passed";
-  if (difference === 0) return "Today";
-  if (difference === 1) return "Tomorrow";
-  return `${difference} days to go`;
-}
-
 export function weeklyRevisionMinutes(
   logs: RevisionLog[],
   referenceDate: string

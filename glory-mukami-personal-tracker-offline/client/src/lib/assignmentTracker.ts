@@ -95,13 +95,6 @@ export function assignmentDueDetail(
   };
 }
 
-export function assignmentDueStatus(
-  due: string,
-  referenceDate: string
-): string {
-  return assignmentDueDetail(due, referenceDate).label;
-}
-
 export type AssignmentSort = "due" | "priority" | "course";
 
 const priorityRank: Record<AssignmentPlan["priority"], number> = {

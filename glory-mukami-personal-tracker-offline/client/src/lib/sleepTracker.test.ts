@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   formatSleepDuration,
-  replaceSleepLog,
   sleepDateInputValue,
   sleepDurationBand,
   sleepDurationCheck,
@@ -50,27 +49,4 @@ describe("sleep tracker helpers", () => {
     expect(sleepDurationBand(9).label).toBe("9 h or more");
   });
 
-  it("replaces only the edited sleep log", () => {
-    const original = {
-      id: "night-1",
-      date: "Mon, Aug 24",
-      bedtime: "23:15",
-      wakeTime: "07:10",
-      hours: 7.9,
-      quality: "Restful",
-      windDown: true,
-      note: "",
-    };
-    const other = { ...original, id: "night-2", date: "Sun, Aug 23" };
-    const updated = {
-      ...original,
-      quality: "Deep",
-      note: "No late screen time",
-    };
-    const previous = [original, other];
-    const next = replaceSleepLog(previous, updated);
-    expect(next).toEqual([updated, other]);
-    expect(next).not.toBe(previous);
-    expect(previous).toEqual([original, other]);
-  });
 });

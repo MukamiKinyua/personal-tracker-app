@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  examDueStatus,
   nextAcademicItem,
   standingDetail,
   weeklyRevisionMinutes,
@@ -35,14 +34,13 @@ describe("academic planning helpers", () => {
     ).toBe(68);
   });
 
-  it("finds the next unfinished academic item and describes exam timing", () => {
+  it("finds the next unfinished academic item", () => {
     expect(
       nextAcademicItem([
         { id: "late", label: "Later", due: "2026-09-04", done: false },
         { id: "early", label: "Earlier", due: "2026-08-27", done: false },
       ])?.id
     ).toBe("early");
-    expect(examDueStatus("2026-08-27", "2026-08-25")).toBe("2 days to go");
   });
 
   it("totals revision time for the factual rolling seven-day view", () => {

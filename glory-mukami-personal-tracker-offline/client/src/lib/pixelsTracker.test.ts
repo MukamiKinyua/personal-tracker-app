@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  countFilledPixels,
   migratePixelRecords,
   pixelsCellKey,
   pixelsDaysInMonth,
@@ -19,7 +18,7 @@ describe("Pixels tracker helpers", () => {
   it("fills a selected cell and clears it when the same status is selected again", () => {
     const filled = updatePixelCell({}, 6, 14, "#d94889");
     expect(filled).toEqual({ "7-14": "#d94889" });
-    expect(countFilledPixels(filled)).toBe(1);
+    expect(Object.keys(filled)).toHaveLength(1);
     expect(updatePixelCell(filled, 6, 14, "#d94889")).toEqual({});
   });
 

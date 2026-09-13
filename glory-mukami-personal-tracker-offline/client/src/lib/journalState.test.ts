@@ -3,16 +3,12 @@ import {
   addPracticeSession,
   practiceProgress,
   practiceTotals,
-  adjustManualCountdown,
   activePageAfterNavigation,
-  renameNamedEntry,
   reflectionCarryForward,
   resolveJournalView,
   saveReflectionEntry,
   estimateCycle,
   formatHistoryActivityMetric,
-  toggleDailySlotFill,
-  toggleNamedCompletion,
   toggleQuickAddVisibility,
 } from "./journalState";
 
@@ -36,45 +32,9 @@ describe("journal view selection", () => {
 });
 
 describe("journal prototype interactions", () => {
-  it("adds and clears an exact daily portrait fill", () => {
-    const filled = toggleDailySlotFill({}, 8, "#d238a4");
-    expect(filled).toEqual({ 8: "#d238a4" });
-    expect(toggleDailySlotFill(filled, 8, "#d238a4")).toEqual({});
-  });
-
   it("toggles the quick-add panel visibility", () => {
     expect(toggleQuickAddVisibility(false)).toBe(true);
     expect(toggleQuickAddVisibility(true)).toBe(false);
-  });
-
-  it("adjusts a manual local focus countdown without dropping below zero", () => {
-    expect(adjustManualCountdown(60, -5)).toBe(55);
-    expect(adjustManualCountdown(3, -5)).toBe(0);
-  });
-
-  it("logs and reverses a named workout completion", () => {
-    expect(toggleNamedCompletion({}, "Bicycle crunches")).toEqual({
-      "Bicycle crunches": true,
-    });
-    expect(
-      toggleNamedCompletion({ "Bicycle crunches": true }, "Bicycle crunches")
-    ).toEqual({ "Bicycle crunches": false });
-  });
-
-  it("renames just the selected existing entry", () => {
-    expect(
-      renameNamedEntry(
-        [
-          { title: "Plan study", done: false },
-          { title: "Walk", done: true },
-        ],
-        0,
-        "Plan focused study"
-      )
-    ).toEqual([
-      { title: "Plan focused study", done: false },
-      { title: "Walk", done: true },
-    ]);
   });
 
   it("adds a dated practice session with duration and note to the selected skill history", () => {

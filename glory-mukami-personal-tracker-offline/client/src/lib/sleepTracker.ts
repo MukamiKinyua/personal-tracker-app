@@ -77,24 +77,6 @@ export function sleepDurationCheck(
   return { kind: "ok" };
 }
 
-export type SleepLogRecord = {
-  id: string;
-  date: string;
-  bedtime: string;
-  wakeTime: string;
-  hours: number;
-  quality: string;
-  windDown: boolean;
-  note: string;
-};
-
-export function replaceSleepLog<T extends SleepLogRecord>(
-  logs: T[],
-  updated: T
-) {
-  return logs.map(log => (log.id === updated.id ? updated : log));
-}
-
 export function sleepDurationBand(hours: number) {
   if (hours < 5) return { label: "Under 5 h", color: "#df7c9e" };
   if (hours < 7) return { label: "5–6 h 59", color: "#8e7ac0" };

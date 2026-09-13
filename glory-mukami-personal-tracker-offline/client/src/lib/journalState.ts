@@ -70,42 +70,8 @@ export function activePageAfterNavigation(
     : nextPage;
 }
 
-export function toggleDailySlotFill(
-  fills: Record<number, string>,
-  day: number,
-  selectedColor: string
-): Record<number, string> {
-  if (fills[day]) {
-    const { [day]: _cleared, ...remaining } = fills;
-    return remaining;
-  }
-
-  return { ...fills, [day]: selectedColor };
-}
-
 export function toggleQuickAddVisibility(isOpen: boolean): boolean {
   return !isOpen;
-}
-
-export function adjustManualCountdown(minutes: number, delta: number): number {
-  return Math.max(0, minutes + delta);
-}
-
-export function toggleNamedCompletion(
-  completed: Record<string, boolean>,
-  name: string
-): Record<string, boolean> {
-  return { ...completed, [name]: !completed[name] };
-}
-
-export function renameNamedEntry<T extends { title: string }>(
-  entries: T[],
-  index: number,
-  title: string
-): T[] {
-  return entries.map((entry, position) =>
-    position === index ? { ...entry, title } : entry
-  );
 }
 
 export type PracticeSession = {

@@ -70,10 +70,6 @@ export function setPixelCell(
   return { ...cells, [pixelsCellKey(monthIndex, day)]: color };
 }
 
-export function countFilledPixels(cells: PixelCells) {
-  return Object.keys(cells).length;
-}
-
 /**
  * Colours that pages once painted automatically but that never appeared in
  * the tracker's legend, mapped to the legend key they most honestly meant.

@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   assignmentDueDetail,
-  assignmentDueStatus,
   assignmentWorkload,
   sortAssignments,
   sortAssignmentsByDue,
@@ -52,10 +51,10 @@ const assignments: AssignmentPlan[] = [
 
 describe("assignment tracker helpers", () => {
   it("provides factual due labels", () => {
-    expect(assignmentDueStatus("2026-08-25T17:00", "2026-08-25")).toBe(
+    expect(assignmentDueDetail("2026-08-25T17:00", "2026-08-25").label).toBe(
       "Due today"
     );
-    expect(assignmentDueStatus("2026-08-27T17:00", "2026-08-25")).toBe(
+    expect(assignmentDueDetail("2026-08-27T17:00", "2026-08-25").label).toBe(
       "2 days left"
     );
   });
