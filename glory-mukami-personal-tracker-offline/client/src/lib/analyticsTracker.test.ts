@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  activityCoverage,
+  analyticsCsv,
   compareLocalActivitySources,
   descriptiveActivityTrend,
   filterAnalyticsActivityByPeriod,
@@ -8,6 +10,74 @@ import {
 } from "./analyticsTracker";
 
 describe("analyticsTracker", () => {
+  it("counts the period against the reference's local calendar day, not UTC", () => {
+    // 01:00 on 27 Aug local; in UTC+3 that is still 26 Aug UTC. "Today"
+    // must mean the 27th.
+    const reference = new Date(2026, 7, 27, 1, 0);
+    const records = [
+      {
+        id: "t",
+        module: "Habits",
+        amount: 1,
+        label: "x",
+        createdAt: "",
+        recordedOn: "2026-08-27",
+      },
+    ];
+    expect(filterAnalyticsActivityByPeriod(records, "today", reference)).toHaveLength(1);
+  });
+
+  it("reports how many days in a period have any record at all", () => {
+    const reference = new Date(2026, 7, 26, 12, 0);
+    const records = ["26", "26", "24"].map((day, index) => ({
+      id: String(index),
+      module: "Habits",
+      amount: 1,
+      label: "Habit",
+      createdAt: "",
+      recordedOn: `2026-08-${day}`,
+    }));
+    expect(activityCoverage(records, "7d", reference)).toEqual({
+      daysInPeriod: 7,
+      daysWithRecords: 2,
+    });
+    expect(activityCoverage(records, "all", reference)).toBeNull();
+  });
+
+  it("compares over the window it is given", () => {
+    const reference = new Date(2026, 7, 30, 12, 0);
+    const records = Array.from({ length: 60 }, (_, index) => {
+      const date = new Date(2026, 7, 30 - index);
+      return {
+        id: String(index),
+        module: "Habits",
+        amount: 1,
+        label: "Habit",
+        createdAt: "",
+        recordedOn: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`,
+      };
+    });
+    const monthly = descriptiveActivityTrend(records, reference, 30);
+    expect(monthly.windowDays).toBe(30);
+    expect(monthly.currentCount).toBe(30);
+    expect(monthly.previousCount).toBe(30);
+    expect(monthly.direction).toBe("similar");
+  });
+
+  it("exports the filtered records as CSV with quoting", () => {
+    const csv = analyticsCsv([
+      {
+        id: "1",
+        module: "Tasks",
+        amount: 1,
+        label: 'Call "mum", then rest',
+        createdAt: "2026-08-26T10:00:00.000Z",
+        recordedOn: "2026-08-26",
+      },
+    ]);
+    expect(csv.split("\n")[0]).toBe("day,saved_at,area,label,amount");
+    expect(csv).toContain('"Call ""mum"", then rest"');
+  });
   it("keeps recorded minute totals separate from non-time entries", () => {
     const summary = localActivitySummary([
       {
@@ -129,12 +199,14 @@ describe("analyticsTracker", () => {
     expect(descriptiveActivityTrend(records, reference)).toEqual({
       currentCount: 3,
       previousCount: 3,
+      windowDays: 7,
       evidence: "descriptive",
       direction: "similar",
     });
     expect(descriptiveActivityTrend(records.slice(0, 2), reference)).toEqual({
       currentCount: 2,
       previousCount: 0,
+      windowDays: 7,
       evidence: "not-enough",
       direction: null,
     });

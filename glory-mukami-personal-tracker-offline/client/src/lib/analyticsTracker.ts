@@ -87,14 +87,64 @@ function dayNumber(value: string): number | null {
   return Number.isNaN(timestamp) ? null : timestamp / 86_400_000;
 }
 
+/** The reference's LOCAL calendar day, on the same day-number scale as
+ * `recordedOn` (which is a local YYYY-MM-DD). Reading the UTC fields here
+ * made "today" mean yesterday for anyone east of Greenwich before their
+ * local midnight had reached UTC. */
 function referenceDay(reference: Date): number {
   return Math.floor(
     Date.UTC(
-      reference.getUTCFullYear(),
-      reference.getUTCMonth(),
-      reference.getUTCDate()
+      reference.getFullYear(),
+      reference.getMonth(),
+      reference.getDate()
     ) / 86_400_000
   );
+}
+
+export function periodDays(period: AnalyticsPeriod): number | null {
+  return period === "today" ? 1 : period === "7d" ? 7 : period === "30d" ? 30 : null;
+}
+
+/**
+ * How many calendar days in the period carry at least one saved record —
+ * the difference between "nothing happened" and "nothing was written down".
+ */
+export function activityCoverage(
+  records: AnalyticsActivityRecord[],
+  period: AnalyticsPeriod,
+  reference = new Date()
+): { daysInPeriod: number; daysWithRecords: number } | null {
+  const days = periodDays(period);
+  if (days === null) return null;
+  const end = referenceDay(reference);
+  const start = end - (days - 1);
+  const seen = new Set<number>();
+  for (const record of records) {
+    const date = record.recordedOn ? dayNumber(record.recordedOn) : null;
+    if (date !== null && date >= start && date <= end) seen.add(date);
+  }
+  return { daysInPeriod: days, daysWithRecords: seen.size };
+}
+
+export function analyticsCsv(records: AnalyticsActivityRecord[]) {
+  const escape = (value: string | number) => {
+    const text = String(value);
+    return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+  };
+  const rows = [...records]
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+    .map(record =>
+      [
+        record.recordedOn ?? record.createdAt.slice(0, 10),
+        record.createdAt,
+        record.module,
+        record.label,
+        record.amount,
+      ]
+        .map(escape)
+        .join(",")
+    );
+  return ["day,saved_at,area,label,amount", ...rows].join("\n");
 }
 
 export function filterAnalyticsActivityByPeriod(
@@ -113,16 +163,18 @@ export function filterAnalyticsActivityByPeriod(
 
 export function descriptiveActivityTrend(
   records: AnalyticsActivityRecord[],
-  reference = new Date()
+  reference = new Date(),
+  windowDays = 7
 ): {
   currentCount: number;
   previousCount: number;
+  windowDays: number;
   evidence: "not-enough" | "descriptive";
   direction: "more" | "fewer" | "similar" | null;
 } {
   const end = referenceDay(reference);
-  const currentStart = end - 6;
-  const previousStart = end - 13;
+  const currentStart = end - (windowDays - 1);
+  const previousStart = end - (windowDays * 2 - 1);
   const inRange = (start: number, finish: number) =>
     records.filter(record => {
       const date = record.recordedOn ? dayNumber(record.recordedOn) : null;
@@ -134,12 +186,14 @@ export function descriptiveActivityTrend(
     return {
       currentCount,
       previousCount,
+      windowDays,
       evidence: "not-enough",
       direction: null,
     };
   return {
     currentCount,
     previousCount,
+    windowDays,
     evidence: "descriptive",
     direction:
       currentCount > previousCount

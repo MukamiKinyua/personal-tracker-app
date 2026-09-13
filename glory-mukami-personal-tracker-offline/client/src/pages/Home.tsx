@@ -183,10 +183,13 @@ import {
 } from "../lib/securityTracker";
 import {
   compareLocalActivitySources,
+  activityCoverage,
+  analyticsCsv,
   descriptiveActivityTrend,
   filterAnalyticsActivityByPeriod,
   localActivitySummary,
   localPixelSummary,
+  periodDays,
   type AnalyticsPeriod,
 } from "../lib/analyticsTracker";
 import { eligibleRecommendationSourceKeys } from "../lib/recommendationTracker";
@@ -9026,16 +9029,61 @@ function AnalyticsPage({
         setPeriod(payload.period);
     },
   });
-  const filteredActivity = filterAnalyticsActivityByPeriod(activity, period);
+  const [areaFilter, setAreaFilter] = useState<string>("all");
+  const periodActivity = filterAnalyticsActivityByPeriod(activity, period);
+  const areasInPeriod = Array.from(
+    new Set(periodActivity.map(record => record.module))
+  ).sort();
+  const filteredActivity =
+    areaFilter === "all"
+      ? periodActivity
+      : periodActivity.filter(record => record.module === areaFilter);
   const activitySummary = localActivitySummary(filteredActivity);
   const pixelsSummary = localPixelSummary(pixelStore?.records ?? {});
-  const trend = descriptiveActivityTrend(activity);
+  const comparisonWindow = periodDays(period) ?? 7;
+  const trend = descriptiveActivityTrend(
+    areaFilter === "all"
+      ? activity
+      : activity.filter(record => record.module === areaFilter),
+    new Date(),
+    comparisonWindow
+  );
+  const coverage = activityCoverage(filteredActivity, period);
   const periodLabel: Record<AnalyticsPeriod, string> = {
     today: "Today",
     "7d": "Last 7 days",
     "30d": "Last 30 days",
-    all: "This open session",
+    all: "All time",
   };
+  const windowLabel =
+    comparisonWindow === 1
+      ? "day"
+      : comparisonWindow === 7
+        ? "7 days"
+        : "30 days";
+  function formatSavedAt(value: string) {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return date.toLocaleString([], {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  }
+  function downloadCsv() {
+    const csv = analyticsCsv(filteredActivity);
+    const url = URL.createObjectURL(
+      new Blob([csv], { type: "text/csv;charset=utf-8" })
+    );
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `analytics-${period}${areaFilter === "all" ? "" : `-${areaFilter.toLowerCase().replace(/\s+/g, "-")}`}.csv`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    toast(`${filteredActivity.length} record${filteredActivity.length === 1 ? "" : "s"} exported`);
+  }
   const sourceDestinations: Record<string, View | undefined> = {
     Productivity: "productivity",
     Habits: "habits",
@@ -9085,9 +9133,15 @@ function AnalyticsPage({
           <span>your local record</span>
           <b>Quiet facts, kept in context</b>
           <small>
-            This page reads only the actions connected during this open journal
-            session and the shared annual Pixels marks. It does not inspect
+            This page reads the actions you explicitly saved in connected
+            workspaces and the shared annual Pixels marks. It does not inspect
             accounts, devices, or any external service.
+          </small>
+          <small className="analytics-method">
+            Counts update the moment you save — nothing is batched or
+            scheduled. Periods are whole calendar days on your device’s clock;
+            “Last 7 days” includes today. Each saved action counts once, on
+            the day it was recorded for.
           </small>
         </header>
         <section
@@ -9112,22 +9166,75 @@ function AnalyticsPage({
                     : option === "30d"
                       ? "30 days"
                       : option === "all"
-                        ? "Session"
+                        ? "All time"
                         : "Today"}
                 </button>
               )
             )}
           </div>
         </section>
+        {areasInPeriod.length > 1 && (
+          <section className="analytics-area-filter" aria-label="Filter by area">
+            <span>Area</span>
+            <div>
+              <button
+                type="button"
+                className={cn(areaFilter === "all" && "active")}
+                aria-pressed={areaFilter === "all"}
+                onClick={() => setAreaFilter("all")}
+              >
+                All
+              </button>
+              {areasInPeriod.map(area => (
+                <button
+                  type="button"
+                  key={area}
+                  className={cn(areaFilter === area && "active")}
+                  aria-pressed={areaFilter === area}
+                  onClick={() => setAreaFilter(area)}
+                >
+                  {area}
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
         <div className="analytics-ledger" aria-label="Local analytics overview">
           <article>
             <span>recorded moments</span>
-            <b>{activitySummary.recordCount}</b>
-            <small>{periodLabel[period].toLowerCase()} · saved actions</small>
+            <b>
+              {activitySummary.recordCount === 0
+                ? "—"
+                : activitySummary.recordCount}
+            </b>
+            <small>
+              {activitySummary.recordCount === 0
+                ? `nothing saved ${periodLabel[period].toLowerCase()} — not a zero, an absence`
+                : `${periodLabel[period].toLowerCase()} · saved actions`}
+            </small>
+          </article>
+          <article>
+            <span>days with a record</span>
+            <b>
+              {coverage
+                ? `${coverage.daysWithRecords} / ${coverage.daysInPeriod}`
+                : "—"}
+            </b>
+            <small>
+              {coverage
+                ? coverage.daysWithRecords === coverage.daysInPeriod
+                  ? "every day in the period has something saved"
+                  : `${coverage.daysInPeriod - coverage.daysWithRecords} day${coverage.daysInPeriod - coverage.daysWithRecords === 1 ? "" : "s"} with nothing written down — unknown, not empty`
+                : "not counted for all time"}
+            </small>
           </article>
           <article>
             <span>timed practice</span>
-            <b>{activitySummary.trackedMinutes}</b>
+            <b>
+              {activitySummary.trackedMinutes === 0
+                ? "—"
+                : activitySummary.trackedMinutes}
+            </b>
             <small>
               minutes from linked focus, study, learning, and time logs
             </small>
@@ -9146,8 +9253,15 @@ function AnalyticsPage({
           aria-labelledby="analytics-comparison"
         >
           <div className="analytics-section-heading">
-            <span id="analytics-comparison">7-day record comparison</span>
-            <small>descriptive count only</small>
+            <span id="analytics-comparison">
+              {period === "all"
+                ? "7-day record comparison"
+                : `${windowLabel} vs the ${windowLabel} before`}
+            </span>
+            <small>
+              descriptive count only
+              {areaFilter !== "all" ? ` · ${areaFilter}` : ""}
+            </small>
           </div>
           {trend.evidence === "descriptive" ? (
             <p>
@@ -9160,18 +9274,21 @@ function AnalyticsPage({
                 saved actions
               </b>
               <span>
-                {trend.currentCount} in the most recent 7 days compared with{" "}
-                {trend.previousCount} in the prior 7 days. This does not explain
-                why the count changed.
+                {trend.currentCount} in the most recent {windowLabel} compared
+                with {trend.previousCount} in the {windowLabel} before that
+                {trend.previousCount > 0
+                  ? ` (${trend.currentCount > trend.previousCount ? "+" : ""}${trend.currentCount - trend.previousCount})`
+                  : ""}
+                . This does not explain why the count changed.
               </span>
             </p>
           ) : (
             <p>
-              <b>Not enough local history for a comparison.</b>
+              <b>Not enough history for a comparison.</b>
               <span>
                 {trend.currentCount} recent and {trend.previousCount}{" "}
                 prior-period records are available. A descriptive comparison
-                needs at least three in each 7-day window.
+                needs at least three in each {windowLabel} window.
               </span>
             </p>
           )}
@@ -9269,7 +9386,17 @@ function AnalyticsPage({
         >
           <div className="analytics-section-heading">
             <span id="analytics-recent">recent local activity</span>
-            <small>latest three in this review period</small>
+            <small>
+              latest three in this review period ·{" "}
+              <button
+                type="button"
+                className="analytics-export"
+                onClick={downloadCsv}
+                disabled={filteredActivity.length === 0}
+              >
+                export {filteredActivity.length} as CSV
+              </button>
+            </small>
           </div>
           {activitySummary.recent.length ? (
             <div className="analytics-recent-list">
@@ -9277,11 +9404,14 @@ function AnalyticsPage({
                 const destination = sourceDestinations[record.module];
                 return (
                   <article key={record.id}>
-                    <i>{record.module.slice(0, 1)}</i>
+                    <i aria-hidden="true">{record.module.slice(0, 1)}</i>
                     <div>
                       <b>{record.label}</b>
                       <small>
-                        {record.module} · {record.createdAt}
+                        {record.module} ·{" "}
+                        <time dateTime={record.createdAt}>
+                          {formatSavedAt(record.createdAt)}
+                        </time>
                       </small>
                     </div>
                     <strong>
