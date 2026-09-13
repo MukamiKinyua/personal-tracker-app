@@ -8488,9 +8488,6 @@ function RecommendationsPage({
                   onClick={() => {
                     setState("snoozed");
                     setSnoozedUntil(Date.now() + 24 * 60 * 60 * 1000);
-                    chooseFeedback(
-                      "Paused until tomorrow. Show it sooner whenever you choose."
-                    );
                   }}
                 >
                   Not now
