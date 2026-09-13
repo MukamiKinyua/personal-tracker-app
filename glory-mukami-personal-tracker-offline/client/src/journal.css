@@ -1051,6 +1051,53 @@ button:focus-visible {
   color: var(--ui-text-secondary);
   margin-bottom: 0.55rem;
 }
+#root .contents-motion {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.7rem 0 0.2rem;
+}
+#root .contents-motion > span {
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.8) !important;
+  -webkit-text-fill-color: rgba(255, 255, 255, 0.8) !important;
+  text-shadow: none !important;
+  margin-right: 0.2rem;
+}
+#root .contents-motion > button {
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 999px;
+  padding: 0.32rem 0.7rem;
+  background: rgba(255, 255, 255, 0.18);
+  color: rgba(255, 255, 255, 0.94) !important;
+  -webkit-text-fill-color: rgba(255, 255, 255, 0.94) !important;
+  text-shadow: none !important;
+  font-size: 0.7rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+#root .contents-motion > button.active {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: rgba(255, 255, 255, 0.92);
+  color: #1c1420 !important;
+  -webkit-text-fill-color: #1c1420 !important;
+}
+#root .contents-motion > button:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+#root .contents-motion > small {
+  flex: 1 1 100%;
+  font-size: 0.66rem;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.78) !important;
+  -webkit-text-fill-color: rgba(255, 255, 255, 0.78) !important;
+  text-shadow: none !important;
+}
 .contents-quick-row {
   display: flex;
   flex-wrap: wrap;
@@ -11947,6 +11994,28 @@ button:focus-visible {
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
   }
+  /* An opacity fade is not motion; it's the one transition kept so a page
+     change is still perceptible when the flip is off. */
+  .journal-stage {
+    transition-duration: 140ms !important;
+  }
+}
+.journal-stage {
+  transition: opacity 140ms ease;
+}
+.journal-stage.is-fading {
+  opacity: 0;
+  pointer-events: none;
+}
+.journal-stage h2:focus,
+.journal-stage [role="heading"]:focus {
+  outline: none;
+}
+.journal-stage h2:focus-visible,
+.journal-stage [role="heading"]:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 4px;
+  border-radius: 4px;
 }
 
 /* The supplied page-flip uses paired transforms: an oversized r1/r3 wrapper

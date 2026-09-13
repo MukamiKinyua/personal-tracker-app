@@ -962,7 +962,10 @@ export default function Home() {
     lastVisitedPage: "dashboard" as View,
     favorites: [] as View[],
     recentPages: [] as View[],
+    /** Page-turn motion: follow the OS setting, always fade, or always flip. */
+    motion: "system" as "system" | "reduced" | "full",
   });
+  const [isFading, setIsFading] = useState(false);
   const [contentsSearch, setContentsSearch] = useState("");
   const [insightActivity, setInsightActivity] = useState<InsightActivity[]>([]);
   const [privateMode, setPrivateMode] = useState(false);
@@ -1291,19 +1294,47 @@ export default function Home() {
         ? "Saved locally · cloud sync unavailable"
         : "Saved locally";
 
+  /**
+   * After a turn lands, put keyboard focus on the new page's heading so a
+   * keyboard or screen-reader user isn't left on an element that no longer
+   * exists, and the live chapter marker announces the page name.
+   */
+  function focusArrivedPage() {
+    window.requestAnimationFrame(() => {
+      const heading = document.querySelector<HTMLElement>(
+        '.journal-stage h2, .journal-stage [role="heading"]'
+      );
+      if (!heading) return;
+      if (!heading.hasAttribute("tabindex"))
+        heading.setAttribute("tabindex", "-1");
+      heading.focus({ preventScroll: true });
+    });
+  }
   function turnTo(nextView: View, direction: TurnDirection = "forward") {
-    if (isTurning || nextView === view) return;
+    if (isTurning || isFading || nextView === view) return;
     setMobileContentsOpen(false);
     setQuickAddOpen(false);
-    const prefersReducedMotion = window.matchMedia?.(
-      "(prefers-reduced-motion: reduce)"
-    ).matches;
-    const duration = pageTurnDuration(Boolean(prefersReducedMotion));
+    const systemReduced = Boolean(
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
+    );
+    const reduced =
+      contentsPreferences.motion === "reduced" ||
+      (contentsPreferences.motion === "system" && systemReduced);
+    const duration = pageTurnDuration(reduced);
     if (duration === 0) {
-      setActivePage(currentPage =>
-        activePageAfterNavigation(currentPage, nextView)
-      );
-      setView(nextView);
+      // A short crossfade rather than a hard cut: no movement, but still a
+      // cue that the page changed.
+      setIsFading(true);
+      window.setTimeout(() => {
+        setActivePage(currentPage =>
+          activePageAfterNavigation(currentPage, nextView)
+        );
+        setView(nextView);
+        window.setTimeout(() => {
+          setIsFading(false);
+          focusArrivedPage();
+        }, 20);
+      }, 140);
       return;
     }
     setTurnDirection(direction);
@@ -1315,6 +1346,7 @@ export default function Home() {
       );
       setView(nextView);
       setIsTurning(false);
+      focusArrivedPage();
     }, duration);
   }
 
@@ -1477,6 +1509,45 @@ export default function Home() {
                   </button>
                 )}
               </label>
+              <div
+                className="contents-motion"
+                role="radiogroup"
+                aria-labelledby="contents-motion-label"
+              >
+                <span id="contents-motion-label">Page turns</span>
+                {(
+                  [
+                    ["system", "Follow device"],
+                    ["reduced", "Fade only"],
+                    ["full", "Flip"],
+                  ] as const
+                ).map(([value, label]) => (
+                  <button
+                    type="button"
+                    key={value}
+                    role="radio"
+                    aria-checked={contentsPreferences.motion === value}
+                    className={cn(
+                      contentsPreferences.motion === value && "active"
+                    )}
+                    onClick={() =>
+                      setContentsPreferences(prev => ({
+                        ...prev,
+                        motion: value,
+                      }))
+                    }
+                  >
+                    {label}
+                  </button>
+                ))}
+                <small>
+                  {contentsPreferences.motion === "system"
+                    ? "Uses your device’s reduce-motion setting: a fade when it’s on, a page flip when it’s off."
+                    : contentsPreferences.motion === "reduced"
+                      ? "A short fade, no movement — whatever the device says."
+                      : "Always the page flip, even if the device asks for less motion."}
+                </small>
+              </div>
 
               {!isSearching && favorites.length > 0 && (
                 <div className="contents-quick-section" aria-label="Favorite pages">
@@ -2293,7 +2364,11 @@ export default function Home() {
           </svg>
 
           <div
-            className={cn("journal-stage", view !== "cover" && "journal-open")}
+            className={cn(
+              "journal-stage",
+              view !== "cover" && "journal-open",
+              isFading && "is-fading"
+            )}
             data-journal-view={view}
           >
             {renderPage()}
@@ -2432,7 +2507,7 @@ export default function Home() {
             </div>
           )}
           <div className="chapter-marker" aria-live="polite">
-            {activeLabel}
+            Now on: {activeLabel}
           </div>
         </main>
       </ReminderPreviewContext.Provider>
