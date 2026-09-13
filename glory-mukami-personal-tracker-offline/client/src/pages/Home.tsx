@@ -8150,10 +8150,11 @@ function RecommendationsPage({
     time: false,
   });
   const [showLessFrom, setShowLessFrom] = useState<Record<string, boolean>>({});
+  const [snoozedUntil, setSnoozedUntil] = useState<number | null>(null);
   const [feedback, setFeedback] = useState("");
   useMongoJournalScope({
     scope: "recommendations",
-    payload: { enabled, state, duration, modules, showLessFrom },
+    payload: { enabled, state, duration, modules, showLessFrom, snoozedUntil },
     hydrate: payload => {
       if (typeof payload.enabled === "boolean") setEnabled(payload.enabled);
       if (
@@ -8167,8 +8168,24 @@ function RecommendationsPage({
         setModules(payload.modules as typeof modules);
       if (payload.showLessFrom && typeof payload.showLessFrom === "object")
         setShowLessFrom(payload.showLessFrom as Record<string, boolean>);
+      if (typeof payload.snoozedUntil === "number" || payload.snoozedUntil === null)
+        setSnoozedUntil(payload.snoozedUntil as number | null);
     },
   });
+  // "Not now" is a pause, not a dismissal: it comes back on its own.
+  useEffect(() => {
+    if (state !== "snoozed") return;
+    if (snoozedUntil === null || snoozedUntil <= Date.now()) {
+      setState("shown");
+      setSnoozedUntil(null);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      setState("shown");
+      setSnoozedUntil(null);
+    }, Math.min(snoozedUntil - Date.now(), 2_147_483_647));
+    return () => window.clearTimeout(timer);
+  }, [state, snoozedUntil]);
   const recommendationSources = [
     {
       key: "productivity",
@@ -8234,7 +8251,7 @@ function RecommendationsPage({
     : 0;
   const rationale = primary
     ? sourceCount
-      ? `${sourceCount} explicit ${primary.label} ${sourceCount === 1 ? "record" : "records"} saved in this open journal session.`
+      ? `${sourceCount} ${primary.label} ${sourceCount === 1 ? "record" : "records"} saved in your journal.`
       : primary.starter
     : "Choose at least one source to make a local optional prompt available.";
   const chooseFeedback = (message: string) => {
@@ -8244,7 +8261,7 @@ function RecommendationsPage({
     if (!primary) return;
     setShowLessFrom(current => ({ ...current, [primary.key]: true }));
     setFeedback(
-      `Showing less from ${primary.label} for this open journal session.`
+      `Showing less from ${primary.label} until you restore it below.`
     );
     setState("shown");
   };
@@ -8279,7 +8296,7 @@ function RecommendationsPage({
         <div className="recommendation-header">
           <div>
             <span>Optional recommendations</span>
-            <small>local to this open journal session</small>
+            <small>saved with your journal</small>
           </div>
           <button
             type="button"
@@ -8322,7 +8339,7 @@ function RecommendationsPage({
               onClick={() => {
                 setShowLessFrom({});
                 setFeedback(
-                  "All selected sources are available again for this open session."
+                  "All selected sources are available again."
                 );
               }}
             >
@@ -8365,7 +8382,7 @@ function RecommendationsPage({
                   type="button"
                   onClick={() =>
                     chooseFeedback(
-                      `Marked helpful locally. ${primary.label} stays available in this open session.`
+                      `Marked helpful. ${primary.label} stays available.`
                     )
                   }
                 >
@@ -8375,8 +8392,9 @@ function RecommendationsPage({
                   type="button"
                   onClick={() => {
                     setState("snoozed");
+                    setSnoozedUntil(Date.now() + 24 * 60 * 60 * 1000);
                     chooseFeedback(
-                      "Not now. You can show it again whenever you choose."
+                      "Paused until tomorrow. Show it sooner whenever you choose."
                     );
                   }}
                 >
@@ -8397,7 +8415,7 @@ function RecommendationsPage({
                 <small>
                   {activity.filter(entry => entry.module === alternative.module)
                     .length
-                    ? `${activity.filter(entry => entry.module === alternative.module).length} explicit ${alternative.label} record${activity.filter(entry => entry.module === alternative.module).length === 1 ? "" : "s"} saved in this open session.`
+                    ? `${activity.filter(entry => entry.module === alternative.module).length} ${alternative.label} record${activity.filter(entry => entry.module === alternative.module).length === 1 ? "" : "s"} saved in your journal.`
                     : alternative.starter}
                 </small>
                 <button
@@ -8413,21 +8431,30 @@ function RecommendationsPage({
           <div className="recommendation-return">
             <b>No source is currently included.</b>
             <small>
-              Choose one or more local sources above. Recommendations never fill
-              this space with a generic score or hidden data.
+              {Object.values(showLessFrom).some(Boolean)
+                ? "Every ticked source is muted with “Show less”. Restore one below, or tick another."
+                : "Choose one or more sources above. Recommendations never fill this space with a generic score or hidden data."}
             </small>
           </div>
         ) : enabled ? (
           <div className="recommendation-return">
             <b>
               {state === "snoozed"
-                ? "Recommendation paused for now"
+                ? `Paused${snoozedUntil ? ` until ${new Date(snoozedUntil).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" })}` : ""}`
                 : "Recommendation dismissed"}
             </b>
             <small>
-              {feedback || "You can bring it back whenever you choose."}
+              {state === "snoozed"
+                ? "It comes back on its own then, or sooner if you ask."
+                : "It stays dismissed until you show it again."}
             </small>
-            <button type="button" onClick={() => setState("shown")}>
+            <button
+              type="button"
+              onClick={() => {
+                setState("shown");
+                setSnoozedUntil(null);
+              }}
+            >
               Show again
             </button>
           </div>
@@ -8442,11 +8469,31 @@ function RecommendationsPage({
         {feedback && enabled && state === "shown" ? (
           <p className="recommendation-feedback">{feedback}</p>
         ) : null}
+        {Object.entries(showLessFrom).some(([, muted]) => muted) ? (
+          <div className="recommendation-muted">
+            <span>Showing less from</span>
+            {recommendationSources
+              .filter(source => showLessFrom[source.key])
+              .map(source => (
+                <button
+                  type="button"
+                  key={source.key}
+                  onClick={() => {
+                    setShowLessFrom(current => ({ ...current, [source.key]: false }));
+                    setFeedback(`${source.label} restored.`);
+                  }}
+                  aria-label={`Restore ${source.label}`}
+                >
+                  {source.label} · restore
+                </button>
+              ))}
+          </div>
+        ) : null}
         <section className="recommendation-boundary">
           <b>How these prompts work</b>
           <span>
             They use only the sources you include and entries you explicitly
-            saved in this open journal session. They do not inspect devices,
+            saved in your journal. They do not inspect devices,
             accounts, health data, or background activity, and they do not
             predict what will work for you.
           </span>

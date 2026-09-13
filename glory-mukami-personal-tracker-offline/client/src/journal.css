@@ -31495,3 +31495,52 @@ button.attention-row:focus-visible {
 .local-reminder-row time {
   font-variant-numeric: tabular-nums;
 }
+
+/* .history-destinations button: fine on its own (near-white gradient card,
+   dark ink), but a separate site-wide pass forces its <b>/<small> text
+   white, so the label read as near-white on a near-white card. Converting
+   the whole row to the same dark glass used elsewhere on this page (Search
+   history input, the workspace cards below) rather than fighting that
+   inherited override - consistent with it instead of restoring a light
+   card that would have been the only light element on an otherwise dark
+   right page. */
+#root .journal-stage[data-journal-view="history"] .history-destinations button {
+  background: rgba(0, 0, 0, 0.35) !important;
+  backdrop-filter: blur(14px) saturate(118%) !important;
+  -webkit-backdrop-filter: blur(14px) saturate(118%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+}
+#root .journal-stage[data-journal-view="history"] .history-destinations button,
+#root .journal-stage[data-journal-view="history"] .history-destinations b {
+  color: rgba(255, 255, 255, 0.94) !important;
+  -webkit-text-fill-color: rgba(255, 255, 255, 0.94) !important;
+}
+#root .journal-stage[data-journal-view="history"] .history-destinations small {
+  color: rgba(255, 255, 255, 0.68) !important;
+  -webkit-text-fill-color: rgba(255, 255, 255, 0.68) !important;
+}
+
+.recommendation-muted {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+  font-size: 0.56rem;
+}
+.recommendation-muted > span {
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.8;
+}
+.recommendation-muted button {
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  padding: 0.22rem 0.5rem;
+  color: inherit;
+  background: transparent;
+  font-size: 0.55rem;
+  font-weight: 700;
+  opacity: 0.85;
+}
