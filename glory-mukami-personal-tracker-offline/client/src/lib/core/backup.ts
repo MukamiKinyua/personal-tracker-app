@@ -11,6 +11,7 @@
  * caller applies a plan the user has already seen.
  */
 
+import { localCalendarDay } from "./datetime";
 import { EXPORT_FORMAT_VERSION, type ExportBundle } from "./exportData";
 import type { RecordLink } from "./links";
 import type { TrackerRecord } from "./record";
@@ -276,5 +277,5 @@ export function restoreWarning(plan: RestorePlan): string {
 }
 
 export function backupFilename(now: Date = new Date()): string {
-  return `personal-tracker-backup-${now.toISOString().slice(0, 10)}.json`;
+  return `personal-tracker-backup-${localCalendarDay(now)}.json`;
 }

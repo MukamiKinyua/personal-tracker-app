@@ -1,3 +1,4 @@
+import { localCalendarDay } from "./core/datetime";
 export type FocusSession = {
   id: string;
   date: string;
@@ -14,7 +15,7 @@ export function focusSummary(
 ): { sessions: number; minutes: number; completed: number } {
   const cutoff = new Date(`${referenceDate}T12:00:00`);
   cutoff.setDate(cutoff.getDate() - 6);
-  const cutoffDate = cutoff.toISOString().slice(0, 10);
+  const cutoffDate = localCalendarDay(cutoff);
   const weekly = sessions.filter(
     session => session.date >= cutoffDate && session.date <= referenceDate
   );

@@ -311,3 +311,13 @@ export function detectTimeZone(): string {
 export function isFutureDay(day: DayKey, today: DayKey): boolean {
   return daysBetween(today, day) > 0;
 }
+
+/**
+ * The device's local calendar day as YYYY-MM-DD. For "what day is it for
+ * the person typing", not for cross-timezone record keys (use dayKeyOf).
+ * Never derive this from toISOString(), which names the UTC day and is a
+ * day early for anyone east of Greenwich in the evening.
+ */
+export function localCalendarDay(date: Date = new Date()): DayKey {
+  return `${pad(date.getFullYear(), 4)}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}

@@ -1,3 +1,4 @@
+import { localCalendarDay } from "./core/datetime";
 export type DigitalEntry = {
   id: string;
   date: string;
@@ -13,7 +14,7 @@ export function digitalSummary(
 ): { todayMinutes: number; weekMinutes: number; topCategory: string | null } {
   const cutoff = new Date(`${referenceDate}T12:00:00`);
   cutoff.setDate(cutoff.getDate() - 6);
-  const cutoffDate = cutoff.toISOString().slice(0, 10);
+  const cutoffDate = localCalendarDay(cutoff);
   const weekly = entries.filter(
     entry => entry.date >= cutoffDate && entry.date <= referenceDate
   );

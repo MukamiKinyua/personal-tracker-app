@@ -160,3 +160,13 @@ describe("durations and labels", () => {
     expect(relativeDayLabel("2026-03-12", "2026-03-14")).toBe("2 days ago");
   });
 });
+
+describe("localCalendarDay", () => {
+  it("names the device's local day, not the UTC one", async () => {
+    const { localCalendarDay } = await import("./datetime");
+    // 23:30 local on the 12th. In any zone east of UTC this instant's
+    // toISOString() can already read the 13th; the local day must not.
+    expect(localCalendarDay(new Date(2026, 8, 12, 23, 30))).toBe("2026-09-12");
+    expect(localCalendarDay(new Date(2026, 0, 1, 0, 5))).toBe("2026-01-01");
+  });
+});

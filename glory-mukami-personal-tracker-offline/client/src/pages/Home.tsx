@@ -47,6 +47,7 @@ import { WorkoutStudio } from "@/components/WorkoutStudio";
 import { useRecordStore } from "@/contexts/RecordStoreContext";
 import { toCSV } from "@/lib/core/exportData";
 import { eraseLocalJournalData } from "@/lib/core/storage";
+import { localCalendarDay } from "@/lib/core/datetime";
 import {
   computeStreak,
   isDueOn,
@@ -847,6 +848,23 @@ type InsightActivity = {
   createdAt: string;
   recordedOn?: string;
 };
+/**
+ * Activity saved before createdAt was an instant holds "Sep 13"-style
+ * strings, and recordedOn may be a UTC day. Rebuild createdAt from the
+ * recorded day so sorting and formatting work; leave recordedOn as it is —
+ * a day off in old data is better than a guessed correction.
+ */
+function normalizeInsightActivity(records: InsightActivity[]): InsightActivity[] {
+  return records.map(record => {
+    const isInstant = /^d{4}-d{2}-d{2}T/.test(record.createdAt);
+    if (isInstant) return record;
+    const day = record.recordedOn && /^d{4}-d{2}-d{2}$/.test(record.recordedOn)
+      ? record.recordedOn
+      : null;
+    return day ? { ...record, createdAt: `${day}T12:00:00.000Z` } : record;
+  });
+}
+
 type ReminderPreferenceKey =
   | "assignments"
   | "habits"
@@ -988,7 +1006,7 @@ export default function Home() {
     const payload = (journalStateQuery.data?.payload ||
       {}) as JournalShellPayload;
     if (Array.isArray(payload.insightActivity))
-      setInsightActivity(payload.insightActivity);
+      setInsightActivity(normalizeInsightActivity(payload.insightActivity));
     if (typeof payload.privateMode === "boolean")
       setPrivateMode(payload.privateMode);
     if (typeof payload.showSensitiveSummaries === "boolean")
@@ -1054,7 +1072,7 @@ export default function Home() {
       if (!raw) return;
       const payload = JSON.parse(raw) as JournalShellPayload;
       if (Array.isArray(payload.insightActivity))
-        setInsightActivity(payload.insightActivity);
+        setInsightActivity(normalizeInsightActivity(payload.insightActivity));
       if (typeof payload.privateMode === "boolean")
         setPrivateMode(payload.privateMode);
       if (typeof payload.showSensitiveSummaries === "boolean")
@@ -1209,11 +1227,12 @@ export default function Home() {
     const record = {
       ...activity,
       id: `${Date.now()}-${insightActivity.length}`,
-      createdAt: now.toLocaleDateString("en", {
-        month: "short",
-        day: "numeric",
-      }),
-      recordedOn: now.toISOString().slice(0, 10),
+      // A real instant, not "Sep 13": History sorts on it and every
+      // reader formats it. recordedOn is the local calendar day the
+      // period filters key on; the UTC day was a day early east of
+      // Greenwich in the evening.
+      createdAt: now.toISOString(),
+      recordedOn: localCalendarDay(now),
     };
     setInsightActivity(current => [record, ...current]);
     if (persistenceEnabled) {
