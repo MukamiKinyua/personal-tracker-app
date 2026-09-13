@@ -568,14 +568,16 @@ const pixelsProfiles = {
     ],
   },
   mood: {
-    title: "Mood Pixels",
+    title: "Check-in Pixels",
     eyebrow: "wellbeing · daily check-in",
-    source: "Days fill in from your daily check-in, or by hand here.",
+    source:
+      "Days fill in with the word you chose at check-in, or by hand here. The colours are just labels — there is no good end or bad end.",
     statuses: [
-      { label: "Happy", color: "#e65c97" },
-      { label: "Calm", color: "#3a9ba0" },
+      { label: "Low", color: "#e6ae42" },
       { label: "Tender", color: "#9673c6" },
-      { label: "Low energy", color: "#e6ae42" },
+      { label: "Steady", color: "#3a9ba0" },
+      { label: "Bright", color: "#e65c97" },
+      { label: "Joyful", color: "#e35d48" },
     ],
   },
   water: {
@@ -666,9 +668,13 @@ const pixelsTrackerForView: Partial<Record<View, PixelsProfileKey>> = {};
 function PixelsGrid({
   tracker,
   inkText = true,
+  describeDay,
 }: {
   tracker: PixelsProfileKey;
   inkText?: boolean;
+  /** The entry behind a cell, for its label and tooltip — so a colour is
+   * never the only way to find out what a day held. */
+  describeDay?: (monthIndex: number, day: number) => string | undefined;
 }) {
   const store = useContext(PixelsTrackerContext);
   if (!store) return null;
@@ -776,8 +782,9 @@ function PixelsGrid({
               const fill = cells[key];
               const status = fill ? statusByColor.get(fill) : undefined;
               const fullMonth = pixelsMonthNames[monthIndex];
+              const detail = fill ? describeDay?.(monthIndex, day) : undefined;
               const label = status
-                ? `${fullMonth} ${day}, ${status.label} logged`
+                ? `${fullMonth} ${day}, ${status.label} logged${detail ? ` — ${detail}` : ""}`
                 : fill
                   ? `${fullMonth} ${day}, logged with a retired colour — tap to relabel`
                   : `${fullMonth} ${day}, not logged`;
@@ -19457,8 +19464,34 @@ function WellbeingPage({
         setEntries(payload.entries as MoodEntry[]);
     },
   });
-  const moods = ["Low", "Tender", "Steady", "Bright", "Joyful"];
+  const moods = pixelsProfiles.mood.statuses.map(status => status.label);
+  const energyWords: Record<number, string> = {
+    1: "Running on empty",
+    2: "Low",
+    3: "Enough",
+    4: "Good",
+    5: "Full",
+  };
   const pattern = moodPatternSummary(entries);
+  const firstMoodRef = useRef<HTMLButtonElement>(null);
+  // Latest entry for each calendar day, so the year grid can show what a
+  // cell actually holds instead of only its colour.
+  const entryByDate = new Map<string, MoodEntry>();
+  for (const entry of entries) {
+    if (!entryByDate.has(entry.date)) entryByDate.set(entry.date, entry);
+  }
+  function describeMoodDay(monthIndex: number, day: number) {
+    const key = `${new Date().getFullYear()}-${String(monthIndex + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    const entry = entryByDate.get(key);
+    if (!entry) return undefined;
+    return [
+      `${entry.mood}, energy ${entry.energy}/5 (${energyWords[entry.energy] ?? ""})`,
+      entry.contexts.length ? entry.contexts.join(", ") : null,
+      entry.note ? `“${entry.note}”` : null,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  }
   function clearForm() {
     setMood("Steady");
     setEnergy(3);
@@ -19470,7 +19503,7 @@ function WellbeingPage({
     const savedNote = note.trim();
     const entry: MoodEntry = {
       id: editingId || `${Date.now()}-${mood}`,
-      date: new Date().toISOString().slice(0, 10),
+      date: sleepDateInputValue(new Date()),
       mood,
       energy,
       note: savedNote,
@@ -19486,14 +19519,11 @@ function WellbeingPage({
     clearForm();
     const monthIndex = new Date().getMonth();
     const day = new Date().getDate();
-    const moodColors: Record<string, string> = {
-      Low: "#ef4444",
-      Tender: "#f97316",
-      Steady: "#eab308",
-      Bright: "#84cc16",
-      Joyful: "#22c55e",
-    };
-    pixelStore?.set("mood", monthIndex, day, moodColors[mood] || "#eab308");
+    const color = pixelsProfiles.mood.statuses.find(
+      status => status.label === mood
+    )?.color;
+    if (color) pixelStore?.set("mood", monthIndex, day, color);
+    toast(editingId ? "Check-in updated" : `${mood} check-in saved`);
   }
   function editEntry(entry: MoodEntry) {
     setMood(entry.mood);
@@ -19520,12 +19550,21 @@ function WellbeingPage({
             A calm daily check-in for noticing your emotional weather, energy,
             and what could care for you next.
           </p>
+          <p className="wellbeing-scope-note">
+            This is a notebook, not a measurement. It doesn’t diagnose, score,
+            or watch for anything — it only keeps the words you choose. If
+            things feel heavy for a while, talking with someone you trust, or a
+            local support line, is a real next step; this page can’t be that.
+          </p>
           <button
             type="button"
             className="ink-button"
-            onClick={() => setEditingId(null)}
+            onClick={() => {
+              setEditingId(null);
+              firstMoodRef.current?.focus();
+            }}
           >
-            <Plus size={15} /> Save check-in
+            <Plus size={15} /> Begin check-in
           </button>
         </div>
       </div>
@@ -19541,12 +19580,21 @@ function WellbeingPage({
             <small>Choose what fits. Leave the rest blank.</small>
           </div>
           <div className="wellbeing-section">
-            <span>How do you feel?</span>
-            <div className="mood-pills">
-              {moods.map(item => (
+            <span id="mood-word-label">
+              Which word is closest? <small>No right answer</small>
+            </span>
+            <div
+              className="mood-pills"
+              role="radiogroup"
+              aria-labelledby="mood-word-label"
+            >
+              {moods.map((item, index) => (
                 <button
                   key={item}
                   type="button"
+                  role="radio"
+                  aria-checked={mood === item}
+                  ref={index === 0 ? firstMoodRef : undefined}
                   className={cn(mood === item && "active")}
                   onClick={() => setMood(item)}
                 >
@@ -19556,19 +19604,32 @@ function WellbeingPage({
             </div>
           </div>
           <div className="wellbeing-section">
-            <span>Energy today · {energy}/5</span>
-            <div className="energy-scale">
+            <span id="energy-label">
+              Energy today · {energy}/5 · {energyWords[energy]}
+            </span>
+            <div
+              className="energy-scale"
+              role="radiogroup"
+              aria-labelledby="energy-label"
+            >
               {[1, 2, 3, 4, 5].map(value => (
                 <button
                   key={value}
                   type="button"
+                  role="radio"
+                  aria-checked={energy === value}
                   className={cn(value <= energy && "active")}
                   onClick={() => setEnergy(value)}
-                  aria-label={`${value} out of 5 energy`}
+                  aria-label={`${value} out of 5, ${energyWords[value]}`}
+                  title={energyWords[value]}
                 >
                   ✦
                 </button>
               ))}
+            </div>
+            <div className="energy-anchors" aria-hidden="true">
+              <small>1 · {energyWords[1]}</small>
+              <small>5 · {energyWords[5]}</small>
             </div>
           </div>
           <div className="mood-context">
@@ -19627,11 +19688,13 @@ function WellbeingPage({
           </div>
           {pattern ? (
             <p>
-              <strong>{pattern.commonMood}</strong> appeared most often. Average
-              energy was <strong>{pattern.averageEnergy.toFixed(1)}/5</strong>.
+              <strong>{pattern.commonMood}</strong> was the word you chose most
+              often. Energy averaged{" "}
+              <strong>{pattern.averageEnergy.toFixed(1)}/5</strong>. That’s a
+              count, not a verdict.
             </p>
           ) : (
-            <p>Save a few check-ins to see a simple factual pattern here.</p>
+            <p>Save a few check-ins to see a simple count of your words here.</p>
           )}
         </section>
         <section className="wellbeing-history">
@@ -19646,7 +19709,10 @@ function WellbeingPage({
               <article key={entry.id}>
                 <div>
                   <b>
-                    {entry.date} · {entry.mood} · {entry.energy}/5 energy
+                    {entry.date} · {entry.mood} · energy {entry.energy}/5
+                    {energyWords[entry.energy]
+                      ? ` (${energyWords[entry.energy].toLowerCase()})`
+                      : ""}
                   </b>
                   <small>
                     {entry.contexts.length
@@ -19661,11 +19727,14 @@ function WellbeingPage({
                   </button>
                   <button
                     type="button"
-                    onClick={() =>
+                    onClick={() => {
+                      setLastEntries(entries);
                       setEntries(current =>
                         current.filter(item => item.id !== entry.id)
-                      )
-                    }
+                      );
+                      toast("Check-in removed — Undo last brings it back");
+                    }}
+                    aria-label={`Remove check-in from ${entry.date}`}
                   >
                     Remove
                   </button>
@@ -19676,10 +19745,10 @@ function WellbeingPage({
         </section>
         <section className="mood-year">
           <div>
-            <span>Year in mood</span>
-            <b>Long-term pattern</b>
+            <span>Year in check-ins</span>
+            <b>Hover or focus a day to read its entry</b>
           </div>
-          <PixelsGrid tracker="mood" />
+          <PixelsGrid tracker="mood" describeDay={describeMoodDay} />
         </section>
       </div>
     </section>

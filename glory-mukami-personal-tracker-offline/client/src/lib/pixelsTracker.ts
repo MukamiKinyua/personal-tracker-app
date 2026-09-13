@@ -82,6 +82,14 @@ export function countFilledPixels(cells: PixelCells) {
 export const legacyPixelColors: Record<string, Record<string, string>> = {
   water: { "#16a8a8": "#8fd4e7" }, // "Some water" — goal status unknown
   learning: { "#8b5cf6": "#c94894" }, // "Practised" — the only auto path
+  // The check-in once painted a red-to-green ramp the legend never listed.
+  mood: {
+    "#ef4444": "#e6ae42", // Low
+    "#f97316": "#9673c6", // Tender
+    "#eab308": "#3a9ba0", // Steady
+    "#84cc16": "#e65c97", // Bright
+    "#22c55e": "#e35d48", // Joyful
+  },
 };
 
 export function migratePixelRecords(

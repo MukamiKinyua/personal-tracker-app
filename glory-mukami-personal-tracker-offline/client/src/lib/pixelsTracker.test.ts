@@ -47,6 +47,15 @@ describe("Pixels tracker helpers", () => {
     });
   });
 
+  it("moves the check-in's red-to-green ramp onto the legend's own colours", () => {
+    const stored = {
+      mood: { "1-1": "#ef4444", "1-2": "#22c55e", "1-3": "#3a9ba0" },
+    };
+    expect(migratePixelRecords(stored)).toEqual({
+      mood: { "1-1": "#e6ae42", "1-2": "#e35d48", "1-3": "#3a9ba0" },
+    });
+  });
+
   it("returns the same object when nothing needs migrating", () => {
     const stored = { water: { "3-5": "#32a7cf" } };
     expect(migratePixelRecords(stored)).toBe(stored);
