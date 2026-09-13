@@ -5756,13 +5756,58 @@ function PersonalGrowthPage({
   onCover: () => void;
 }) {
   type GrowthEntry = {
+    id?: string;
     value: string;
     area: string;
     practice: string;
     reflection: string;
     nextStep: string;
+    createdAt?: string;
+    updatedAt?: string;
   };
   const [entries, setEntries] = useState<GrowthEntry[]>([]);
+  const [lastGrowthEntrys, setLastGrowthEntrys] = useState<GrowthEntry[] | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const today = sleepDateInputValue(new Date());
+  const formatDay = (value?: string) =>
+    value && /^\d{4}-\d{2}-\d{2}$/.test(value)
+      ? new Date(`${value}T12:00:00`).toLocaleDateString(undefined, {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        })
+      : null;
+  function dateLabel(value: string) {
+    if (!value) return null;
+    const detail = assignmentDueDetail(value, today);
+    const days = detail.daysAway ?? 0;
+    const abs = Math.abs(days);
+    const rel =
+      detail.kind === "today"
+        ? "today"
+        : detail.kind === "tomorrow"
+          ? "tomorrow"
+          : days < 0
+            ? `${abs} day${abs === 1 ? "" : "s"} ago`
+            : `in ${days} days`;
+    return { text: `${detail.exact} · ${rel}`, kind: detail.kind };
+  }
+  function editGrowthEntry(entry: GrowthEntry) {
+    setEditingId(entry.id ?? null);
+    setDraft({
+      value: entry.value,
+      area: entry.area,
+      practice: entry.practice,
+      reflection: entry.reflection,
+      nextStep: entry.nextStep,
+    });
+  }
+  function removeGrowthEntry(entry: GrowthEntry) {
+    setLastGrowthEntrys(entries);
+    setEntries(current => current.filter(entry => entry.id !== entry.id));
+    if (editingId === entry.id) setEditingId(null);
+    toast(`Removed “${entry.value}”`);
+  }
   const [draft, setDraft] = useState<GrowthEntry>({
     value: "",
     area: "",
@@ -5775,16 +5820,33 @@ function PersonalGrowthPage({
     payload: { entries },
     hydrate: payload => {
       if (Array.isArray(payload.entries))
-        setEntries(payload.entries as GrowthEntry[]);
+        setEntries(
+          (payload.entries as GrowthEntry[]).map((entry, index) => ({
+            ...entry,
+            id: entry.id ?? `growth-${index}-${entry.value}`,
+          }))
+        );
     },
   });
   function addEntry(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!draft.value.trim() && !draft.area.trim()) return;
-    setEntries(current => [
-      { ...draft, value: draft.value.trim(), area: draft.area.trim() },
-      ...current,
-    ]);
+    const fields = { ...draft, value: draft.value.trim(), area: draft.area.trim() };
+    if (editingId) {
+      setEntries(current =>
+        current.map(entry =>
+          entry.id === editingId ? { ...entry, ...fields, updatedAt: today } : entry
+        )
+      );
+      toast("Updated");
+    } else {
+      setEntries(current => [
+        { ...fields, id: `growth-${Date.now()}`, createdAt: today },
+        ...current,
+      ]);
+      toast(`“${fields.value || fields.area}” saved`);
+    }
+    setEditingId(null);
     setDraft({
       value: "",
       area: "",
@@ -5876,14 +5938,48 @@ function PersonalGrowthPage({
               placeholder="Keep it small and possible"
             />
           </label>
-          <Button type="submit" className="ink-button">
-            <Plus size={15} /> Save growth note
-          </Button>
+          <div className="career-form-actions">
+            <Button type="submit" className="ink-button">
+              <Plus size={15} /> {editingId ? "Save changes" : "Save growth note"}
+            </Button>
+            {editingId ? (
+              <button
+                type="button"
+                className="local-undo"
+                onClick={() => {
+                  setEditingId(null);
+                  setDraft({
+      value: "",
+      area: "",
+      practice: "",
+      reflection: "",
+      nextStep: "",
+                  });
+                }}
+              >
+                Cancel edit
+              </button>
+            ) : null}
+          </div>
         </form>
         <div className="growth-list">
           <div>
             <span>becoming notebook</span>
-            <b>{entries.length} notes</b>
+            <b>
+              {entries.length} notes
+              {lastGrowthEntrys && (
+                <button
+                  type="button"
+                  className="local-undo"
+                  onClick={() => {
+                    setEntries(lastGrowthEntrys);
+                    setLastGrowthEntrys(null);
+                  }}
+                >
+                  Undo remove
+                </button>
+              )}
+            </b>
           </div>
           {entries.length === 0 ? (
             <small>
@@ -5891,8 +5987,8 @@ function PersonalGrowthPage({
               with more curiosity.
             </small>
           ) : (
-            entries.map((entry, index) => (
-              <article key={`${entry.value}-${entry.area}-${index}`}>
+            entries.map(entry => (
+              <article key={entry.id} className={cn(editingId === entry.id && "is-editing")}>
                 <i>{(entry.value || entry.area).slice(0, 1)}</i>
                 <p>
                   <b>{entry.value || "Growth note"}</b>
@@ -5904,6 +6000,25 @@ function PersonalGrowthPage({
                     Reflection: {entry.reflection || "Add what you notice"}
                   </em>
                   <em>Next: {entry.nextStep || "Choose your next step"}</em>
+                  <small className="career-stamp">
+                    {formatDay(entry.updatedAt)
+                      ? `Updated ${formatDay(entry.updatedAt)}`
+                      : formatDay(entry.createdAt)
+                        ? `Saved ${formatDay(entry.createdAt)}`
+                        : "Saved before dates were kept"}
+                  </small>
+                  <span className="career-actions">
+                    <button type="button" onClick={() => editGrowthEntry(entry)}>
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeGrowthEntry(entry)}
+                      aria-label={`Remove ${entry.value}`}
+                    >
+                      Remove
+                    </button>
+                  </span>
                 </p>
               </article>
             ))
