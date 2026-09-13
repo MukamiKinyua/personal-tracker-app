@@ -144,10 +144,14 @@ import {
   type TimerRun,
 } from "../lib/timeTracker";
 import {
+  cashFlowCsv,
   cashFlowSummary,
   cashOutByCategory,
   entriesForPeriod,
+  formatMoney,
   periodLabel,
+  periodWindowDescription,
+  roundMoney,
   runningBalanceSeries,
   type CashFlowEntry,
   type CashFlowPeriod,
@@ -1440,9 +1444,6 @@ export default function Home() {
                 Each page keeps the journal in view while making the day easier
                 to manage.
               </p>
-              <div className="contents-art-mark">
-                <Flower2 size={34} strokeWidth={1.5} />
-              </div>
               <p className="contents-note">
                 Tip: every chapter has a path back to here.
               </p>
@@ -13131,22 +13132,32 @@ function FinanceCashflowPage({
     monthly: "",
   });
   const [entries, setEntries] = useState<CashFlowEntry[]>([]);
+  const [lastEntries, setLastEntries] = useState<CashFlowEntry[] | null>(null);
   const [customCategories, setCustomCategories] = useState<string[]>([]);
   const [savingIntent, setSavingIntent] = useState("");
+  const [currency, setCurrency] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
+  const auth = useAuth();
   const [draft, setDraft] = useState({
     title: "",
     amount: "",
     direction: "out" as CashFlowEntry["direction"],
     category: "Everyday",
     customCategory: "",
-    date: new Date().toISOString().slice(0, 10),
+    date: sleepDateInputValue(new Date()),
     note: "",
     recurring: false,
   });
   useMongoJournalScope({
     scope: "finances",
-    payload: { period, openings, entries, customCategories, savingIntent },
+    payload: {
+      period,
+      openings,
+      entries,
+      customCategories,
+      savingIntent,
+      currency,
+    },
     hydrate: payload => {
       if (
         payload.period === "daily" ||
@@ -13162,8 +13173,37 @@ function FinanceCashflowPage({
         setCustomCategories(payload.customCategories as string[]);
       if (typeof payload.savingIntent === "string")
         setSavingIntent(payload.savingIntent);
+      if (typeof payload.currency === "string") setCurrency(payload.currency);
     },
   });
+  const money = (value: number) => formatMoney(value, currency);
+  function removeEntry(entry: CashFlowEntry) {
+    setLastEntries(entries);
+    setEntries(current => current.filter(item => item.id !== entry.id));
+    if (editingId === entry.id) resetDraft();
+    toast(`Removed ${entry.title} · ${money(entry.amount)}`);
+  }
+  function removeCustomCategory(name: string) {
+    const inUse = entries.filter(entry => entry.category === name).length;
+    setCustomCategories(current => current.filter(item => item !== name));
+    toast(
+      inUse
+        ? `“${name}” removed from the list; ${inUse} record${inUse === 1 ? " keeps" : "s keep"} that label`
+        : `“${name}” removed`
+    );
+  }
+  function downloadCsv() {
+    const csv = cashFlowCsv(entries, currency);
+    const url = URL.createObjectURL(
+      new Blob([csv], { type: "text/csv;charset=utf-8" })
+    );
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "cash-flow-export.csv";
+    anchor.click();
+    URL.revokeObjectURL(url);
+    toast(`${entries.length} record${entries.length === 1 ? "" : "s"} exported as CSV`);
+  }
   const categories = [
     "Everyday",
     "Food",
@@ -13179,7 +13219,9 @@ function FinanceCashflowPage({
     () => entriesForPeriod(entries, period),
     [entries, period]
   );
-  const openingAmount = Math.max(0, Number(openings[period]) || 0);
+  // A negative opening is a real state (an overdraft, a debt); clamping it
+  // to zero would silently change the user's number.
+  const openingAmount = roundMoney(Number(openings[period]) || 0);
   const summary = useMemo(
     () => cashFlowSummary(openingAmount, periodEntries),
     [openingAmount, periodEntries]
@@ -13205,14 +13247,17 @@ function FinanceCashflowPage({
       direction: "out",
       category: "Everyday",
       customCategory: "",
-      date: new Date().toISOString().slice(0, 10),
+      date: sleepDateInputValue(new Date()),
       note: "",
       recurring: false,
     });
   }
   function saveEntry(event: React.FormEvent) {
     event.preventDefault();
-    const amount = Number(draft.amount);
+    // Accept "1,250.50" and "1 250,50"-style input; store to the cent.
+    const amount = roundMoney(
+      Number(draft.amount.replace(/\s/g, "").replace(/,(?=\d{3}\b)/g, "").replace(",", "."))
+    );
     const category =
       draft.category === "Custom"
         ? draft.customCategory.trim()
@@ -13221,7 +13266,8 @@ function FinanceCashflowPage({
       !draft.title.trim() ||
       !Number.isFinite(amount) ||
       amount <= 0 ||
-      !category
+      !category ||
+      !draft.date
     )
       return;
     if (draft.category === "Custom" && !customCategories.includes(category))
@@ -13245,6 +13291,9 @@ function FinanceCashflowPage({
       onRecord(
         `${entry.direction === "in" ? "Money in" : "Money out"} · ${entry.title}`
       );
+    toast(
+      `${editingId ? "Updated" : "Saved"} ${entry.direction === "in" ? "+" : "−"}${money(entry.amount)} · ${entry.title}`
+    );
     resetDraft();
   }
   function editEntry(entry: CashFlowEntry) {
@@ -13288,8 +13337,38 @@ function FinanceCashflowPage({
         </p>
         <div className="finance-privacy">
           <HeartPulse size={15} />
-          <span>Private local entries · no bank connection</span>
+          <span>Private entries · no bank connection · no advice</span>
         </div>
+        <section className="finance-handling" aria-labelledby="finance-handling-title">
+          <span id="finance-handling-title">How this money data is handled</span>
+          <ul>
+            <li>
+              <b>Where:</b>{" "}
+              {auth.isAuthenticated
+                ? "on this device and in your own account’s database. "
+                : "on this device only until you sign in. "}
+              Never sent to a bank, a third party, or anyone else.
+            </li>
+            <li>
+              <b>Amounts:</b> stored to the cent and shown with two decimals,
+              in whichever currency label you set below. No conversion is ever
+              applied.
+            </li>
+            <li>
+              <b>Recurring:</b> a label so you notice it — nothing is re-added
+              on your behalf.
+            </li>
+            <li>
+              <b>Transfers:</b> there is one pot here, not accounts. Record a
+              transfer as money out only if it left the amount you’re tracking;
+              otherwise leave it out.
+            </li>
+            <li>
+              <b>Correct or delete:</b> any record, from the history below.
+              Export everything as CSV there too.
+            </li>
+          </ul>
+        </section>
       </div>
       <div className="spread-page finances-workbench">
         <section className="finance-period-setup">
@@ -13299,8 +13378,21 @@ function FinanceCashflowPage({
           </div>
           <p>
             Choose a rhythm, then enter the amount you started this current
-            period with.
+            period with. {periodLabel(period)} means{" "}
+            {periodWindowDescription(period)}.
           </p>
+          <label className="finance-currency">
+            Currency label
+            <input
+              value={currency}
+              onChange={event => setCurrency(event.target.value.slice(0, 5))}
+              placeholder="e.g. KES, USD, £"
+              aria-describedby="finance-currency-help"
+            />
+            <small id="finance-currency-help">
+              Shown before every amount. Leave blank for plain numbers.
+            </small>
+          </label>
           <div className="finance-period-controls">
             <button
               type="button"
@@ -13342,29 +13434,30 @@ function FinanceCashflowPage({
         <section className="finance-balance-summary">
           <article>
             <span>Opening</span>
-            <b>
-              {openings[period].trim()
-                ? openingAmount.toLocaleString()
-                : "Not set"}
-            </b>
+            <b>{openings[period].trim() ? money(openingAmount) : "Not set"}</b>
           </article>
           <article className="in">
             <span>Money in</span>
-            <b>{summary.moneyIn.toLocaleString()}</b>
+            <b>{money(summary.moneyIn)}</b>
           </article>
           <article className="out">
             <span>Money out</span>
-            <b>{summary.moneyOut.toLocaleString()}</b>
+            <b>{money(summary.moneyOut)}</b>
           </article>
           <article className="balance">
-            <span>Current local balance</span>
+            <span>Current balance</span>
             <b>
               {openings[period].trim()
-                ? summary.currentBalance.toLocaleString()
+                ? money(summary.currentBalance)
                 : "Set opening amount"}
             </b>
           </article>
         </section>
+        <p className="finance-formula" aria-live="polite">
+          {openings[period].trim()
+            ? `${money(openingAmount)} opening + ${money(summary.moneyIn)} in − ${money(summary.moneyOut)} out = ${money(summary.currentBalance)}, from ${periodEntries.length} record${periodEntries.length === 1 ? "" : "s"} dated ${periodWindowDescription(period)}.`
+            : `Balance = opening + money in − money out. Enter an opening amount to see it; ${periodEntries.length} record${periodEntries.length === 1 ? "" : "s"} fall in this period.`}
+        </p>
         <section className="finance-entry-form">
           <div>
             <span>{editingId ? "Edit local record" : "Record cash flow"}</span>
@@ -13477,9 +13570,25 @@ function FinanceCashflowPage({
                     customCategory: event.target.value,
                   }))
                 }
-                placeholder="Name a local category"
+                placeholder="Name a category — it’s added to the list"
               />
             ) : null}
+            {customCategories.length > 0 && (
+              <div className="finance-custom-categories">
+                <span>Your categories</span>
+                {customCategories.map(name => (
+                  <button
+                    type="button"
+                    key={name}
+                    onClick={() => removeCustomCategory(name)}
+                    aria-label={`Remove category ${name} from the list`}
+                    title="Remove from the list (records keep their label)"
+                  >
+                    {name} ×
+                  </button>
+                ))}
+              </div>
+            )}
             <input
               value={draft.note}
               onChange={event =>
@@ -13498,11 +13607,10 @@ function FinanceCashflowPage({
                   }))
                 }
               />{" "}
-              Recurring item
+              Recurring item <small>a label only — not re-added for you</small>
             </label>
             <button type="submit">
-              <Plus size={14} />{" "}
-              {editingId ? "Save record" : "Add local record"}
+              <Plus size={14} /> {editingId ? "Save changes" : "Add record"}
             </button>
           </form>
         </section>
@@ -13541,7 +13649,7 @@ function FinanceCashflowPage({
                 <article key={item.category}>
                   <p>
                     <b>{item.category}</b>
-                    <small>{item.amount.toLocaleString()}</small>
+                    <small>{money(item.amount)}</small>
                   </p>
                   <i>
                     <em
@@ -13570,36 +13678,67 @@ function FinanceCashflowPage({
         </label>
         <section className="finance-history">
           <div>
-            <span>Local money history</span>
+            <span>Money history</span>
             <b>{entries.length} saved</b>
+            <span className="finance-history-tools">
+              {lastEntries && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEntries(lastEntries);
+                    setLastEntries(null);
+                  }}
+                >
+                  Undo remove
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={downloadCsv}
+                disabled={entries.length === 0}
+              >
+                Export CSV
+              </button>
+            </span>
           </div>
           {entries.length ? (
             entries.map(entry => (
-              <article key={entry.id}>
-                <i className={entry.direction}>
+              <article
+                key={entry.id}
+                className={cn(editingId === entry.id && "is-editing")}
+              >
+                <i className={entry.direction} aria-hidden="true">
                   {entry.direction === "in" ? "+" : "−"}
                 </i>
                 <p>
                   <b>{entry.title}</b>
                   <small>
                     {entry.direction === "in" ? "Money in" : "Money out"} ·{" "}
-                    {entry.category} · {entry.date}
+                    {entry.category} ·{" "}
+                    <time dateTime={entry.date}>
+                      {new Date(`${entry.date}T12:00:00`).toLocaleDateString(
+                        undefined,
+                        { weekday: "short", day: "numeric", month: "short" }
+                      )}
+                    </time>
                     {entry.recurring ? " · recurring" : ""}
                   </small>
                   {entry.note ? <em>{entry.note}</em> : null}
                 </p>
-                <strong>{entry.amount.toLocaleString()}</strong>
+                <strong
+                  aria-label={`${entry.direction === "in" ? "plus" : "minus"} ${money(entry.amount)}`}
+                >
+                  {entry.direction === "in" ? "+" : "−"}
+                  {money(entry.amount)}
+                </strong>
                 <div>
                   <button type="button" onClick={() => editEntry(entry)}>
                     Edit
                   </button>
                   <button
                     type="button"
-                    onClick={() =>
-                      setEntries(current =>
-                        current.filter(item => item.id !== entry.id)
-                      )
-                    }
+                    onClick={() => removeEntry(entry)}
+                    aria-label={`Remove ${entry.title}, ${money(entry.amount)}`}
                   >
                     Remove
                   </button>
@@ -13608,8 +13747,8 @@ function FinanceCashflowPage({
             ))
           ) : (
             <small>
-              There are no local money records yet. Add only amounts you want
-              this journal to reflect.
+              No money records yet. Add only amounts you want this journal to
+              reflect.
             </small>
           )}
         </section>
