@@ -24007,9 +24007,46 @@ body {
   flex-wrap: wrap;
   gap: 0.34rem;
 }
+.exam-plan-top-actions {
+  display: flex;
+  gap: 0.3rem;
+  align-items: flex-start;
+  flex-shrink: 0;
+}
+.exam-when.is-overdue {
+  color: #7d2946;
+}
+.exam-when.is-overdue::before {
+  content: "▲ ";
+}
+.exam-when.is-today,
+.exam-when.is-tomorrow {
+  color: #a8481f;
+}
+.exam-plan-card.is-today,
+.exam-plan-card.is-tomorrow {
+  box-shadow: inset 3px 0 0 #e98d79;
+}
+.exam-plan-card.is-editing {
+  outline: 2px dashed rgba(28, 29, 40, 0.5);
+  outline-offset: 3px;
+}
+.exam-plan-top time {
+  font-variant-numeric: tabular-nums;
+}
+.exam-card-actions .exam-delete {
+  border-style: dashed;
+  color: rgba(28, 29, 40, 0.75);
+}
+.exam-card-actions .is-danger {
+  color: #fffaf4;
+  background: #7d2946;
+  border-color: #7d2946;
+}
 .course-card-actions button,
 .exam-card-actions button,
 .exam-plan-top > button,
+.exam-plan-top-actions button,
 .exam-archive > div button {
   border: 1px solid rgba(28, 29, 40, 0.36);
   border-radius: 8px;

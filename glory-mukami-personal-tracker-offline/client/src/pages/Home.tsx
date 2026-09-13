@@ -115,7 +115,6 @@ import {
   type AssignmentPlan,
 } from "../lib/assignmentTracker";
 import {
-  examDueStatus,
   nextAcademicItem,
   standingDetail,
   weeklyRevisionMinutes,
@@ -16463,7 +16462,7 @@ function ExamPlannerPage({
     reflection: string;
     completed: boolean;
   };
-  const today = new Date().toISOString().slice(0, 10);
+  const today = sleepDateInputValue(new Date());
   const emptyDraft = {
     title: "",
     date: "",
@@ -16473,6 +16472,31 @@ function ExamPlannerPage({
     checkpoints: [] as ExamCheckpoint[],
   };
   const [exams, setExams] = useState<ExamPlan[]>([]);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const readinessWords: Record<number, string> = {
+    1: "Not started",
+    2: "Early days",
+    3: "Getting there",
+    4: "Nearly ready",
+    5: "Ready",
+  };
+  const topicCycle =
+    "Tap to cycle: Needs practice → Revising → Confident → Needs practice";
+  function examWhen(date: string) {
+    const detail = assignmentDueDetail(date, today);
+    const label =
+      detail.kind === "overdue"
+        ? `Was ${Math.abs(detail.daysAway ?? 0)} day${Math.abs(detail.daysAway ?? 0) === 1 ? "" : "s"} ago`
+        : detail.kind === "today"
+          ? "Today"
+          : detail.kind === "tomorrow"
+            ? "Tomorrow"
+            : detail.kind === "none"
+              ? "No date"
+              : `${detail.daysAway} days to go`;
+    return { ...detail, label };
+  }
   const [draft, setDraft] = useState(emptyDraft);
   const [topicDraft, setTopicDraft] = useState("");
   const [checkpointDraft, setCheckpointDraft] = useState({
@@ -16512,6 +16536,26 @@ function ExamPlannerPage({
     setCheckpointDraft({ label: "", date: "", minutes: "30" });
     setOpenComposer(false);
     setPlanningOpen(false);
+    setEditingId(null);
+  }
+  function beginEditExam(exam: ExamPlan) {
+    setDraft({
+      title: exam.title,
+      date: exam.date,
+      focus: exam.focus,
+      readiness: String(exam.readiness),
+      topics: exam.topics,
+      checkpoints: exam.checkpoints,
+    });
+    setEditingId(exam.id);
+    setOpenComposer(true);
+    setPlanningOpen(true);
+  }
+  function deleteExam(id: string) {
+    setExams(current => current.filter(exam => exam.id !== id));
+    setConfirmDeleteId(null);
+    if (editingId === id) resetComposer();
+    toast("Exam and its revision log deleted");
   }
   function addTopic() {
     const label = topicDraft.trim();
@@ -16546,21 +16590,36 @@ function ExamPlannerPage({
   function saveExam(event: React.FormEvent) {
     event.preventDefault();
     if (!draft.title.trim() || !draft.date || !draft.focus.trim()) return;
-    setExams(current => [
-      ...current,
-      {
-        id: `${Date.now()}-exam`,
-        title: draft.title.trim(),
-        date: draft.date,
-        focus: draft.focus.trim(),
-        readiness: Number(draft.readiness),
-        topics: draft.topics,
-        checkpoints: draft.checkpoints,
-        logs: [],
-        reflection: "",
-        completed: false,
-      },
-    ]);
+    const fields = {
+      title: draft.title.trim(),
+      date: draft.date,
+      focus: draft.focus.trim(),
+      readiness: Number(draft.readiness),
+      topics: draft.topics,
+      checkpoints: draft.checkpoints,
+    };
+    if (editingId) {
+      // Logs, reflection and completion belong to the exam's history and
+      // are not part of the form; an edit leaves them untouched.
+      setExams(current =>
+        current.map(exam =>
+          exam.id === editingId ? { ...exam, ...fields } : exam
+        )
+      );
+      toast("Exam updated");
+    } else {
+      setExams(current => [
+        ...current,
+        {
+          id: `${Date.now()}-exam`,
+          ...fields,
+          logs: [],
+          reflection: "",
+          completed: false,
+        },
+      ]);
+      toast(`${fields.title} added · ${examWhen(fields.date).label}`);
+    }
     resetComposer();
   }
   function updateExam(id: string, updater: (exam: ExamPlan) => ExamPlan) {
@@ -16592,30 +16651,56 @@ function ExamPlannerPage({
       item => item.done
     ).length;
     const weekMinutes = weeklyRevisionMinutes(exam.logs, today);
+    const when = examWhen(exam.date);
+    const confident = exam.topics.filter(
+      topic => topic.status === "Confident"
+    ).length;
     return (
       <article
-        className={cn("exam-plan-card", exam.completed && "completed")}
+        className={cn(
+          "exam-plan-card",
+          exam.completed && "completed",
+          !exam.completed && `is-${when.kind}`,
+          editingId === exam.id && "is-editing"
+        )}
         key={exam.id}
       >
         <div className="exam-plan-top">
           <div>
-            <span>{examDueStatus(exam.date, today)}</span>
+            <span
+              className={cn("exam-when", !exam.completed && `is-${when.kind}`)}
+              title={when.exact}
+            >
+              {exam.completed ? "✓ Completed" : when.label}
+            </span>
             <b>{exam.title}</b>
             <small>
-              {exam.date} · readiness {exam.readiness}/5
+              <time dateTime={exam.date}>{when.exact}</time> · readiness{" "}
+              {exam.readiness}/5
+              {readinessWords[exam.readiness]
+                ? ` (${readinessWords[exam.readiness].toLowerCase()})`
+                : ""}
+              {exam.topics.length
+                ? ` · ${confident} of ${exam.topics.length} topics confident`
+                : ""}
             </small>
           </div>
-          <button
-            type="button"
-            onClick={() =>
-              updateExam(exam.id, item => ({
-                ...item,
-                completed: !item.completed,
-              }))
-            }
-          >
-            {exam.completed ? "Reopen" : "Complete"}
-          </button>
+          <div className="exam-plan-top-actions">
+            <button type="button" onClick={() => beginEditExam(exam)}>
+              Edit
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                updateExam(exam.id, item => ({
+                  ...item,
+                  completed: !item.completed,
+                }))
+              }
+            >
+              {exam.completed ? "Reopen" : "Complete"}
+            </button>
+          </div>
         </div>
         <p>
           <strong>Today’s revision focus:</strong> {exam.focus}
@@ -16648,7 +16733,9 @@ function ExamPlannerPage({
                 {checkpoint.done ? "✓" : ""}
                 <span>
                   {checkpoint.label}
-                  {checkpoint.date ? ` · ${checkpoint.date}` : ""}
+                  {checkpoint.date
+                    ? ` · ${checkpoint.done ? "done" : examWhen(checkpoint.date).label.toLowerCase()} (${examWhen(checkpoint.date).exact})`
+                    : ""}
                   {checkpoint.minutes ? ` · ${checkpoint.minutes} min` : ""}
                 </span>
               </button>
@@ -16663,6 +16750,8 @@ function ExamPlannerPage({
                 type="button"
                 key={topic.id}
                 className={topic.status.toLowerCase().replaceAll(" ", "-")}
+                title={topicCycle}
+                aria-label={`${topic.label}: ${topic.status}. ${topicCycle}`}
                 onClick={() =>
                   updateExam(exam.id, item => ({
                     ...item,
@@ -16706,6 +16795,28 @@ function ExamPlannerPage({
           >
             Post-exam reflection
           </button>
+          {confirmDeleteId === exam.id ? (
+            <>
+              <button
+                type="button"
+                className="is-danger"
+                onClick={() => deleteExam(exam.id)}
+              >
+                Delete for good
+              </button>
+              <button type="button" onClick={() => setConfirmDeleteId(null)}>
+                Keep
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              className="exam-delete"
+              onClick={() => setConfirmDeleteId(exam.id)}
+            >
+              Delete…
+            </button>
+          )}
         </div>
         {logOpen === exam.id ? (
           <div className="revision-log-form">
@@ -16803,19 +16914,25 @@ function ExamPlannerPage({
             <span>Next exam</span>
             <b>
               {active[0]
-                ? `${active[0].title} · ${examDueStatus(active[0].date, today)}`
+                ? `${active[0].title} · ${examWhen(active[0].date).label} · ${examWhen(active[0].date).exact}`
                 : "No exam added yet"}
             </b>
           </div>
           <p>{revisionMinutes} local revision minutes in the last 7 days</p>
-          <button type="button" onClick={() => setOpenComposer(true)}>
+          <button
+            type="button"
+            onClick={() => {
+              resetComposer();
+              setOpenComposer(true);
+            }}
+          >
             Add exam
           </button>
         </section>
         {openComposer ? (
           <form className="exam-composer" onSubmit={saveExam}>
             <div>
-              <span>Plan an exam</span>
+              <span>{editingId ? "Edit exam" : "Plan an exam"}</span>
               <button type="button" onClick={resetComposer}>
                 Close
               </button>
@@ -16981,7 +17098,9 @@ function ExamPlannerPage({
                 </div>
               </div>
             ) : null}
-            <button type="submit">Save exam</button>
+            <button type="submit">
+              {editingId ? "Save changes" : "Save exam"}
+            </button>
           </form>
         ) : null}
         <section className="exam-active-list">
