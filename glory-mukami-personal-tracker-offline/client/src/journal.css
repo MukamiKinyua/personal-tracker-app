@@ -24758,6 +24758,61 @@ body {
 .time-ribbon article.done {
   opacity: 0.58;
 }
+.time-block-actions {
+  display: flex;
+  gap: 0.28rem;
+  align-items: center;
+}
+.time-block-actions button {
+  border: 1px solid rgba(255, 250, 242, 0.4);
+  border-radius: 7px;
+  padding: 0.32rem 0.45rem;
+  color: #fffaf2;
+  background: transparent;
+  font-size: 0.56rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.time-block-actions button:disabled {
+  opacity: 0.5;
+}
+.time-earlier {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.3rem 0 0.4rem;
+  padding: 0.45rem 0.55rem;
+  border: 1px dashed rgba(255, 250, 242, 0.4);
+  border-radius: 8px;
+}
+.time-earlier small {
+  flex: 1 1 100%;
+  color: rgba(255, 250, 242, 0.88);
+  font-size: 0.58rem;
+}
+.time-earlier button {
+  border: 1px solid rgba(255, 250, 242, 0.45);
+  border-radius: 999px;
+  padding: 0.3rem 0.6rem;
+  color: #fffaf2;
+  background: transparent;
+  font-size: 0.56rem;
+  font-weight: 800;
+}
+.time-ribbon > div b .local-undo,
+.time-history > div b .local-undo {
+  margin-left: 0.5rem;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  background: none;
+  font: inherit;
+  text-decoration: underline;
+  text-transform: none;
+  letter-spacing: 0;
+  cursor: pointer;
+}
 .time-history {
   display: grid;
   gap: 0.4rem;

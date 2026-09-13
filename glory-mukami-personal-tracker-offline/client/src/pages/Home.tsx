@@ -14323,9 +14323,52 @@ function TimePage({
     minutes: number;
     time: string;
     done: boolean;
+    /** The day the block belongs to; blocks saved before this field
+     * existed are treated as today's until moved or removed. */
+    date?: string;
   };
-  const today = new Date().toISOString().slice(0, 10);
+  const today = sleepDateInputValue(new Date());
   const [blocks, setBlocks] = useState<TimeBlock[]>([]);
+  const [lastBlocks, setLastBlocks] = useState<TimeBlock[] | null>(null);
+  const [lastRecords, setLastRecords] = useState<LocalTimerRecord[] | null>(
+    null
+  );
+  const todaysBlocks = blocks.filter(block => (block.date ?? today) === today);
+  const earlierBlocks = blocks.filter(
+    block => block.date !== undefined && block.date < today
+  );
+  const earlierOpen = earlierBlocks.filter(block => !block.done);
+  function removeBlock(block: TimeBlock) {
+    setLastBlocks(blocks);
+    setBlocks(current => current.filter(item => item.id !== block.id));
+    if (activeBlockId === block.id) setActiveBlockId(null);
+    toast(`Removed block “${block.title}”`);
+  }
+  function toggleBlockDone(block: TimeBlock) {
+    setBlocks(current =>
+      current.map(item =>
+        item.id === block.id ? { ...item, done: !item.done } : item
+      )
+    );
+  }
+  function carryEarlierForward() {
+    setLastBlocks(blocks);
+    setBlocks(current =>
+      current.map(block =>
+        block.date !== undefined && block.date < today && !block.done
+          ? { ...block, date: today }
+          : block
+      )
+    );
+    toast(`${earlierOpen.length} open block${earlierOpen.length === 1 ? "" : "s"} moved to today`);
+  }
+  function clearEarlier() {
+    setLastBlocks(blocks);
+    setBlocks(current =>
+      current.filter(block => !(block.date !== undefined && block.date < today))
+    );
+    toast(`${earlierBlocks.length} earlier block${earlierBlocks.length === 1 ? "" : "s"} removed`);
+  }
   const [draft, setDraft] = useState({
     title: "",
     category: "Study",
@@ -14486,6 +14529,7 @@ function TimePage({
       ...draft,
       title: draft.title.trim(),
       done: false,
+      date: today,
     };
     setBlocks(current =>
       [...current, block].sort((first, second) =>
@@ -14493,6 +14537,7 @@ function TimePage({
       )
     );
     setDraft({ title: "", category: "Study", minutes: 60, time: "" });
+    toast(`Block added${block.time ? ` at ${block.time}` : ""} · ${block.minutes} min`);
   }
   function chooseCountdown(value: number) {
     if (running) return;
@@ -14882,15 +14927,46 @@ function TimePage({
         <section className="time-ribbon">
           <div>
             <span>Today’s blocks</span>
-            <b>{blocks.filter(block => !block.done).length} open</b>
+            <b>
+              {todaysBlocks.filter(block => !block.done).length} open
+              {lastBlocks && (
+                <button
+                  type="button"
+                  className="local-undo"
+                  onClick={() => {
+                    setBlocks(lastBlocks);
+                    setLastBlocks(null);
+                  }}
+                >
+                  Undo
+                </button>
+              )}
+            </b>
           </div>
-          {blocks.length === 0 ? (
+          {earlierBlocks.length > 0 && (
+            <div className="time-earlier">
+              <small>
+                {earlierBlocks.length} block
+                {earlierBlocks.length === 1 ? "" : "s"} from earlier days
+                {earlierOpen.length ? ` (${earlierOpen.length} still open)` : ""}.
+              </small>
+              {earlierOpen.length > 0 && (
+                <button type="button" onClick={carryEarlierForward}>
+                  Bring open ones to today
+                </button>
+              )}
+              <button type="button" onClick={clearEarlier}>
+                Clear earlier
+              </button>
+            </div>
+          )}
+          {todaysBlocks.length === 0 ? (
             <small>
               Start with one block that would make your day feel more
               intentional.
             </small>
           ) : (
-            blocks.map(block => (
+            todaysBlocks.map(block => (
               <article
                 className={cn(
                   block.category.toLowerCase().replace(" ", "-"),
@@ -14904,27 +14980,68 @@ function TimePage({
                   <b>{block.title}</b>
                   <small>
                     {block.category} · {block.minutes} minutes
+                    {block.done ? " · done" : ""}
                   </small>
                 </p>
-                <button
-                  type="button"
-                  onClick={() => beginBlockTimer(block)}
-                  disabled={running || block.done}
-                >
-                  {block.done
-                    ? "Saved"
-                    : activeBlockId === block.id
-                      ? "Ready"
-                      : "Use timer"}
-                </button>
+                <div className="time-block-actions">
+                  <button
+                    type="button"
+                    onClick={() => beginBlockTimer(block)}
+                    disabled={running || block.done}
+                  >
+                    {block.done
+                      ? "Saved"
+                      : activeBlockId === block.id
+                        ? "Ready"
+                        : "Use timer"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => toggleBlockDone(block)}
+                    aria-label={
+                      block.done
+                        ? `Reopen ${block.title}`
+                        : `Mark ${block.title} done without timing it`
+                    }
+                    title={
+                      block.done
+                        ? "Reopen"
+                        : "Mark done without timing it"
+                    }
+                  >
+                    {block.done ? "Reopen" : "✓"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => removeBlock(block)}
+                    aria-label={`Remove block ${block.title}`}
+                    title="Remove"
+                  >
+                    ×
+                  </button>
+                </div>
               </article>
             ))
           )}
         </section>
         <section className="time-history">
           <div>
-            <span>Recent local timing</span>
-            <b>· {records.length} saved</b>
+            <span>Recent timing</span>
+            <b>
+              · {records.length} saved
+              {lastRecords && (
+                <button
+                  type="button"
+                  className="local-undo"
+                  onClick={() => {
+                    setRecords(lastRecords);
+                    setLastRecords(null);
+                  }}
+                >
+                  Undo remove
+                </button>
+              )}
+            </b>
           </div>
           {records.length === 0 ? (
             <small>
@@ -14938,17 +15055,21 @@ function TimePage({
                     {formatClockSeconds(record.seconds)} · {record.label}
                   </b>
                   <small>
-                    {record.date} · {record.category} ·{" "}
+                    {record.date === today ? "Today" : record.date} ·{" "}
+                    {record.category} ·{" "}
                     {record.mode === "countdown" ? "Countdown" : "Count up"}
                   </small>
                 </div>
                 <button
                   type="button"
-                  onClick={() =>
+                  onClick={() => {
+                    setLastRecords(records);
                     setRecords(current =>
                       current.filter(item => item.id !== record.id)
-                    )
-                  }
+                    );
+                    toast(`Removed ${formatClockSeconds(record.seconds)} · ${record.label}`);
+                  }}
+                  aria-label={`Remove ${record.label}`}
                 >
                   Remove
                 </button>
