@@ -6348,6 +6348,7 @@ function HobbiesPage({
                   onClick={() => {
                     setHobbies(lastHobbys);
                     setLastHobbys(null);
+                    toast("Hobby restored");
                   }}
                 >
                   Undo remove
