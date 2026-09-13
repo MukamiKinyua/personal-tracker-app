@@ -45,9 +45,10 @@ import { SettingsPanel } from "@/components/SettingsPanel";
 import { DayPlanner } from "@/components/DayPlanner";
 import { WorkoutStudio } from "@/components/WorkoutStudio";
 import { useRecordStore } from "@/contexts/RecordStoreContext";
+import type { AnyRecord } from "@/lib/core/recordStore";
 import { toCSV } from "@/lib/core/exportData";
 import { eraseLocalJournalData } from "@/lib/core/storage";
-import { localCalendarDay } from "@/lib/core/datetime";
+import { localCalendarDay, shiftDayKey } from "@/lib/core/datetime";
 import {
   computeStreak,
   isDueOn,
@@ -173,6 +174,7 @@ import {
   reviewGoals,
   type GoalMilestoneRecord,
   type GoalState,
+  type GoalWorkspaceRecord,
 } from "../lib/goalTracker";
 import {
   appendSecurityReviewLog,
@@ -931,6 +933,327 @@ function JournalActions({
         <span>Contents</span>
       </button>
     </div>
+  );
+}
+
+/**
+ * The dashboard's cards, computed from what the journal actually holds.
+ * Every line either comes from a saved record or says that nothing is saved
+ * yet; nothing here is invented, scored, or predicted.
+ */
+function DashboardCards({
+  activity,
+  ownerKey,
+  privateMode,
+  showSensitiveSummaries,
+  onOpen,
+}: {
+  activity: InsightActivity[];
+  ownerKey: string;
+  privateMode: boolean;
+  showSensitiveSummaries: boolean;
+  onOpen: (view: View) => void;
+}) {
+  const journal = useRecordStore();
+  const today = journal.today;
+  const localToday = localCalendarDay(new Date());
+  const masked = privateMode || !showSensitiveSummaries;
+
+  function readScope<T>(scope: string): T | null {
+    try {
+      const raw = window.localStorage.getItem(
+        `glory-personal-tracker:${scope}:${ownerKey}`
+      );
+      return raw ? (JSON.parse(raw) as T) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  // What needs attention: open assignments by due date, plus today's open tasks.
+  const assignments = (
+    readScope<{ assignments?: AssignmentPlan[] }>("assignments")?.assignments ??
+    []
+  ).filter(item => !item.completed);
+  const dueSoon = sortAssignments(assignments, "due")
+    .map(item => ({ item, due: assignmentDueDetail(item.due, localToday) }))
+    .filter(({ due }) => due.kind !== "none")
+    .slice(0, 2);
+  const openTasksToday = journal
+    .inScope("task")
+    .filter(
+      record => record.body.when === "today" && !record.body.done
+    ).length;
+
+  // How you are doing: the latest check-in, in the user's own words.
+  const checkIns =
+    readScope<{ entries?: MoodEntry[] }>("wellbeing")?.entries ?? [];
+  const latestCheckIn = [...checkIns].sort((a, b) =>
+    b.date.localeCompare(a.date)
+  )[0];
+
+  // Toward your goals: active goals with milestone-derived progress.
+  const goals = (
+    readScope<{ goals?: GoalWorkspaceRecord[] }>("goals")?.goals ?? []
+  ).filter(goal => goal.state === "active");
+  const goalLines = goals.slice(0, 2).map(goal => ({
+    title: goal.title,
+    percent: factualGoalProgress(goal.milestones, goal.manualProgress),
+    fromMilestones: goal.milestones.length > 0,
+  }));
+
+  // What's changing: saved actions this 7 days vs the 7 before, and sleep.
+  const trend = descriptiveActivityTrend(activity);
+  const weekAgo = shiftDayKey(today, -6);
+  const twoWeeksAgo = shiftDayKey(today, -13);
+  const nightHours = (records: AnyRecord[]) =>
+    records
+      .map(record => Number(record.body.hours))
+      .filter(value => Number.isFinite(value) && value > 0);
+  const thisWeekNights = nightHours(journal.between("sleep", weekAgo, today));
+  const lastWeekNights = nightHours(
+    journal.between("sleep", twoWeeksAgo, shiftDayKey(weekAgo, -1))
+  );
+  const average = (values: number[]) =>
+    values.reduce((total, value) => total + value, 0) / values.length;
+  const sleepDelta =
+    thisWeekNights.length >= 3 && lastWeekNights.length >= 3
+      ? Math.round((average(thisWeekNights) - average(lastWeekNights)) * 60)
+      : null;
+
+  const savedToday = activity.filter(
+    record => record.recordedOn === localToday
+  ).length;
+  const savedThisWeek = activity.filter(
+    record => record.recordedOn && record.recordedOn >= weekAgo
+  ).length;
+
+  // Next best step: the nearest deadline's next action, else a goal's, else
+  // a plain suggestion — and it says which.
+  const nextStep = dueSoon[0]
+    ? {
+        title: dueSoon[0].item.nextAction || `Open ${dueSoon[0].item.title}`,
+        why: `${dueSoon[0].item.title} is ${dueSoon[0].due.label.toLowerCase()}.`,
+        view: "assignments" as View,
+        label: "Open assignments",
+      }
+    : goals[0]
+      ? {
+          title: (goals[0] as GoalWorkspaceRecord & { nextAction?: string })
+            .nextAction || `Move “${goals[0].title}” one step`,
+          why: "From your active goals.",
+          view: "goals" as View,
+          label: "Open goals",
+        }
+      : {
+          title: "Choose one small task for today.",
+          why: "Nothing is due and no goal is active, so today is yours to shape.",
+          view: "tasks" as View,
+          label: "Open tasks",
+        };
+
+  return (
+    <>
+      <div className="dashboard-grid">
+        <article className="dashboard-card attention-card">
+          <span className="card-label">what needs attention</span>
+          {dueSoon.length === 0 && openTasksToday === 0 ? (
+            <div className="attention-row">
+              <span className="priority-dot gold" aria-hidden="true" />
+              <div>
+                <b>Nothing due</b>
+                <small>No open assignment has a date, and no task is set for today.</small>
+              </div>
+            </div>
+          ) : null}
+          {dueSoon.map(({ item, due }) => (
+            <button
+              type="button"
+              className="attention-row"
+              key={item.id}
+              onClick={() => onOpen("assignments")}
+            >
+              <span
+                className={cn(
+                  "priority-dot",
+                  due.kind === "overdue" || due.kind === "today"
+                    ? "magenta"
+                    : "gold"
+                )}
+                aria-hidden="true"
+              />
+              <div>
+                <b>{item.title}</b>
+                <small>
+                  {due.label} · {due.exact}
+                </small>
+              </div>
+              <ArrowRight size={16} aria-hidden="true" />
+            </button>
+          ))}
+          {openTasksToday > 0 ? (
+            <button
+              type="button"
+              className="attention-row"
+              onClick={() => onOpen("tasks")}
+            >
+              <span className="priority-dot gold" aria-hidden="true" />
+              <div>
+                <b>
+                  {openTasksToday} task{openTasksToday === 1 ? "" : "s"} for
+                  today
+                </b>
+                <small>Open in Tasks</small>
+              </div>
+              <ArrowRight size={16} aria-hidden="true" />
+            </button>
+          ) : null}
+        </article>
+        <article className="dashboard-card wellbeing-card">
+          <span className="card-label">how you are doing</span>
+          {masked ? (
+            <div className="dashboard-private-mask">
+              <HeartPulse size={20} aria-hidden="true" />
+              <b>Sensitive summary hidden</b>
+              <small>Open Privacy Controls to change this display choice.</small>
+            </div>
+          ) : latestCheckIn ? (
+            <>
+              <div className="wellbeing-orbit">
+                <span className="orbit-orb one" aria-hidden="true" />
+                <span className="orbit-orb two" aria-hidden="true" />
+                <span className="wellbeing-score">
+                  {latestCheckIn.mood}
+                  <small>energy {latestCheckIn.energy}/5</small>
+                </span>
+              </div>
+              <p>
+                Your last check-in, in your own words —{" "}
+                {latestCheckIn.date === localToday
+                  ? "today"
+                  : new Date(`${latestCheckIn.date}T12:00:00`).toLocaleDateString(
+                      undefined,
+                      { weekday: "short", day: "numeric", month: "short" }
+                    )}
+                . Not a score.
+              </p>
+            </>
+          ) : (
+            <p>
+              No check-in yet. When you save one on the Wellbeing page, the
+              word you chose shows here — never a score.
+            </p>
+          )}
+        </article>
+        <article className="dashboard-card next-card">
+          <span className="card-label">your next best step</span>
+          <Target size={26} aria-hidden="true" />
+          <h3>{nextStep.title}</h3>
+          <p>{nextStep.why}</p>
+          <button type="button" onClick={() => onOpen(nextStep.view)}>
+            {nextStep.label} <ArrowRight size={15} aria-hidden="true" />
+          </button>
+        </article>
+        <article className="dashboard-card goals-card">
+          <span className="card-label">toward your goals</span>
+          {goalLines.length === 0 ? (
+            <p>No active goal yet. Set one and its progress appears here.</p>
+          ) : (
+            goalLines.map((goal, index) => (
+              <div key={goal.title}>
+                <div className="goal-line">
+                  <span>{goal.title}</span>
+                  <b>
+                    {goal.percent}%
+                    <small>
+                      {goal.fromMilestones ? " of milestones" : " estimated"}
+                    </small>
+                  </b>
+                </div>
+                <div
+                  className="progress-track"
+                  role="progressbar"
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={goal.percent}
+                  aria-label={`${goal.title}, ${goal.percent}%`}
+                >
+                  <i
+                    className={cn(index % 2 === 1 && "pink")}
+                    style={{ width: `${goal.percent}%` }}
+                  />
+                </div>
+              </div>
+            ))
+          )}
+        </article>
+        <article className="dashboard-card trends-card">
+          <span className="card-label">what’s changing</span>
+          {masked ? (
+            <div className="dashboard-private-mask compact">
+              <HeartPulse size={17} aria-hidden="true" />
+              <b>Sensitive health trend hidden</b>
+              <small>Private mode is active.</small>
+            </div>
+          ) : (
+            <div className="trend-item">
+              <span
+                className={cn(
+                  "trend-glyph",
+                  sleepDelta === null ? "soft" : sleepDelta >= 0 ? "up" : "soft"
+                )}
+                aria-hidden="true"
+              >
+                {sleepDelta === null ? "~" : sleepDelta >= 0 ? "↗" : "↘"}
+              </span>
+              <p>
+                <b>
+                  {sleepDelta === null
+                    ? "Sleep: not enough nights to compare"
+                    : `Sleep averages ${Math.abs(sleepDelta)} min ${sleepDelta >= 0 ? "longer" : "shorter"}`}
+                </b>
+                <small>
+                  {sleepDelta === null
+                    ? `${thisWeekNights.length} logged this week, ${lastWeekNights.length} the week before; 3 each are needed`
+                    : "this 7 days against the 7 before, from logged nights"}
+                </small>
+              </p>
+            </div>
+          )}
+          <div className="trend-item">
+            <span
+              className={cn(
+                "trend-glyph",
+                trend.direction === "more" ? "up" : "soft"
+              )}
+              aria-hidden="true"
+            >
+              {trend.direction === "more" ? "↗" : trend.direction === "fewer" ? "↘" : "~"}
+            </span>
+            <p>
+              <b>
+                {trend.evidence === "descriptive"
+                  ? `${trend.direction === "more" ? "More" : trend.direction === "fewer" ? "Fewer" : "About as many"} actions saved this week`
+                  : "Not enough saved actions to compare weeks"}
+              </b>
+              <small>
+                {trend.currentCount} this 7 days · {trend.previousCount} the 7
+                before
+              </small>
+            </p>
+          </div>
+        </article>
+      </div>
+      <div className="dashboard-bottom-bar">
+        <span>
+          {savedToday} action{savedToday === 1 ? "" : "s"} saved today ·{" "}
+          {savedThisWeek} this week. Counts, not conclusions.
+        </span>
+        <button type="button" onClick={() => onOpen("reflections")}>
+          Write reflection <NotebookPen size={15} aria-hidden="true" />
+        </button>
+      </div>
+    </>
   );
 }
 
@@ -1748,114 +2071,13 @@ export default function Home() {
                   <Plus size={18} /> Quick add
                 </button>
               </div>
-              <div className="dashboard-grid">
-                <article className="dashboard-card attention-card">
-                  <span className="card-label">what needs attention</span>
-                  <div className="attention-row">
-                    <span className="priority-dot magenta" />
-                    <div>
-                      <b>Database assignment</b>
-                      <small>Due tomorrow · 2 hours left</small>
-                    </div>
-                    <ArrowRight size={16} />
-                  </div>
-                  <div className="attention-row">
-                    <span className="priority-dot gold" />
-                    <div>
-                      <b>Review study plan</b>
-                      <small>Suggested before 6:00 PM</small>
-                    </div>
-                    <ArrowRight size={16} />
-                  </div>
-                </article>
-                <article className="dashboard-card wellbeing-card">
-                  <span className="card-label">how you are doing</span>
-                  {privateMode || !showSensitiveSummaries ? (
-                    <div className="dashboard-private-mask">
-                      <HeartPulse size={20} />
-                      <b>Sensitive summary hidden</b>
-                      <small>
-                        Open Privacy Controls to change this display choice.
-                      </small>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="wellbeing-orbit">
-                        <span className="orbit-orb one" />
-                        <span className="orbit-orb two" />
-                        <span className="wellbeing-score">
-                          74<small>steady</small>
-                        </span>
-                      </div>
-                      <p>
-                        Your sleep and study rhythm are holding steady this
-                        week.
-                      </p>
-                    </>
-                  )}
-                </article>
-                <article className="dashboard-card next-card">
-                  <span className="card-label">your next best step</span>
-                  <Target size={26} />
-                  <h3>Start with a 25-minute assignment sprint.</h3>
-                  <p>
-                    It protects tomorrow’s deadline and leaves the evening open.
-                  </p>
-                  <button type="button" onClick={() => turnTo("assignments")}>
-                    Open assignments <ArrowRight size={15} />
-                  </button>
-                </article>
-                <article className="dashboard-card goals-card">
-                  <span className="card-label">toward your goals</span>
-                  <div className="goal-line">
-                    <span>Learning</span>
-                    <b>68%</b>
-                  </div>
-                  <div className="progress-track">
-                    <i style={{ width: "68%" }} />
-                  </div>
-                  <div className="goal-line">
-                    <span>Movement</span>
-                    <b>42%</b>
-                  </div>
-                  <div className="progress-track">
-                    <i className="pink" style={{ width: "42%" }} />
-                  </div>
-                </article>
-                <article className="dashboard-card trends-card">
-                  <span className="card-label">what’s changing</span>
-                  {privateMode || !showSensitiveSummaries ? (
-                    <div className="dashboard-private-mask compact">
-                      <HeartPulse size={17} />
-                      <b>Sensitive health trend hidden</b>
-                      <small>Private mode is active.</small>
-                    </div>
-                  ) : (
-                    <div className="trend-item">
-                      <span className="trend-glyph up">↗</span>
-                      <p>
-                        <b>Sleep is 36 min steadier</b>
-                        <small>than last week’s average</small>
-                      </p>
-                    </div>
-                  )}
-                  <div className="trend-item">
-                    <span className="trend-glyph soft">~</span>
-                    <p>
-                      <b>Learning rhythm is building</b>
-                      <small>4 focused sessions this week</small>
-                    </p>
-                  </div>
-                </article>
-              </div>
-              <div className="dashboard-bottom-bar">
-                <span>
-                  Today’s pattern: your focus grows after a calm start.
-                </span>
-                <button type="button" onClick={() => turnTo("reflections")}>
-                  Write reflection <NotebookPen size={15} />
-                </button>
-              </div>
+              <DashboardCards
+                activity={insightActivity}
+                ownerKey={String(auth.user?.id ?? "guest")}
+                privateMode={privateMode}
+                showSensitiveSummaries={showSensitiveSummaries}
+                onOpen={destination => turnTo(destination)}
+              />
             </div>
             {quickAddOpen && (
               <div

@@ -31455,3 +31455,30 @@ body {
   color: rgba(255, 255, 255, 0.94) !important;
   -webkit-text-fill-color: rgba(255, 255, 255, 0.94) !important;
 }
+
+/* Attention rows are buttons now that they open their source. */
+button.attention-row {
+  width: 100%;
+  border-top: 0;
+  border-left: 0;
+  border-right: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+button.attention-row:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+.goals-card .goal-line b small {
+  margin-left: 0.2rem;
+  font-size: 0.6em;
+  font-weight: 600;
+  opacity: 0.8;
+}
+.wellbeing-card .wellbeing-score {
+  font-size: 1.05rem;
+}
