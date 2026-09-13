@@ -248,6 +248,7 @@ import {
   saveReflectionEntry,
   toggleAnnualSlotFill,
   toggleQuickAddVisibility,
+  journalViews,
   type ReflectionEntry,
   type JournalView,
 } from "../lib/journalState";
@@ -10980,6 +10981,7 @@ function SocialLifePage({
                   onClick={() => {
                     setPlans(lastConnectionPlans);
                     setLastConnectionPlans(null);
+                    toast("Connection plan restored");
                   }}
                 >
                   Undo remove
