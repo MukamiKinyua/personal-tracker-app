@@ -22913,7 +22913,9 @@ function UtilitiesPage({
           A quiet index for the tools that support more than one chapter of your
           journal.
         </p>
-        <p className="utility-purpose">7 shared tools · one clear way in</p>
+        <p className="utility-purpose">
+          {utilityItems.length} shared tools · one clear way in
+        </p>
       </div>
       <div className="spread-page utility-grid-page">
         <div className="utility-grid-heading">
@@ -22930,7 +22932,9 @@ function UtilitiesPage({
               aria-label={`Open ${label}`}
               onClick={() => onNavigate(view)}
             >
-              <span className="utility-tile-index">0{index + 1}</span>
+              <span className="utility-tile-index" aria-hidden="true">
+                {String(index + 1).padStart(2, "0")}
+              </span>
               <span className="utility-tile-copy">
                 <b>{label}</b>
                 <small>{note}</small>
