@@ -9075,6 +9075,13 @@ function NotificationPreviewPage({
       ...current,
     ]);
     setDraftTitle("");
+    // Otherwise a second reminder added right after the first defaults to
+    // the same due time — easy to miss and save by accident.
+    setDraftDueAt(() => {
+      const date = new Date(Date.now() + 60 * 60 * 1000);
+      date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+      return date.toISOString().slice(0, 16);
+    });
     setDraftMessage("Reminder saved locally.");
   }
   function requestReminderPermission() {
@@ -9262,6 +9269,7 @@ function NotificationPreviewPage({
                 onClick={() => {
                   setLocalReminders(lastReminders);
                   setLastReminders(null);
+                  toast("Reminder restored");
                 }}
               >
                 Undo remove
