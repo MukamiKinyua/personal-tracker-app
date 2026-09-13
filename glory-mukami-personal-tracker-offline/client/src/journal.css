@@ -9332,8 +9332,109 @@ button:focus-visible {
   padding: 0.48rem 0.72rem;
   font-size: 0.6rem;
 }
+.export-page .ink-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 .export-confirmation {
   color: #5a8275;
+}
+.export-manifest {
+  display: grid;
+  gap: 0.12rem;
+  padding: 0.52rem;
+  border-left: 2px solid #56917f;
+  border-radius: 0 9px 9px 0;
+  background: #eff5f1;
+}
+.export-manifest b {
+  color: #3f5f57;
+  font-size: 0.59rem;
+}
+.export-manifest small {
+  color: #5e756f;
+  font-size: 0.55rem;
+  line-height: 1.4;
+}
+.export-csv {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0.45rem;
+  margin-top: 0.4rem;
+  padding-top: 0.55rem;
+  border-top: 1px dashed rgba(86, 145, 127, 0.35);
+}
+.export-csv label {
+  display: grid;
+  gap: 0.22rem;
+  flex: 1 1 10rem;
+  color: #627d78;
+  font-size: 0.56rem;
+  font-weight: 700;
+}
+.export-csv select {
+  border: 1px solid rgba(86, 145, 127, 0.4);
+  border-radius: 8px;
+  padding: 0.4rem 0.5rem;
+  color: #3f5f57;
+  background: #fff;
+  font: inherit;
+  font-size: 0.62rem;
+}
+.export-csv button {
+  border: 1px solid rgba(86, 145, 127, 0.5);
+  border-radius: 999px;
+  padding: 0.42rem 0.7rem;
+  color: #3f5f57;
+  background: #fff;
+  font-size: 0.58rem;
+  font-weight: 800;
+}
+.export-csv button:disabled {
+  opacity: 0.5;
+}
+.export-ownership {
+  margin-top: 0.8rem;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid rgba(86, 145, 127, 0.28);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.62);
+}
+.export-ownership > span {
+  display: block;
+  margin-bottom: 0.35rem;
+  color: #56917f;
+  font-size: 0.55rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.export-ownership ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.28rem;
+}
+.export-ownership li {
+  color: #4a635d;
+  font-size: 0.57rem;
+  line-height: 1.45;
+}
+.export-ownership li b {
+  color: #3f5f57;
+}
+.export-inline-link {
+  padding: 0;
+  border: 0;
+  color: #3f7a69;
+  background: none;
+  font: inherit;
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
 }
 .recommendations-spread .recommendations-intro {
   background:

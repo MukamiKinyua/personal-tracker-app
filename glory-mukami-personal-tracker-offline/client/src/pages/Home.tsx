@@ -46,6 +46,7 @@ import { SettingsPanel } from "@/components/SettingsPanel";
 import { DayPlanner } from "@/components/DayPlanner";
 import { WorkoutStudio } from "@/components/WorkoutStudio";
 import { useRecordStore } from "@/contexts/RecordStoreContext";
+import { toCSV } from "@/lib/core/exportData";
 import {
   computeStreak,
   isDueOn,
@@ -2071,6 +2072,7 @@ export default function Home() {
           <ExportPage
             onContents={() => turnTo("contents", "backward")}
             onCover={() => turnTo("cover", "backward")}
+            onNavigate={destination => turnTo(destination)}
           />
         );
       case "history":
@@ -7908,53 +7910,209 @@ function RecommendationsPage({
 function ExportPage({
   onContents,
   onCover,
+  onNavigate,
 }: {
   onContents: () => void;
   onCover: () => void;
+  onNavigate: (destination: View) => void;
 }) {
+  const auth = useAuth();
+  const journal = useRecordStore();
   const [selected, setSelected] = useState({
-    journal: true,
+    records: true,
+    workspaces: true,
     sensitive: false,
     settings: true,
   });
-  const [exported, setExported] = useState(false);
+  const [lastExport, setLastExport] = useState<{
+    at: string;
+    fileName: string;
+    bytes: number;
+  } | null>(null);
+  const [csvScope, setCsvScope] = useState("");
   useMongoJournalScope({
     scope: "export",
     payload: { selected },
     hydrate: payload => {
       if (payload.selected && typeof payload.selected === "object")
-        setSelected(payload.selected as typeof selected);
+        setSelected(current => ({
+          ...current,
+          ...(payload.selected as Partial<typeof selected>),
+        }));
     },
   });
-  function downloadExport() {
-    const payload = {
-      exportedAt: new Date().toISOString(),
-      scope: Object.entries(selected)
-        .filter(([, included]) => included)
-        .map(([section]) => section),
-      note: "Local prototype export only. Persistent data integration has not been approved or configured.",
-      records: {
-        journal: selected.journal
-          ? "Current local journal interface state"
-          : undefined,
-        sensitive: selected.sensitive
-          ? "Sensitive module selections included by user choice"
-          : undefined,
-        settings: selected.settings
-          ? "Local display and reminder-preview preferences"
-          : undefined,
-      },
-    };
-    const url = URL.createObjectURL(
-      new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" })
-    );
+
+  // Page workspaces persist under one key prefix per owner; the shell key
+  // holds settings and the year grids. Sensitive scopes are named so they
+  // can be left out unless deliberately included.
+  const ownerKey = auth.user?.id ?? "guest";
+  const keyPrefix = "glory-personal-tracker:";
+  const keySuffix = `:${ownerKey}`;
+  const sensitiveScopes = new Set([
+    "cycle",
+    "finances",
+    "wellbeing",
+    "documents",
+    "security",
+    "privacy",
+  ]);
+  const workspaceLabels: Record<string, string> = {
+    "journal-shell": "Settings & year grids",
+    habits: "Habits",
+    cycle: "Period & Cycle",
+    wellbeing: "Wellbeing",
+    reflections: "Reflections",
+    learning: "Learning",
+    finances: "Finances",
+    productivity: "Productivity",
+    "digital-life": "Digital Life",
+    "workout-studio": "Workout Studio",
+    assignments: "Assignments",
+    analytics: "Analytics view",
+    integrations: "Integrations notes",
+    export: "Export choices",
+  };
+  const workspaces = useMemo(() => {
+    const found: Array<{
+      scope: string;
+      label: string;
+      bytes: number;
+      sensitive: boolean;
+    }> = [];
+    try {
+      for (let index = 0; index < window.localStorage.length; index += 1) {
+        const key = window.localStorage.key(index);
+        if (!key || !key.startsWith(keyPrefix) || !key.endsWith(keySuffix))
+          continue;
+        const scope = key.slice(keyPrefix.length, key.length - keySuffix.length);
+        const raw = window.localStorage.getItem(key) ?? "";
+        found.push({
+          scope,
+          label: workspaceLabels[scope] ?? scope,
+          bytes: raw.length,
+          sensitive: sensitiveScopes.has(scope),
+        });
+      }
+    } catch {
+      // Storage unavailable (private window, blocked) — the export still
+      // works for the record store; the manifest just says so.
+    }
+    return found.sort((a, b) => a.label.localeCompare(b.label));
+    // Recomputed after a download or an owner change; localStorage has no
+    // change event for same-tab writes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ownerKey, lastExport]);
+
+  const bundle = useMemo(() => journal.exportAll(), [journal]);
+  const recordScopes = Object.entries(bundle.counts).sort((a, b) =>
+    a[0].localeCompare(b[0])
+  );
+  const recordSensitive = new Set(["cycle", "finance", "finances", "wellbeing"]);
+  const includedRecordScopes = recordScopes.filter(
+    ([scope]) => selected.sensitive || !recordSensitive.has(scope)
+  );
+  const pageWorkspaces = workspaces.filter(
+    item => item.scope !== "journal-shell" && item.scope !== "export"
+  );
+  const includedWorkspaces = pageWorkspaces.filter(
+    item => selected.sensitive || !item.sensitive
+  );
+  const shell = workspaces.find(item => item.scope === "journal-shell");
+  const excludedSensitive = Array.from(
+    new Set([
+      ...recordScopes
+        .filter(([scope]) => recordSensitive.has(scope))
+        .map(([scope]) => scope),
+      ...pageWorkspaces.filter(item => item.sensitive).map(item => item.label),
+    ])
+  );
+  const totalRecords = includedRecordScopes.reduce(
+    (sum, [, count]) => sum + count,
+    0
+  );
+
+  function readWorkspace(scope: string) {
+    try {
+      const raw = window.localStorage.getItem(
+        `${keyPrefix}${scope}${keySuffix}`
+      );
+      return raw ? (JSON.parse(raw) as unknown) : null;
+    } catch {
+      return null;
+    }
+  }
+  function download(name: string, text: string, type: string) {
+    const blob = new Blob([text], { type });
+    const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = "glory-personal-tracker-prototype-export.json";
+    anchor.download = name;
     anchor.click();
     URL.revokeObjectURL(url);
-    setExported(true);
+    setLastExport({
+      at: new Date().toISOString(),
+      fileName: name,
+      bytes: blob.size,
+    });
   }
+  function downloadExport() {
+    const stamp = sleepDateInputValue(new Date());
+    const payload = {
+      formatVersion: bundle.formatVersion,
+      exportedAt: new Date().toISOString(),
+      generatedBy:
+        "Glory Mukami's Personal Tracker — built in your browser; nothing was uploaded to make this file",
+      owner: bundle.owner,
+      included: { ...selected },
+      readme: bundle.readme,
+      dictionary: selected.records ? bundle.dictionary : undefined,
+      counts: selected.records
+        ? Object.fromEntries(includedRecordScopes)
+        : undefined,
+      records: selected.records
+        ? bundle.records.filter(
+            record => selected.sensitive || !recordSensitive.has(record.scope)
+          )
+        : undefined,
+      links: selected.records ? bundle.links : undefined,
+      workspaces: selected.workspaces
+        ? Object.fromEntries(
+            includedWorkspaces.map(item => [
+              item.scope,
+              readWorkspace(item.scope),
+            ])
+          )
+        : undefined,
+      settings:
+        selected.settings && shell ? readWorkspace("journal-shell") : undefined,
+    };
+    const name = `personal-tracker-export-${stamp}.json`;
+    download(name, JSON.stringify(payload, null, 2), "application/json");
+    toast(`Export saved as ${name}`);
+  }
+  function downloadCsv() {
+    if (!csvScope) return;
+    const records = bundle.records.filter(record => record.scope === csvScope);
+    const name = `${csvScope}-${sleepDateInputValue(new Date())}.csv`;
+    download(
+      name,
+      toCSV(records, bundle.owner.timezone),
+      "text/csv;charset=utf-8"
+    );
+    toast(
+      `${records.length} ${csvScope} record${records.length === 1 ? "" : "s"} saved as ${name}`
+    );
+  }
+  const nothingSelected =
+    !selected.records && !selected.workspaces && !selected.settings;
+  const formatBytes = (bytes: number) =>
+    bytes < 1024 ? `${bytes} B` : `${(bytes / 1024).toFixed(1)} KB`;
+  const formatTime = (value: string) =>
+    new Date(value).toLocaleTimeString([], {
+      hour: "numeric",
+      minute: "2-digit",
+    });
+
   return (
     <section
       className="journal-spread export-spread glass-scope"
@@ -7962,42 +8120,100 @@ function ExportPage({
     >
       <div className="spread-page export-intro">
         <JournalActions onContents={onContents} onCover={onCover} />
-        <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">utilities · export</p>
+        <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">
+          utilities · export
+        </p>
         <h2 id="export-title">
           Keep a copy
           <br />
           <em>on your terms.</em>
         </h2>
         <p className="page-intro">
-          Choose what to package from this local prototype. This export is a
-          transparent JSON handoff for future data integration—not a promise of
-          persisted records.
+          Everything this journal holds for you, as a file you own. The file is
+          built in your browser and saved to your device; nothing is uploaded
+          anywhere to make it.
         </p>
         <div className="export-signal">
           <Sparkles size={15} />
           <span>
-            {exported
-              ? "Local export prepared"
-              : "Nothing leaves this prototype until you choose download"}
+            {lastExport
+              ? `Last export ${formatTime(lastExport.at)} · ${lastExport.fileName} · ${formatBytes(lastExport.bytes)}`
+              : "No export yet this visit"}
           </span>
         </div>
+        <section
+          className="export-ownership"
+          aria-labelledby="export-ownership-title"
+        >
+          <span id="export-ownership-title">Your data, in plain terms</span>
+          <ul>
+            <li>
+              <b>Format:</b> one JSON file with a readme and a field dictionary
+              inside it, so it can be read without this app. Any single area
+              can also go out as CSV below.
+            </li>
+            <li>
+              <b>What’s included:</b> exactly what the manifest lists. Records
+              include ones you deleted, marked with a deletion time, so nothing
+              is a silent gap.
+            </li>
+            <li>
+              <b>Where it goes:</b> your downloads folder. Only you decide
+              where it goes after that.
+            </li>
+            <li>
+              <b>Deleting afterwards:</b> exporting changes nothing here.
+              Removal of what the app holds is in{" "}
+              <button
+                type="button"
+                className="export-inline-link"
+                onClick={() => onNavigate("privacy")}
+              >
+                Privacy Controls
+              </button>
+              .
+            </li>
+          </ul>
+        </section>
       </div>
       <div className="spread-page export-page">
         <div className="export-scope">
-          <span>Choose export scope</span>
+          <span>Choose what to include</span>
           <label>
             <input
               type="checkbox"
-              checked={selected.journal}
+              checked={selected.records}
               onChange={() =>
                 setSelected(current => ({
                   ...current,
-                  journal: !current.journal,
+                  records: !current.records,
                 }))
               }
             />
-            <b>Journal activity</b>
-            <small>Local tracker and reflection interface state</small>
+            <b>Records</b>
+            <small>
+              {bundle.records.length === 0
+                ? "Nothing saved yet"
+                : `${bundle.records.length} across ${recordScopes.length} area${recordScopes.length === 1 ? "" : "s"}: ${recordScopes.map(([scope, count]) => `${scope} (${count})`).join(", ")}`}
+            </small>
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={selected.workspaces}
+              onChange={() =>
+                setSelected(current => ({
+                  ...current,
+                  workspaces: !current.workspaces,
+                }))
+              }
+            />
+            <b>Page workspaces</b>
+            <small>
+              {pageWorkspaces.length === 0
+                ? "None found on this device"
+                : `${includedWorkspaces.length} of ${pageWorkspaces.length} on this device: ${includedWorkspaces.map(item => item.label).join(", ") || "none unless sensitive areas are included"}`}
+            </small>
           </label>
           <label>
             <input
@@ -8010,10 +8226,11 @@ function ExportPage({
                 }))
               }
             />
-            <b>Sensitive module selections</b>
+            <b>Include sensitive areas</b>
             <small>
-              Only include if you choose; health, finance, documents, and
-              security
+              {excludedSensitive.length
+                ? `Off by default: ${excludedSensitive.join(", ")}. Tick to include them.`
+                : "Nothing sensitive is stored yet; this box has nothing to add."}
             </small>
           </label>
           <label>
@@ -8027,25 +8244,69 @@ function ExportPage({
                 }))
               }
             />
-            <b>Privacy & reminder settings</b>
-            <small>Local display and preview choices</small>
+            <b>Settings & year grids</b>
+            <small>
+              {shell
+                ? `Display, reminder and privacy preferences plus the annual pixel grids (${formatBytes(shell.bytes)})`
+                : "Not found on this device"}
+            </small>
           </label>
         </div>
-        <div className="export-note">
-          <b>Before you download</b>
+        <div className="export-manifest" aria-live="polite">
+          <b>This file will contain</b>
           <small>
-            Current tracker records are local prototype state. MongoDB or
-            another persistence model will be decided only after UX rules are
-            approved.
+            {nothingSelected
+              ? "Nothing — tick at least one box above."
+              : [
+                  selected.records
+                    ? `${totalRecords} record${totalRecords === 1 ? "" : "s"}${bundle.links.length ? ` and ${bundle.links.length} link${bundle.links.length === 1 ? "" : "s"} between them` : ""}`
+                    : null,
+                  selected.workspaces
+                    ? `${includedWorkspaces.length} page workspace${includedWorkspaces.length === 1 ? "" : "s"}`
+                    : null,
+                  selected.settings && shell ? "settings and year grids" : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ") +
+                (selected.sensitive
+                  ? " · sensitive areas included"
+                  : excludedSensitive.length
+                    ? " · sensitive areas left out"
+                    : "")}
           </small>
         </div>
-        <Button type="button" className="ink-button" onClick={downloadExport}>
+        <Button
+          type="button"
+          className="ink-button"
+          onClick={downloadExport}
+          disabled={nothingSelected}
+        >
           <ArrowRight size={15} /> Download JSON export
         </Button>
-        {exported ? (
+        <div className="export-csv">
+          <label>
+            One area as CSV
+            <select
+              value={csvScope}
+              onChange={event => setCsvScope(event.target.value)}
+            >
+              <option value="">Choose an area…</option>
+              {recordScopes.map(([scope, count]) => (
+                <option key={scope} value={scope}>
+                  {scope} · {count}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button type="button" onClick={downloadCsv} disabled={!csvScope}>
+            Download CSV
+          </button>
+        </div>
+        {lastExport ? (
           <small className="export-confirmation">
-            Prepared locally. Review the downloaded file before sharing it
-            anywhere.
+            Saved {lastExport.fileName} ({formatBytes(lastExport.bytes)}) to
+            your device at {formatTime(lastExport.at)}. Open it before sharing
+            it anywhere.
           </small>
         ) : null}
       </div>
