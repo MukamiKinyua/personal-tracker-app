@@ -98,6 +98,12 @@ describe("project organization", () => {
       file =>
         !file.includes("media/runtime") && !file.includes("media\\runtime")
     );
-    expect(publicMedia).toEqual([]);
+    // The app icons are the one exception: a manifest needs raster icons at
+    // a fixed public path, and at a few kilobytes each they are not the
+    // large media this rule exists to keep out.
+    const notIcons = publicMedia.filter(
+      file => !/[\\/]icons[\\/](icon|maskable)-\d+\.png$/.test(file)
+    );
+    expect(notIcons).toEqual([]);
   });
 });
