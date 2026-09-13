@@ -1056,12 +1056,21 @@ button:focus-visible {
   flex-wrap: wrap;
   gap: 0.5rem;
 }
-.contents-quick-chip {
+/* #root + !important throughout: a separate rule -
+   `.contents-list :is(h3, h4, p, small, span, b, strong, button, ...)` -
+   lists `button` generically and paints near-black text (rgb(16,4,24)) with
+   a light embossed highlight underneath (text-shadow: rgba(255,255,255,.96)
+   0 1px 0) - a light-surface "pressed ink" look, both declared !important.
+   Every chip is a <button>, so it's caught. Without !important + an id this
+   loses outright regardless of what color is declared here. */
+#root .contents-quick-chip {
   /* Contents is a dark painted spread; this chip was styled for a light
      surface (opaque-ish white fill, near-black ink) and never got a
      dark-mode pass, so its label read as dark text on a barely-lighter
-     pill. Matched to the same frosted-glass recipe as the nav pills right
-     above it: translucent white fill + blur, white text. */
+     pill, with a light 1px shadow meant to emboss dark text now just
+     doubling as a stray pale fringe. Matched to the same frosted-glass
+     recipe as the nav pills right above it: translucent white fill + blur,
+     white text, no shadow. */
   border: 1px solid rgba(255, 255, 255, 0.4);
   background: rgba(255, 255, 255, 0.28);
   backdrop-filter: blur(16px) saturate(118%);
@@ -1070,7 +1079,9 @@ button:focus-visible {
   padding: 0.4rem 0.85rem;
   font-size: 0.76rem;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.94);
+  color: rgba(255, 255, 255, 0.94) !important;
+  -webkit-text-fill-color: rgba(255, 255, 255, 0.94) !important;
+  text-shadow: none !important;
   cursor: pointer;
   transition:
     background 160ms ease,
@@ -1079,17 +1090,19 @@ button:focus-visible {
   outline: 2px solid transparent;
   outline-offset: 1px;
 }
-.contents-quick-chip:hover {
+#root .contents-quick-chip:hover {
   background: rgba(255, 255, 255, 0.4);
   transform: translateY(-1px);
 }
-.contents-quick-chip:focus-visible {
+#root .contents-quick-chip:focus-visible {
   outline: 2px solid var(--journal-magenta);
 }
-.contents-quick-chip.is-current {
+#root .contents-quick-chip.is-current {
   background: var(--journal-magenta);
   border-color: var(--journal-magenta);
-  color: #fff;
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+  text-shadow: none !important;
 }
 
 .contents-empty-state {
@@ -23175,13 +23188,64 @@ body {
   font-size: 0.54rem;
   font-weight: 880;
 }
-.assignment-due.past-due {
+.assignment-due.is-overdue {
   color: #fffaf2;
   background: #7d2946;
 }
-.assignment-due.due-today,
-.assignment-due.due-tomorrow {
+.assignment-due.is-overdue::before {
+  content: "▲ ";
+}
+.assignment-due.is-today,
+.assignment-due.is-tomorrow {
   background: #e98d79;
+}
+.assignment-due.is-none {
+  color: rgba(22, 10, 22, 0.8);
+  background: transparent;
+  border: 1px dashed rgba(22, 10, 22, 0.45);
+}
+.assignment-due.is-completed {
+  color: #fffaf2;
+  background: #3c7a5e;
+}
+.assignment-due.is-completed::before {
+  content: "✓ ";
+}
+.assignment-plan-card.is-overdue {
+  box-shadow: inset 3px 0 0 #7d2946;
+}
+.assignment-card-top time {
+  font-variant-numeric: tabular-nums;
+}
+.assignment-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.35rem;
+  color: #160a16;
+  font-size: 0.56rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.assignment-sort select {
+  border: 1px solid rgba(22, 10, 22, 0.4);
+  border-radius: 7px;
+  padding: 0.25rem 0.4rem;
+  color: #160a16;
+  background: rgba(255, 250, 242, 0.7);
+  font: inherit;
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.assignment-core-fields label small {
+  margin-left: 0.3rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  opacity: 0.8;
 }
 .assignment-card-top b {
   color: #160a16;

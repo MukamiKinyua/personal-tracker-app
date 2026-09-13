@@ -105,9 +105,12 @@ import {
 } from "../lib/avoidanceTracker";
 import { digitalSummary, type DigitalEntry } from "../lib/digitalTracker";
 import {
+  assignmentDueDetail,
   assignmentDueStatus,
   assignmentWorkload,
+  sortAssignments,
   sortAssignmentsByDue,
+  type AssignmentSort,
   type AssignmentPlan,
 } from "../lib/assignmentTracker";
 import {
@@ -3770,7 +3773,8 @@ function EnhancedAssignmentsPage({
   onRecord: (activity: Omit<InsightActivity, "id" | "createdAt">) => void;
   onFocus: () => void;
 }) {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = sleepDateInputValue(new Date());
+  const [sortBy, setSortBy] = useState<AssignmentSort>("due");
   const emptyDraft = {
     title: "",
     subject: "",
@@ -3815,12 +3819,17 @@ function EnhancedAssignmentsPage({
     },
   });
   const workload = assignmentWorkload(assignments, today);
-  const activeAssignments = sortAssignmentsByDue(
-    assignments.filter(item => !item.completed)
+  const activeAssignments = sortAssignments(
+    assignments.filter(item => !item.completed),
+    sortBy
   );
   const completedAssignments = sortAssignmentsByDue(
     assignments.filter(item => item.completed)
   );
+  const overdueCount = activeAssignments.filter(
+    item => assignmentDueDetail(item.due, today).kind === "overdue"
+  ).length;
+  const undatedCount = activeAssignments.filter(item => !item.due).length;
   function resetComposer() {
     setDraft(emptyDraft);
     setSubtaskDraft("");
@@ -3842,12 +3851,9 @@ function EnhancedAssignmentsPage({
   }
   function saveAssignment(event: React.FormEvent) {
     event.preventDefault();
-    if (
-      !draft.title.trim() ||
-      !draft.subject.trim() ||
-      !draft.due ||
-      !draft.nextAction.trim()
-    )
+    // A due date is optional: some work has no deadline yet, and forcing a
+    // made-up one produces a false "Due today" later.
+    if (!draft.title.trim() || !draft.subject.trim() || !draft.nextAction.trim())
       return;
     const plan: AssignmentPlan = {
       id: editingId || `${Date.now()}-assignment`,
@@ -3928,11 +3934,16 @@ function EnhancedAssignmentsPage({
   }
   function assignmentCard(assignment: AssignmentPlan) {
     const completeCount = assignment.subtasks.filter(item => item.done).length;
+    const due = assignmentDueDetail(assignment.due, today);
+    const priorityGlyph = { High: "!!!", Medium: "!!", Low: "!" }[
+      assignment.priority
+    ];
     return (
       <article
         className={cn(
           "assignment-plan-card",
-          assignment.completed && "completed"
+          assignment.completed && "completed",
+          !assignment.completed && `is-${due.kind}`
         )}
         key={assignment.id}
       >
@@ -3941,16 +3952,20 @@ function EnhancedAssignmentsPage({
             <span
               className={cn(
                 "assignment-due",
-                assignmentDueStatus(assignment.due, today)
-                  .toLowerCase()
-                  .replaceAll(" ", "-")
+                assignment.completed ? "is-completed" : `is-${due.kind}`
               )}
+              title={due.exact}
             >
-              {assignmentDueStatus(assignment.due, today)}
+              {assignment.completed ? "Completed" : due.label}
             </span>
             <b>{assignment.title}</b>
             <small>
-              {assignment.subject} · due {assignment.due.replace("T", " at ")}
+              {assignment.subject} ·{" "}
+              {assignment.due ? (
+                <time dateTime={assignment.due}>{due.exact}</time>
+              ) : (
+                "no due date"
+              )}
             </small>
           </div>
           <span
@@ -3958,8 +3973,10 @@ function EnhancedAssignmentsPage({
               "assignment-priority",
               assignment.priority.toLowerCase()
             )}
+            aria-label={`${assignment.priority} priority`}
+            title={`${assignment.priority} priority`}
           >
-            {assignment.priority}
+            <span aria-hidden="true">{priorityGlyph}</span> {assignment.priority}
           </span>
         </div>
         <p>
@@ -4059,7 +4076,26 @@ function EnhancedAssignmentsPage({
           <p>
             {workload.dueThisWeek} due in the next 7 days ·{" "}
             {workload.effortMinutes} planned minutes
+            {overdueCount > 0
+              ? ` · ${overdueCount} past due`
+              : ""}
+            {undatedCount > 0
+              ? ` · ${undatedCount} without a date`
+              : ""}
           </p>
+          <label className="assignment-sort">
+            Sort by
+            <select
+              value={sortBy}
+              onChange={event =>
+                setSortBy(event.target.value as AssignmentSort)
+              }
+            >
+              <option value="due">Due date (soonest first)</option>
+              <option value="priority">Priority (High first)</option>
+              <option value="course">Course (A–Z)</option>
+            </select>
+          </label>
           <span className="assignment-overview-actions">
             {lastAssignments ? (
               <button
@@ -4121,9 +4157,8 @@ function EnhancedAssignmentsPage({
                 />
               </label>
               <label>
-                Due date & time
+                Due date & time <small>optional · your local time</small>
                 <input
-                  required
                   type="datetime-local"
                   value={draft.due}
                   onChange={event =>
