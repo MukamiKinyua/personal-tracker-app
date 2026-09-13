@@ -7203,42 +7203,93 @@ function ProjectsPage({
   onCover: () => void;
 }) {
   type Project = {
+    id?: string;
     title: string;
     status: string;
     milestone: string;
     evidence: string;
     closeout: string;
+    createdAt?: string;
+    updatedAt?: string;
   };
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [draft, setDraft] = useState<Project>({
+  type ProjectDraft = Pick<
+    Project,
+    "title" | "status" | "milestone" | "evidence" | "closeout"
+  >;
+  const emptyProjectDraft: ProjectDraft = {
     title: "",
     status: "Planning",
     milestone: "",
     evidence: "",
     closeout: "",
-  });
+  };
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [lastProjects, setLastProjects] = useState<Project[] | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draft, setDraft] = useState<ProjectDraft>(emptyProjectDraft);
+  const today = sleepDateInputValue(new Date());
+  const formatDay = (value?: string) =>
+    value && /^\d{4}-\d{2}-\d{2}$/.test(value)
+      ? new Date(`${value}T12:00:00`).toLocaleDateString(undefined, {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        })
+      : null;
   useMongoJournalScope({
     scope: "projects",
     payload: { projects },
     hydrate: payload => {
       if (Array.isArray(payload.projects))
-        setProjects(payload.projects as Project[]);
+        setProjects(
+          (payload.projects as Project[]).map((project, index) => ({
+            ...project,
+            id: project.id ?? `project-${index}-${project.title}`,
+          }))
+        );
     },
   });
   function saveProject(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!draft.title.trim()) return;
-    setProjects(current => [
-      ...current,
-      { ...draft, title: draft.title.trim() },
-    ]);
+    const fields = { ...draft, title: draft.title.trim() };
+    if (editingId) {
+      setProjects(current =>
+        current.map(project =>
+          project.id === editingId
+            ? { ...project, ...fields, updatedAt: today }
+            : project
+        )
+      );
+      toast("Project updated");
+    } else {
+      setProjects(current => [
+        ...current,
+        { ...fields, id: `project-${Date.now()}`, createdAt: today },
+      ]);
+      toast(`“${fields.title}” saved as ${fields.status.toLowerCase()}`);
+    }
+    setDraft(emptyProjectDraft);
+    setEditingId(null);
+  }
+  function editProject(project: Project) {
+    setEditingId(project.id ?? null);
     setDraft({
-      title: "",
-      status: "Planning",
-      milestone: "",
-      evidence: "",
-      closeout: "",
+      title: project.title,
+      status: project.status,
+      milestone: project.milestone,
+      evidence: project.evidence,
+      closeout: project.closeout,
     });
+  }
+  function removeProject(project: Project) {
+    setLastProjects(projects);
+    setProjects(current => current.filter(item => item.id !== project.id));
+    if (editingId === project.id) {
+      setEditingId(null);
+      setDraft(emptyProjectDraft);
+    }
+    toast(`Removed “${project.title}”`);
   }
   return (
     <section
@@ -7330,23 +7381,54 @@ function ProjectsPage({
               placeholder="What do you want to carry forward?"
             />
           </label>
-          <Button type="submit" className="ink-button">
-            <Plus size={15} /> Save project
-          </Button>
+          <div className="career-form-actions">
+            <Button type="submit" className="ink-button">
+              <Plus size={15} /> {editingId ? "Save changes" : "Save project"}
+            </Button>
+            {editingId ? (
+              <button
+                type="button"
+                className="local-undo"
+                onClick={() => {
+                  setEditingId(null);
+                  setDraft(emptyProjectDraft);
+                }}
+              >
+                Cancel edit
+              </button>
+            ) : null}
+          </div>
         </form>
         <div className="projects-list">
           <div>
             <span>project field notes</span>
-            <b>{projects.length} items</b>
+            <b>
+              {projects.length} items
+              {lastProjects && (
+                <button
+                  type="button"
+                  className="local-undo"
+                  onClick={() => {
+                    setProjects(lastProjects);
+                    setLastProjects(null);
+                  }}
+                >
+                  Undo remove
+                </button>
+              )}
+            </b>
           </div>
           {projects.length === 0 ? (
             <small>
               Start with one project that deserves a clear next milestone.
             </small>
           ) : (
-            projects.map((project, index) => (
-              <article key={`${project.title}-${index}`}>
-                <i>{project.title.slice(0, 1)}</i>
+            projects.map(project => (
+              <article
+                key={project.id}
+                className={cn(editingId === project.id && "is-editing")}
+              >
+                <i aria-hidden="true">{project.title.slice(0, 1)}</i>
                 <p>
                   <b>{project.title}</b>
                   <small>
@@ -7357,6 +7439,25 @@ function ProjectsPage({
                   <em>
                     Close-out: {project.closeout || "Keep a note for later"}
                   </em>
+                  <small className="career-stamp">
+                    {formatDay(project.updatedAt)
+                      ? `Updated ${formatDay(project.updatedAt)}`
+                      : formatDay(project.createdAt)
+                        ? `Saved ${formatDay(project.createdAt)}`
+                        : "Saved before dates were kept"}
+                  </small>
+                  <span className="career-actions">
+                    <button type="button" onClick={() => editProject(project)}>
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeProject(project)}
+                      aria-label={`Remove ${project.title}`}
+                    >
+                      Remove
+                    </button>
+                  </span>
                 </p>
               </article>
             ))
