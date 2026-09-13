@@ -51,7 +51,10 @@ export function assignmentDueDetail(
       daysAway: null,
     };
   }
-  const dueDate = new Date(due);
+  // A bare "YYYY-MM-DD" (no clock time) is a calendar day, not an instant —
+  // parsing it plain reads it as UTC midnight, which is the previous day
+  // west of Greenwich. Anchor it to local noon like `reference` below.
+  const dueDate = hasClockTime(due) ? new Date(due) : new Date(`${due}T12:00:00`);
   const reference = new Date(`${referenceDate}T00:00:00`);
   const daysAway = Math.ceil(
     (new Date(

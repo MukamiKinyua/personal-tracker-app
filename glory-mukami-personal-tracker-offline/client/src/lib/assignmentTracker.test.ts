@@ -74,6 +74,21 @@ describe("assignment tracker helpers", () => {
     expect(assignmentDueDetail("", "2026-08-25").kind).toBe("none");
   });
 
+  it("reads a bare date the same way in every timezone", () => {
+    // new Date("2026-08-29") parses as UTC midnight, which is 28 Aug in any
+    // timezone west of Greenwich — this used to shift every date-only due
+    // date back a day for those users.
+    const original = process.env.TZ;
+    process.env.TZ = "America/Los_Angeles";
+    try {
+      expect(assignmentDueDetail("2026-08-29", "2026-08-25").label).toBe(
+        "4 days left"
+      );
+    } finally {
+      process.env.TZ = original;
+    }
+  });
+
   it("sorts by priority or course while keeping the due order inside ties", () => {
     const byPriority = sortAssignments(assignments, "priority").map(
       item => item.id
