@@ -18287,48 +18287,160 @@ function ProductivityPage({
     { id: string; label: string; nextStep: string; done: boolean }[]
   >([]);
   const [activeTaskId, setActiveTaskId] = useState("");
-  const [isFocusing, setIsFocusing] = useState(false);
-  const [secondsLeft, setSecondsLeft] = useState(minutes * 60);
+  /**
+   * The running session is a wall-clock end time, not a decrementing
+   * counter. Background tabs throttle intervals to once a minute or worse,
+   * so a counter drifts; a timestamp is right whenever the tab wakes up.
+   * `pausedRemaining` holds the seconds left while paused.
+   */
+  type FocusRun = {
+    endsAt: number;
+    pausedRemaining: number | null;
+    plannedMinutes: number;
+    startedAt: number;
+  };
+  const [run, setRun] = useState<FocusRun | null>(null);
+  const [tick, setTick] = useState(() => Date.now());
   const [sessions, setSessions] = useState<FocusSession[]>([]);
+  const [lastSessions, setLastSessions] = useState<FocusSession[] | null>(null);
   const [lastOutcome, setLastOutcome] = useState<
     FocusSession["outcome"] | null
   >(null);
+  const [notifyAtEnd, setNotifyAtEnd] = useState(false);
+  const notificationsSupported =
+    typeof window !== "undefined" && "Notification" in window;
+  const [notificationPermission, setNotificationPermission] = useState<
+    NotificationPermission | "unsupported"
+  >(() =>
+    notificationsSupported ? Notification.permission : "unsupported"
+  );
   useMongoJournalScope({
     scope: "productivity",
-    payload: { tasks, activeTaskId, sessions },
+    payload: { tasks, activeTaskId, sessions, run, notifyAtEnd },
     hydrate: payload => {
       if (Array.isArray(payload.tasks)) setTasks(payload.tasks as typeof tasks);
       if (typeof payload.activeTaskId === "string")
         setActiveTaskId(payload.activeTaskId);
       if (Array.isArray(payload.sessions))
         setSessions(payload.sessions as FocusSession[]);
+      if (payload.run && typeof payload.run === "object")
+        setRun(payload.run as FocusRun);
+      if (typeof payload.notifyAtEnd === "boolean")
+        setNotifyAtEnd(payload.notifyAtEnd);
     },
   });
-  const today = new Date().toISOString().slice(0, 10);
+  const today = sleepDateInputValue(new Date());
   const activeTask = tasks.find(task => task.id === activeTaskId) || tasks[0];
   const summary = focusSummary(sessions, today);
   const todaySummary = focusSummary(
     sessions.filter(session => session.date === today),
     today
   );
+  const isFocusing = run !== null;
+  const isPaused = run?.pausedRemaining !== null && run?.pausedRemaining !== undefined;
+  const secondsLeft = run
+    ? isPaused
+      ? run.pausedRemaining!
+      : Math.max(0, Math.round((run.endsAt - tick) / 1000))
+    : minutes * 60;
+  const elapsedSeconds = run ? run.plannedMinutes * 60 - secondsLeft : 0;
+  const timerState: "idle" | "running" | "paused" | "done" = !run
+    ? lastOutcome
+      ? "done"
+      : "idle"
+    : isPaused
+      ? "paused"
+      : "running";
+
+  // Tick once a second while running; re-sync the moment the tab is visible
+  // again, since the interval may not have fired while it was hidden.
   useEffect(() => {
-    if (!isFocusing) setSecondsLeft(minutes * 60);
-  }, [isFocusing, minutes]);
+    if (!run || isPaused) return;
+    const interval = window.setInterval(() => setTick(Date.now()), 1000);
+    const onVisible = () => setTick(Date.now());
+    document.addEventListener("visibilitychange", onVisible);
+    setTick(Date.now());
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [run, isPaused]);
   useEffect(() => {
-    if (!isFocusing || secondsLeft <= 0) return;
-    const timer = window.setInterval(
-      () => setSecondsLeft(current => Math.max(0, current - 1)),
-      1000
-    );
-    return () => window.clearInterval(timer);
-  }, [isFocusing, secondsLeft]);
+    if (run && !isPaused && secondsLeft === 0) {
+      if (notifyAtEnd && notificationPermission === "granted") {
+        try {
+          new Notification("Focus session finished", {
+            body: activeTask
+              ? `${run.plannedMinutes} min on “${activeTask.label}”. Come back to choose what happens next.`
+              : `${run.plannedMinutes} min of focus.`,
+            tag: "focus-session-end",
+          });
+        } catch {
+          // A notification that can't be shown is not worth breaking the save.
+        }
+      }
+      finishSession("continued");
+    }
+  }, [secondsLeft, run, isPaused]);
   useEffect(() => {
-    if (isFocusing && secondsLeft === 0) finishSession("continued");
-  }, [secondsLeft]);
-  function formatRemaining() {
-    const totalMinutes = Math.floor(secondsLeft / 60);
-    const seconds = secondsLeft % 60;
-    return `${totalMinutes}:${String(seconds).padStart(2, "0")}`;
+    if (!run) {
+      document.title = "Glory Mukami's Personal Tracker";
+      return;
+    }
+    document.title = `${isPaused ? "⏸" : "●"} ${formatSeconds(secondsLeft)} · focus`;
+    return () => {
+      document.title = "Glory Mukami's Personal Tracker";
+    };
+  }, [run, isPaused, secondsLeft]);
+
+  function formatSeconds(total: number) {
+    return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
+  }
+  function startSession() {
+    const now = Date.now();
+    setLastOutcome(null);
+    setRun({
+      startedAt: now,
+      endsAt: now + minutes * 60_000,
+      pausedRemaining: null,
+      plannedMinutes: minutes,
+    });
+  }
+  function pauseSession() {
+    if (!run || isPaused) return;
+    setRun({ ...run, pausedRemaining: secondsLeft });
+  }
+  function resumeSession() {
+    if (!run || !isPaused) return;
+    setRun({
+      ...run,
+      endsAt: Date.now() + run.pausedRemaining! * 1000,
+      pausedRemaining: null,
+    });
+  }
+  function cancelSession() {
+    setRun(null);
+    setLastOutcome(null);
+    toast("Session discarded — nothing was saved");
+  }
+  async function toggleNotifications() {
+    if (!notificationsSupported) return;
+    if (notifyAtEnd) {
+      setNotifyAtEnd(false);
+      return;
+    }
+    let permission = Notification.permission;
+    if (permission === "default") {
+      try {
+        permission = await Notification.requestPermission();
+      } catch {
+        permission = "denied";
+      }
+    }
+    setNotificationPermission(permission);
+    setNotifyAtEnd(permission === "granted");
+    if (permission === "denied")
+      toast("Notifications are blocked for this site in your browser settings");
   }
   function addTask(event: React.FormEvent) {
     event.preventDefault();
@@ -18348,18 +18460,21 @@ function ProductivityPage({
     setStepDraft("");
   }
   function finishSession(outcome: FocusSession["outcome"]) {
-    if (!activeTask) return;
+    if (!activeTask || !run) return;
+    // What actually happened, not what was planned: a session ended at
+    // minute 3 of 25 is a 3-minute session.
+    const actualMinutes = Math.max(1, Math.round(elapsedSeconds / 60));
     const session: FocusSession = {
       id: `${Date.now()}-focus`,
       date: today,
-      minutes,
+      minutes: actualMinutes,
       taskId: activeTask.id,
       taskLabel: activeTask.label,
       nextStep: activeTask.nextStep,
       outcome,
     };
     setSessions(current => [session, ...current]);
-    onRecordSession(minutes, activeTask.label);
+    onRecordSession(actualMinutes, activeTask.label);
     const now = new Date();
     pixelStore?.set(
       "focus",
@@ -18378,7 +18493,7 @@ function ProductivityPage({
         )
       );
     setLastOutcome(outcome);
-    setIsFocusing(false);
+    setRun(null);
   }
   return (
     <section
@@ -18480,44 +18595,116 @@ function ProductivityPage({
               ))}
             </div>
           </div>
-          <div className={cn("focus-clock", isFocusing && "running")}>
-            <span>
-              {isFocusing ? "Focus in progress" : "Ready when you are"}
+          <div
+            className={cn(
+              "focus-clock",
+              timerState === "running" && "running",
+              timerState === "paused" && "paused"
+            )}
+            role="timer"
+            aria-live={timerState === "running" ? "off" : "polite"}
+            aria-label={
+              timerState === "running"
+                ? `Focus running, ${formatSeconds(secondsLeft)} remaining`
+                : timerState === "paused"
+                  ? `Focus paused with ${formatSeconds(secondsLeft)} remaining`
+                  : `Timer not started, ${minutes} minutes chosen`
+            }
+          >
+            <span className={cn("focus-state-pill", timerState)}>
+              {timerState === "running"
+                ? "● Running"
+                : timerState === "paused"
+                  ? "⏸ Paused"
+                  : timerState === "done"
+                    ? "✓ Saved"
+                    : "○ Not started"}
             </span>
-            <b>{isFocusing ? formatRemaining() : `${minutes}:00`}</b>
-            <small>{isFocusing ? "remaining" : "chosen session"}</small>
+            <b>{formatSeconds(secondsLeft)}</b>
+            <small>
+              {timerState === "running" && run
+                ? `remaining · ends ${new Date(run.endsAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
+                : timerState === "paused"
+                  ? "remaining · paused"
+                  : `${minutes} min chosen · nothing running`}
+            </small>
           </div>
           {isFocusing ? (
-            <div className="focus-outcomes">
-              <Button
-                type="button"
-                className="ink-button"
-                onClick={() => finishSession("completed")}
-              >
-                Task finished
-              </Button>
-              <button type="button" onClick={() => finishSession("continued")}>
-                Continue later
-              </button>
-              <button type="button" onClick={() => finishSession("next-step")}>
-                Choose next step
-              </button>
-            </div>
+            <>
+              <div className="focus-run-controls">
+                {isPaused ? (
+                  <button type="button" onClick={resumeSession}>
+                    Resume
+                  </button>
+                ) : (
+                  <button type="button" onClick={pauseSession}>
+                    Pause
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="focus-cancel"
+                  onClick={cancelSession}
+                >
+                  Discard — don’t save
+                </button>
+              </div>
+              <div className="focus-outcomes">
+                <Button
+                  type="button"
+                  className="ink-button"
+                  onClick={() => finishSession("completed")}
+                >
+                  Task finished
+                </Button>
+                <button type="button" onClick={() => finishSession("continued")}>
+                  Stop · continue later
+                </button>
+                <button type="button" onClick={() => finishSession("next-step")}>
+                  Stop · choose next step
+                </button>
+              </div>
+              <small className="focus-run-hint">
+                Ending early saves the minutes you actually spent (
+                {Math.max(1, Math.round(elapsedSeconds / 60))} so far), not the
+                {" "}{run?.plannedMinutes} planned.
+              </small>
+            </>
           ) : (
             <Button
               type="button"
               className="ink-button"
-              onClick={() => {
-                setLastOutcome(null);
-                setIsFocusing(true);
-              }}
+              onClick={startSession}
+              disabled={!activeTask}
             >
-              Start focus session
+              {activeTask
+                ? `Start ${minutes} min on “${activeTask.label}”`
+                : "Add a task to start"}
             </Button>
           )}
+          <label className="focus-notify">
+            <input
+              type="checkbox"
+              checked={notifyAtEnd && notificationPermission === "granted"}
+              onChange={toggleNotifications}
+              disabled={!notificationsSupported}
+            />
+            <span>
+              <b>Notify me when the session ends</b>
+              <small>
+                {!notificationsSupported
+                  ? "This browser doesn’t support notifications — the tab title counts down instead."
+                  : notificationPermission === "denied"
+                    ? "Blocked in your browser’s site settings. The tab title still counts down."
+                    : notifyAtEnd && notificationPermission === "granted"
+                      ? "On. A system notification fires when the timer reaches zero, even if this tab is in the background."
+                      : "Off. Turning it on asks your browser for permission once. The tab title counts down either way."}
+              </small>
+            </span>
+          </label>
           {lastOutcome ? (
             <p className="focus-complete-note">
-              Session saved locally ·{" "}
+              Session saved ·{" "}
               {lastOutcome === "completed"
                 ? "task marked complete"
                 : lastOutcome === "continued"
@@ -18544,15 +18731,28 @@ function ProductivityPage({
           <div>
             <span>Recent focus sessions</span>
             <b>{sessions.length} saved</b>
+            {lastSessions && (
+              <button
+                type="button"
+                className="local-undo"
+                onClick={() => {
+                  setSessions(lastSessions);
+                  setLastSessions(null);
+                }}
+              >
+                Undo remove
+              </button>
+            )}
           </div>
           {sessions.length === 0 ? (
-            <small>Your local sessions will gather here.</small>
+            <small>Your sessions will gather here.</small>
           ) : (
             sessions.slice(0, 5).map(session => (
               <article key={session.id}>
                 <div>
                   <b>
-                    {session.minutes} minutes · {session.taskLabel}
+                    {session.date === today ? "Today" : session.date} ·{" "}
+                    {session.minutes} min · {session.taskLabel}
                   </b>
                   <small>
                     {session.nextStep} ·{" "}
@@ -18565,11 +18765,13 @@ function ProductivityPage({
                 </div>
                 <button
                   type="button"
-                  onClick={() =>
+                  onClick={() => {
+                    setLastSessions(sessions);
                     setSessions(current =>
                       current.filter(item => item.id !== session.id)
-                    )
-                  }
+                    );
+                  }}
+                  aria-label={`Remove ${session.minutes} minute session on ${session.taskLabel}`}
                 >
                   Remove
                 </button>
