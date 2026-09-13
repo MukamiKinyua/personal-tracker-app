@@ -2,11 +2,29 @@ import { describe, expect, it } from "vitest";
 import {
   examDueStatus,
   nextAcademicItem,
+  standingDetail,
   weeklyRevisionMinutes,
   weightedStanding,
 } from "./academicTracker";
 
 describe("academic planning helpers", () => {
+  it("says how much of the course's weight a standing actually rests on", () => {
+    expect(
+      standingDetail([
+        { id: "a", name: "Quiz", weight: 20, score: 80 },
+        { id: "b", name: "Essay", weight: 30, score: 60 },
+        { id: "c", name: "Exam", weight: 50, score: null },
+      ])
+    ).toEqual({
+      standing: 68,
+      gradedWeight: 50,
+      totalWeight: 100,
+      gradedCount: 2,
+      totalCount: 3,
+    });
+    expect(standingDetail([]).standing).toBeNull();
+  });
+
   it("calculates a factual weighted standing only from graded components", () => {
     expect(
       weightedStanding([

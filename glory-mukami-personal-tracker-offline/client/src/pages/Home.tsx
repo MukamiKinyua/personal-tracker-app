@@ -117,8 +117,8 @@ import {
 import {
   examDueStatus,
   nextAcademicItem,
+  standingDetail,
   weeklyRevisionMinutes,
-  weightedStanding,
   type CourseAssessment,
   type CourseMilestone,
   type CourseWork,
@@ -6997,28 +6997,6 @@ function CvPage({
             <Plus size={15} /> Save CV outline
           </Button>
         </form>
-        <div className="cv-preview">
-          <div>
-            <span>local CV preview</span>
-            <b>{profile.readiness}</b>
-          </div>
-          <p>
-            <b>Summary</b>
-            {profile.summary || "Add a clear first impression."}
-          </p>
-          <p>
-            <b>Evidence</b>
-            {profile.experience || "Add a role, project, or impact."}
-          </p>
-          <p>
-            <b>Skills</b>
-            {profile.skills || "Add strengths you want to foreground."}
-          </p>
-          <p>
-            <b>Education</b>
-            {profile.education || "Add a learning milestone."}
-          </p>
-        </div>
       </div>
     </section>
   );
@@ -8216,40 +8194,6 @@ function ExportPage({
               : "No export yet this visit"}
           </span>
         </div>
-        <section
-          className="export-ownership"
-          aria-labelledby="export-ownership-title"
-        >
-          <span id="export-ownership-title">Your data, in plain terms</span>
-          <ul>
-            <li>
-              <b>Format:</b> one JSON file with a readme and a field dictionary
-              inside it, so it can be read without this app. Any single area
-              can also go out as CSV below.
-            </li>
-            <li>
-              <b>What’s included:</b> exactly what the manifest lists. Records
-              include ones you deleted, marked with a deletion time, so nothing
-              is a silent gap.
-            </li>
-            <li>
-              <b>Where it goes:</b> your downloads folder. Only you decide
-              where it goes after that.
-            </li>
-            <li>
-              <b>Deleting afterwards:</b> exporting changes nothing here.
-              Removal of what the app holds is in{" "}
-              <button
-                type="button"
-                className="export-inline-link"
-                onClick={() => onNavigate("privacy")}
-              >
-                Privacy Controls
-              </button>
-              .
-            </li>
-          </ul>
-        </section>
       </div>
       <div className="spread-page export-page">
         <div className="export-scope">
@@ -13976,36 +13920,6 @@ function FinanceCashflowPage({
           <HeartPulse size={15} />
           <span>Private entries · no bank connection · no advice</span>
         </div>
-        <section className="finance-handling" aria-labelledby="finance-handling-title">
-          <span id="finance-handling-title">How this money data is handled</span>
-          <ul>
-            <li>
-              <b>Where:</b>{" "}
-              {auth.isAuthenticated
-                ? "on this device and in your own account’s database. "
-                : "on this device only until you sign in. "}
-              Never sent to a bank, a third party, or anyone else.
-            </li>
-            <li>
-              <b>Amounts:</b> stored to the cent and shown with two decimals,
-              in whichever currency label you set below. No conversion is ever
-              applied.
-            </li>
-            <li>
-              <b>Recurring:</b> a label so you notice it — nothing is re-added
-              on your behalf.
-            </li>
-            <li>
-              <b>Transfers:</b> there is one pot here, not accounts. Record a
-              transfer as money out only if it left the amount you’re tracking;
-              otherwise leave it out.
-            </li>
-            <li>
-              <b>Correct or delete:</b> any record, from the history below.
-              Export everything as CSV there too.
-            </li>
-          </ul>
-        </section>
       </div>
       <div className="spread-page finances-workbench">
         <section className="finance-period-setup">
@@ -17460,11 +17374,35 @@ function CourseWorkspacePage({
     score: "",
   });
   const active = courses.filter(course => !course.archived);
+  const archived = courses.filter(course => course.archived);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const today = sleepDateInputValue(new Date());
+  function dueChip(due: string) {
+    if (!due) return null;
+    const detail = assignmentDueDetail(due, today);
+    return (
+      <small
+        className={cn("course-due", `is-${detail.kind}`)}
+        title={detail.exact}
+      >
+        {detail.label}
+      </small>
+    );
+  }
   function resetComposer() {
     setDraft(emptyDraft);
     setEditingId(null);
     setDetailsOpen(false);
     setFormOpen(false);
+  }
+  function setArchived(id: string, value: boolean) {
+    updateCourse(id, current => ({ ...current, archived: value }));
+    toast(value ? "Course archived — find it under Archived courses" : "Course restored");
+  }
+  function deleteCourse(id: string) {
+    setCourses(current => current.filter(course => course.id !== id));
+    setConfirmDeleteId(null);
+    toast("Course and everything inside it deleted");
   }
   function updateDraftList<
     Key extends "milestones" | "materials" | "work" | "assessments",
@@ -17523,9 +17461,12 @@ function CourseWorkspacePage({
     );
   }
   function courseCard(course: CoursePlan) {
-    const standing = weightedStanding(course.assessments);
+    const standing = standingDetail(course.assessments);
     const nextItem = nextAcademicItem([...course.milestones, ...course.work]);
     const milestoneDone = course.milestones.filter(item => item.done).length;
+    const termEnd = course.termEnd
+      ? assignmentDueDetail(course.termEnd, today)
+      : null;
     return (
       <article className="course-work-card" key={course.id}>
         <div className="course-work-top">
@@ -17534,12 +17475,29 @@ function CourseWorkspacePage({
             <b>{course.title}</b>
             <small>
               {course.target || "Set a course outcome whenever you are ready."}
+              {termEnd
+                ? ` · term ${termEnd.kind === "overdue" ? "ended" : "ends"} ${termEnd.exact}${termEnd.daysAway !== null && termEnd.daysAway >= 0 ? ` (${termEnd.daysAway === 0 ? "today" : `${termEnd.daysAway} days`})` : ""}`
+                : ""}
             </small>
           </div>
-          {standing !== null ? (
-            <em>{standing}% weighted standing</em>
+          {standing.standing !== null ? (
+            <em
+              title={`${standing.gradedCount} of ${standing.totalCount} weighted assessments have a score; ${standing.gradedWeight} of ${standing.totalWeight} weight points are graded`}
+            >
+              {standing.standing}% so far
+              <small>
+                across {standing.gradedWeight}
+                {standing.totalWeight ? ` of ${standing.totalWeight}` : ""}{" "}
+                weight graded
+              </small>
+            </em>
           ) : (
-            <em>{course.weeklyGoal} min weekly goal</em>
+            <em>
+              {course.weeklyGoal} min weekly goal
+              {standing.totalCount > 0 ? (
+                <small>no scores yet</small>
+              ) : null}
+            </em>
           )}
         </div>
         <p>
@@ -17548,9 +17506,8 @@ function CourseWorkspacePage({
         <div className="course-next-item">
           <span>Next academic item</span>
           <b>
-            {nextItem
-              ? `${nextItem.label}${nextItem.due ? ` · ${nextItem.due}` : ""}`
-              : "Add a milestone or course-work item"}
+            {nextItem ? nextItem.label : "Add a milestone or course-work item"}
+            {nextItem ? dueChip(nextItem.due) : null}
           </b>
         </div>
         {course.work.length ? (
@@ -17574,7 +17531,13 @@ function CourseWorkspacePage({
               >
                 {item.done ? "✓" : ""}
                 <b>{item.label}</b>
-                <small>{item.due || "No due date"}</small>
+                {item.done ? (
+                  <small>done</small>
+                ) : item.due ? (
+                  dueChip(item.due)
+                ) : (
+                  <small>No due date</small>
+                )}
               </button>
             ))}
           </div>
@@ -17602,7 +17565,7 @@ function CourseWorkspacePage({
               >
                 {item.done ? "✓" : ""}
                 {item.label}
-                {item.due ? ` · ${item.due}` : ""}
+                {!item.done && item.due ? dueChip(item.due) : null}
               </button>
             ))}
           </div>
@@ -17642,15 +17605,7 @@ function CourseWorkspacePage({
           <button type="button" onClick={onFocus}>
             Start focus session
           </button>
-          <button
-            type="button"
-            onClick={() =>
-              updateCourse(course.id, current => ({
-                ...current,
-                archived: true,
-              }))
-            }
-          >
+          <button type="button" onClick={() => setArchived(course.id, true)}>
             Archive
           </button>
         </div>
@@ -18070,6 +18025,67 @@ function CourseWorkspacePage({
             </small>
           )}
         </section>
+        {archived.length > 0 && (
+          <section
+            className="course-archived"
+            aria-labelledby="course-archived-title"
+          >
+            <div>
+              <span id="course-archived-title">Archived courses</span>
+              <b>{archived.length}</b>
+            </div>
+            <small>
+              Archived courses keep their materials, milestones and scores.
+              Restore any time, or delete for good.
+            </small>
+            {archived.map(course => (
+              <article key={course.id}>
+                <b>
+                  {course.code ? `${course.code} · ` : ""}
+                  {course.title}
+                </b>
+                <small>
+                  {course.assessments.length} assessment
+                  {course.assessments.length === 1 ? "" : "s"} ·{" "}
+                  {course.milestones.length} milestone
+                  {course.milestones.length === 1 ? "" : "s"}
+                </small>
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => setArchived(course.id, false)}
+                  >
+                    Restore
+                  </button>
+                  {confirmDeleteId === course.id ? (
+                    <>
+                      <button
+                        type="button"
+                        className="is-danger"
+                        onClick={() => deleteCourse(course.id)}
+                      >
+                        Delete for good
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDeleteId(null)}
+                      >
+                        Keep
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDeleteId(course.id)}
+                    >
+                      Delete…
+                    </button>
+                  )}
+                </div>
+              </article>
+            ))}
+          </section>
+        )}
       </div>
     </section>
   );
@@ -18550,14 +18566,6 @@ function TasksPage({
           </span>
           <b>{planningSummary.timeBoundToday} time-bound today</b>
         </div>
-        <p className="tasks-persistence-note">
-          Saved as you go on this device
-          {auth.isAuthenticated
-            ? ", and synced to your account"
-            : " (sign in to sync across devices)"}
-          . Every add, edit, complete, move and delete can be undone from the
-          message that appears right after.
-        </p>
       </div>
       <div className="spread-page tasks-page">
         <form
@@ -19083,11 +19091,6 @@ function DigitalLifePage({
         <p className="page-intro">
           A private screen-time check-in that makes space for boundaries, focus,
           and the parts of life that do not live behind a screen.
-        </p>
-        <p className="digital-source-note">
-          Everything here is typed in by you. Nothing is read from your phone,
-          browser, or any app — there is no sync, no permission to grant, and
-          nothing that can silently fail.
         </p>
         <button
           type="button"
@@ -21153,12 +21156,6 @@ function WellbeingPage({
             A calm daily check-in for noticing your emotional weather, energy,
             and what could care for you next.
           </p>
-          <p className="wellbeing-scope-note">
-            This is a notebook, not a measurement. It doesn’t diagnose, score,
-            or watch for anything — it only keeps the words you choose. If
-            things feel heavy for a while, talking with someone you trust, or a
-            local support line, is a real next step; this page can’t be that.
-          </p>
           <button
             type="button"
             className="ink-button"
@@ -21421,22 +21418,6 @@ function CyclePage({
     setConfirmDeleteAll(false);
     toast("All cycle data deleted from this journal");
   }
-  function downloadCycleData() {
-    const payload = {
-      exportedAt: new Date().toISOString(),
-      cycles: entries,
-      dailyContext: contextEntries,
-    };
-    const url = URL.createObjectURL(
-      new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" })
-    );
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = "cycle-tracker-export.json";
-    anchor.click();
-    URL.revokeObjectURL(url);
-    toast("Cycle data downloaded");
-  }
   const symptomOptions = [
     "Cramps",
     "Tenderness",
@@ -21497,37 +21478,6 @@ function CyclePage({
         >
           <Plus size={15} /> Log cycle entry
         </button>
-        <section className="cycle-privacy" aria-labelledby="cycle-privacy-title">
-          <span id="cycle-privacy-title">How this data is handled</span>
-          <ul>
-            <li>
-              <b>Where it lives:</b>{" "}
-              {auth.isAuthenticated
-                ? "on this device, and in your own account's database so it survives reinstalling. "
-                : "on this device only, until you sign in. "}
-              It is never shared with anyone else and nothing here is sent to a
-              third party.
-            </li>
-            <li>
-              <b>How long:</b> until you delete it. Nothing expires on its own.
-            </li>
-            <li>
-              <b>Delete:</b> any single entry below, or everything at once.
-            </li>
-            <li>
-              <b>Export:</b>{" "}
-              <button
-                type="button"
-                className="cycle-inline-link"
-                onClick={downloadCycleData}
-                disabled={entries.length === 0 && contextEntries.length === 0}
-              >
-                download everything on this page as a file
-              </button>{" "}
-              you keep.
-            </li>
-          </ul>
-        </section>
       </div>
       <div className="spread-page cycle-ring-page">
         <div className="cycle-ring">

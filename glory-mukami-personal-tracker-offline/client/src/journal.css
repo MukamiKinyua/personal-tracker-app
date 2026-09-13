@@ -12207,12 +12207,21 @@ button:focus-visible {
   --scene-position: 36% center;
 }
 .journal-stage[data-journal-view="documents"],
-.journal-stage[data-journal-view="security"],
-.journal-stage[data-journal-view="environment"],
-.journal-stage[data-journal-view="purchases"],
-.journal-stage[data-journal-view="responsibilities"] {
+.journal-stage[data-journal-view="security"] {
   --scene-image: url("/media/runtime/glory-art-dashboard-peacock-sunrise_80036b69.png");
   --scene-position: 75% center;
+}
+.journal-stage[data-journal-view="environment"] {
+  --scene-image: url("/media/runtime/glory-art-environment-record-player-study_06ad8e81.png");
+  --scene-position: 32% center;
+}
+.journal-stage[data-journal-view="purchases"] {
+  --scene-image: url("/media/runtime/glory-art-purchases-shopping-street_149f969f.png");
+  --scene-position: 38% center;
+}
+.journal-stage[data-journal-view="responsibilities"] {
+  --scene-image: url("/media/runtime/glory-art-responsibilities-bed-work_3fe8f086.png");
+  --scene-position: 42% center;
 }
 
 .journal-stage[data-journal-view="contents"] {
@@ -15851,20 +15860,31 @@ button:focus-visible {
 .journal-stage[data-journal-view="time"],
 .journal-stage[data-journal-view="finances"],
 .journal-stage[data-journal-view="documents"],
-.journal-stage[data-journal-view="security"],
-.journal-stage[data-journal-view="environment"],
-.journal-stage[data-journal-view="purchases"],
-.journal-stage[data-journal-view="responsibilities"] {
+.journal-stage[data-journal-view="security"] {
   --scene-image: url("/media/runtime/glory-art-dashboard-peacock-sunrise_80036b69.png");
   --scene-position: center;
   --scene-art: #071b1f;
 }
+/* Split out from the group above: Environment, Purchases and Responsibilities
+   each get their own painting rather than the shared placeholder every other
+   page in that list still uses. */
+.journal-stage[data-journal-view="environment"] {
+  --scene-image: url("/media/runtime/glory-art-environment-record-player-study_06ad8e81.png");
+  --scene-position: 32% center;
+  --scene-art: #071b1f;
+}
+.journal-stage[data-journal-view="purchases"] {
+  --scene-image: url("/media/runtime/glory-art-purchases-shopping-street_149f969f.png");
+  --scene-position: 38% center;
+  --scene-art: #071b1f;
+}
+.journal-stage[data-journal-view="responsibilities"] {
+  --scene-image: url("/media/runtime/glory-art-responsibilities-bed-work_3fe8f086.png");
+  --scene-position: 42% center;
+  --scene-art: #071b1f;
+}
 
-.journal-stage[data-journal-view="career"],
-.journal-stage[data-journal-view="portfolio"],
-.journal-stage[data-journal-view="projects"],
 .journal-stage[data-journal-view="certifications"],
-.journal-stage[data-journal-view="cv"],
 .journal-stage[data-journal-view="internships"],
 .journal-stage[data-journal-view="analytics"],
 .journal-stage[data-journal-view="insights"],
@@ -15883,6 +15903,34 @@ button:focus-visible {
 .journal-stage[data-journal-view="utilities"] {
   --scene-image: url("/media/runtime/glory-art-learning-cosmic-library_d8ec8d02.png");
   --scene-position: center;
+  --scene-art: #0d0820;
+}
+/* Split out from the group above: Projects gets its own painting rather than
+   the shared placeholder every other page in that list still uses. */
+.journal-stage[data-journal-view="projects"] {
+  --scene-image: url("/media/runtime/glory-art-projects-clerk-desk_f5d8d836.jpg");
+  --scene-position: 42% center;
+  --scene-art: #0d0820;
+}
+/* Split out from the group above: CV gets its own painting rather than the
+   shared placeholder every other page in that list still uses. */
+.journal-stage[data-journal-view="cv"] {
+  --scene-image: url("/media/runtime/glory-art-cv-night-desk_c8bff2ca.jpg");
+  --scene-position: 45% center;
+  --scene-art: #0d0820;
+}
+/* Split out from the group above: Portfolio gets its own painting rather
+   than the shared placeholder every other page in that list still uses. */
+.journal-stage[data-journal-view="portfolio"] {
+  --scene-image: url("/media/runtime/glory-art-portfolio-writer-studio_d5f301e3.jpg");
+  --scene-position: 42% center;
+  --scene-art: #0d0820;
+}
+/* Split out from the group above: Career gets its own painting rather than
+   the shared placeholder every other page in that list still uses. */
+.journal-stage[data-journal-view="career"] {
+  --scene-image: url("/media/runtime/glory-art-career-map-desk_63bd2829.png");
+  --scene-position: 40% center;
   --scene-art: #0d0820;
 }
 
@@ -16901,7 +16949,14 @@ button:focus-visible {
     [data-journal-view="studySessions"],
     [data-journal-view="exams"],
     [data-journal-view="documents"],
-    [data-journal-view="habits"]
+    [data-journal-view="habits"],
+    [data-journal-view="environment"],
+    [data-journal-view="purchases"],
+    [data-journal-view="responsibilities"],
+    [data-journal-view="career"],
+    [data-journal-view="portfolio"],
+    [data-journal-view="cv"],
+    [data-journal-view="projects"]
   ):not([data-journal-view="cover"]):not([data-journal-view="contents"]):not(
     [data-journal-view="dashboard"]
   ) {
@@ -23787,13 +23842,108 @@ body {
 }
 .course-work-top em {
   align-self: start;
-  border-radius: 999px;
-  padding: 0.22rem 0.4rem;
+  display: grid;
+  gap: 0.06rem;
+  justify-items: end;
+  border-radius: 12px;
+  padding: 0.25rem 0.45rem;
   color: #fffaf4;
   background: #6e5795;
   font-size: 0.55rem;
   font-style: normal;
   font-weight: 840;
+  text-align: right;
+}
+.course-work-top em small {
+  color: rgba(255, 250, 244, 0.82);
+  font-size: 0.48rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.course-due {
+  display: inline-block;
+  margin-left: 0.35rem;
+  border-radius: 999px;
+  padding: 0.12rem 0.4rem;
+  color: #1c1d28;
+  background: rgba(242, 212, 109, 0.85);
+  font-size: 0.5rem;
+  font-weight: 800;
+  vertical-align: middle;
+}
+.course-due.is-overdue {
+  color: #fffaf4;
+  background: #7d2946;
+}
+.course-due.is-overdue::before {
+  content: "▲ ";
+}
+.course-due.is-today,
+.course-due.is-tomorrow {
+  background: #e98d79;
+}
+.course-due.is-later {
+  background: rgba(110, 87, 149, 0.18);
+}
+.course-archived {
+  display: grid;
+  gap: 0.4rem;
+  margin-top: 0.9rem;
+  padding: 0.65rem;
+  border: 1px dashed rgba(28, 29, 40, 0.35);
+  border-radius: 10px;
+}
+.course-archived > div {
+  display: flex;
+  justify-content: space-between;
+  color: #1c1d28;
+  font-size: 0.57rem;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.course-archived > small {
+  color: rgba(28, 29, 40, 0.8);
+  font-size: 0.55rem;
+  line-height: 1.45;
+}
+.course-archived article {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.15rem 0.5rem;
+  align-items: center;
+  padding: 0.4rem 0;
+  border-top: 1px dashed rgba(28, 29, 40, 0.2);
+}
+.course-archived article b {
+  color: #1c1d28;
+  font-size: 0.62rem;
+}
+.course-archived article small {
+  grid-column: 1;
+  color: rgba(28, 29, 40, 0.75);
+  font-size: 0.54rem;
+}
+.course-archived article > div {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  display: flex;
+  gap: 0.28rem;
+}
+.course-archived article button {
+  border: 1px solid rgba(28, 29, 40, 0.4);
+  border-radius: 7px;
+  padding: 0.3rem 0.45rem;
+  color: #1c1d28;
+  background: transparent;
+  font-size: 0.55rem;
+  font-weight: 850;
+  white-space: nowrap;
+}
+.course-archived article button.is-danger {
+  color: #fffaf4;
+  background: #7d2946;
+  border-color: #7d2946;
 }
 .course-work-card > p,
 .exam-plan-card > p {
