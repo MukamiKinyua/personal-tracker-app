@@ -7523,6 +7523,7 @@ function CertificationsPage({
                   onClick={() => {
                     setCertifications(lastCerts);
                     setLastCerts(null);
+                    toast("Certification restored");
                   }}
                 >
                   Undo remove
