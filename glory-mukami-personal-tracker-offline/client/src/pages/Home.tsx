@@ -11251,6 +11251,7 @@ function CareerPage({
                   onClick={() => {
                     setEntries(lastEntries);
                     setLastEntries(null);
+                    toast("Career direction restored");
                   }}
                 >
                   Undo remove
