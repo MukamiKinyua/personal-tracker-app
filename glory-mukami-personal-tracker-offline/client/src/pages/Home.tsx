@@ -17569,8 +17569,66 @@ function TasksPage({
     "today"
   );
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [priorityFilter, setPriorityFilter] = useState<
+    PlanningTask["priority"] | "all"
+  >("all");
+  const [query, setQuery] = useState("");
+  const [confirmClear, setConfirmClear] = useState(false);
+  const auth = useAuth();
   const planningSummary = taskPlanningSummary(tasks);
-  const visibleTasks = taskSection(tasks, section);
+  const sectionTasks = taskSection(tasks, section);
+  const visibleTasks = sectionTasks.filter(task => {
+    if (priorityFilter !== "all" && task.priority !== priorityFilter)
+      return false;
+    if (!query.trim()) return true;
+    const haystack =
+      `${task.title} ${task.area} ${task.nextStep} ${task.note} ${task.subtasks.map(item => item.label).join(" ")}`.toLowerCase();
+    return haystack.includes(query.trim().toLowerCase());
+  });
+  const filtersActive = priorityFilter !== "all" || query.trim() !== "";
+  const priorityGlyph: Record<PlanningTask["priority"], string> = {
+    High: "!!!",
+    Medium: "!!",
+    Low: "!",
+  };
+  function deleteTask(task: PlanningTask) {
+    journal.remove(task.id, `Deleted ${task.title}`);
+    if (editingId === task.id) resetTaskDraft();
+  }
+  function deferTask(task: PlanningTask) {
+    const toLater = task.when === "today";
+    journal.edit(
+      task.id,
+      {
+        ...task,
+        when: toLater ? "later" : "today",
+        due:
+          task.due === "Today" || task.due === "Later"
+            ? toLater
+              ? "Later"
+              : "Today"
+            : task.due,
+      },
+      toLater ? `Moved ${task.title} to later` : `Moved ${task.title} to today`
+    );
+  }
+  function completeAllShown() {
+    const open = visibleTasks.filter(task => !task.done);
+    for (const task of open) {
+      journal.edit(
+        task.id,
+        { ...task, done: true, completedAt: new Date().toISOString() },
+        `Completed ${task.title}`
+      );
+    }
+    if (open.length) toast(`${open.length} task${open.length === 1 ? "" : "s"} completed — each one can be undone`);
+  }
+  function clearCompleted() {
+    const done = tasks.filter(task => task.done);
+    for (const task of done) journal.remove(task.id, `Deleted ${task.title}`);
+    setConfirmClear(false);
+    if (done.length) toast(`${done.length} completed task${done.length === 1 ? "" : "s"} deleted — each one can be undone`);
+  }
   function resetTaskDraft() {
     setDraft({
       title: "",
@@ -17596,7 +17654,7 @@ function TasksPage({
       note: draft.note.trim(),
       done: false,
       subtasks: draft.subtasks
-        .split("\\n")
+        .split(/\r?\n/)
         .map(label => label.trim())
         .filter(Boolean)
         .map((label, index) => ({
@@ -17716,6 +17774,14 @@ function TasksPage({
           </span>
           <b>{planningSummary.timeBoundToday} time-bound today</b>
         </div>
+        <p className="tasks-persistence-note">
+          Saved as you go on this device
+          {auth.isAuthenticated
+            ? ", and synced to your account"
+            : " (sign in to sync across devices)"}
+          . Every add, edit, complete, move and delete can be undone from the
+          message that appears right after.
+        </p>
       </div>
       <div className="spread-page tasks-page">
         <form
@@ -17870,6 +17936,40 @@ function TasksPage({
             </button>
           ))}
         </div>
+        <div className="task-filters" role="group" aria-label="Filter tasks">
+          <input
+            type="search"
+            value={query}
+            onChange={event => setQuery(event.target.value)}
+            placeholder="Search title, area, notes…"
+            aria-label="Search tasks"
+          />
+          <div className="task-priority-filter">
+            {(["all", "High", "Medium", "Low"] as const).map(value => (
+              <button
+                type="button"
+                key={value}
+                className={cn(priorityFilter === value && "active")}
+                aria-pressed={priorityFilter === value}
+                onClick={() => setPriorityFilter(value)}
+              >
+                {value === "all" ? "All" : `${priorityGlyph[value]} ${value}`}
+              </button>
+            ))}
+          </div>
+          {filtersActive && (
+            <button
+              type="button"
+              className="task-filter-clear"
+              onClick={() => {
+                setQuery("");
+                setPriorityFilter("all");
+              }}
+            >
+              Clear filters
+            </button>
+          )}
+        </div>
         <div className="task-section-heading">
           <span>
             {section === "today"
@@ -17879,24 +17979,61 @@ function TasksPage({
                 : "Completed archive"}
           </span>
           <b>
-            {section === "today"
-              ? `${planningSummary.timeBoundToday} time-bound`
-              : section === "later"
-                ? "No urgency added"
-                : `${planningSummary.completed} finished`}
+            {filtersActive
+              ? `${visibleTasks.length} of ${sectionTasks.length} shown`
+              : section === "today"
+                ? `${planningSummary.timeBoundToday} time-bound`
+                : section === "later"
+                  ? "No urgency added"
+                  : `${planningSummary.completed} finished`}
           </b>
         </div>
+        {visibleTasks.length > 1 && section !== "completed" && (
+          <div className="task-bulk">
+            <button type="button" onClick={completeAllShown}>
+              Complete all {visibleTasks.length} shown
+            </button>
+          </div>
+        )}
+        {section === "completed" && sectionTasks.length > 0 && (
+          <div className="task-bulk">
+            {confirmClear ? (
+              <>
+                <span>
+                  Delete all {sectionTasks.length} completed tasks? Each one
+                  can still be undone right after.
+                </span>
+                <button type="button" className="is-danger" onClick={clearCompleted}>
+                  Yes, delete them
+                </button>
+                <button type="button" onClick={() => setConfirmClear(false)}>
+                  Keep
+                </button>
+              </>
+            ) : (
+              <button type="button" onClick={() => setConfirmClear(true)}>
+                Clear completed…
+              </button>
+            )}
+          </div>
+        )}
         <div className="task-list">
           {visibleTasks.length === 0 ? (
             <div className="task-empty">
               <b>
-                {section === "completed"
-                  ? "Nothing completed yet"
-                  : section === "today"
-                    ? "Today is clear"
-                    : "Nothing parked for later"}
+                {filtersActive
+                  ? "Nothing matches those filters"
+                  : section === "completed"
+                    ? "Nothing completed yet"
+                    : section === "today"
+                      ? "Today is clear"
+                      : "Nothing parked for later"}
               </b>
-              <small>Add a task above when something needs a place.</small>
+              <small>
+                {filtersActive
+                  ? "Try a different word, or clear the filters above."
+                  : "Add a task above when something needs a place."}
+              </small>
             </div>
           ) : (
             visibleTasks.map(task => {
@@ -17905,7 +18042,11 @@ function TasksPage({
               ).length;
               return (
                 <article
-                  className={cn("task-card", task.done && "done")}
+                  className={cn(
+                    "task-card",
+                    task.done && "done",
+                    editingId === task.id && "is-editing"
+                  )}
                   key={task.id}
                 >
                   <button
@@ -17925,7 +18066,15 @@ function TasksPage({
                       </span>
                     </div>
                     <small className="task-meta">
-                      {task.area} · {task.priority} priority
+                      {task.area} ·{" "}
+                      <span
+                        className={`task-priority task-priority-${task.priority.toLowerCase()}`}
+                      >
+                        <span aria-hidden="true">
+                          {priorityGlyph[task.priority]}
+                        </span>{" "}
+                        {task.priority} priority
+                      </span>
                     </small>
                     {task.nextStep ? (
                       <p className="task-next-step">
@@ -17954,13 +18103,36 @@ function TasksPage({
                       </div>
                     ) : null}
                   </div>
-                  <button
-                    type="button"
-                    className="task-edit"
-                    onClick={() => beginTaskEdit(task)}
-                  >
-                    Edit
-                  </button>
+                  <div className="task-card-actions">
+                    <button
+                      type="button"
+                      className="task-edit"
+                      onClick={() => beginTaskEdit(task)}
+                    >
+                      Edit
+                    </button>
+                    {!task.done && (
+                      <button
+                        type="button"
+                        onClick={() => deferTask(task)}
+                        aria-label={
+                          task.when === "today"
+                            ? `Move ${task.title} to later`
+                            : `Move ${task.title} to today`
+                        }
+                      >
+                        {task.when === "today" ? "→ Later" : "→ Today"}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="task-delete"
+                      onClick={() => deleteTask(task)}
+                      aria-label={`Delete ${task.title}`}
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </article>
               );
             })
