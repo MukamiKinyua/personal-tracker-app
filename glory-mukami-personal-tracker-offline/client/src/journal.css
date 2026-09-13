@@ -7226,7 +7226,10 @@ button:focus-visible {
   gap: 0.45rem;
   padding: 0.48rem 0.56rem;
   border-radius: 9px;
-  background: #eef6e8;
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(14px) saturate(118%);
+  -webkit-backdrop-filter: blur(14px) saturate(118%);
+  border: 1px solid rgba(255, 255, 255, 0.14);
 }
 .recurring-care input {
   width: auto;
@@ -7238,9 +7241,10 @@ button:focus-visible {
 }
 .recurring-care b {
   font-size: 0.59rem;
+  color: rgba(255, 255, 255, 0.94);
 }
 .recurring-care small {
-  color: #92a292;
+  color: rgba(255, 255, 255, 0.68);
   font-size: 0.52rem;
   font-weight: 400;
 }
