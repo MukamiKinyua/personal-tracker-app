@@ -13166,7 +13166,18 @@ button:focus-visible {
 .journal-stage[data-journal-view]:not([data-journal-view="cover"])
   .journal-spread
   > .spread-page:last-child
-  > label,
+  > label {
+  display: block;
+  box-sizing: border-box;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 15px;
+  background: rgba(255, 250, 253, 0.74);
+  color: #32183b;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(12px) saturate(1.06);
+}
+
 .journal-stage[data-journal-view]:not([data-journal-view="cover"])
   .journal-spread
   > .spread-page:last-child
@@ -13187,7 +13198,11 @@ button:focus-visible {
     [class*="-history"]
   )
   > small {
-  display: block;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.3rem 0.6rem;
   box-sizing: border-box;
   padding: 0.6rem 0.7rem;
   border: 1px solid rgba(255, 255, 255, 0.7);
