@@ -10720,18 +10720,59 @@ function ResponsibilitiesPage({
   onCover: () => void;
 }) {
   type Responsibility = {
+    id?: string;
     title: string;
     owner: string;
     cadence: string;
     reminder: string;
     done: boolean;
+    lastDone?: string;
+    nextDue?: string;
   };
   const [responsibilities, setResponsibilities] = useState<Responsibility[]>(
     []
   );
+  const [lastList, setLastList] = useState<Responsibility[] | null>(null);
   const [history, setHistory] = useState<
     Array<{ title: string; date: string }>
   >([]);
+  const today = sleepDateInputValue(new Date());
+  const cadenceDays: Record<string, number> = {
+    Daily: 1,
+    Weekly: 7,
+    Monthly: 30,
+    Seasonally: 91,
+  };
+  function nextDueFrom(cadence: string, from: string) {
+    const date = new Date(`${from}T12:00:00`);
+    if (cadence === "Monthly") date.setMonth(date.getMonth() + 1);
+    else if (cadence === "Seasonally") date.setMonth(date.getMonth() + 3);
+    else date.setDate(date.getDate() + (cadenceDays[cadence] ?? 7));
+    return sleepDateInputValue(date);
+  }
+  function formatDay(value: string) {
+    return /^\d{4}-\d{2}-\d{2}$/.test(value)
+      ? new Date(`${value}T12:00:00`).toLocaleDateString(undefined, {
+          day: "numeric",
+          month: "short",
+        })
+      : value;
+  }
+  function dueState(item: Responsibility) {
+    if (!item.nextDue) return null;
+    const detail = assignmentDueDetail(item.nextDue, today);
+    return {
+      kind: detail.kind,
+      label:
+        detail.kind === "overdue"
+          ? `due again · ${Math.abs(detail.daysAway ?? 0)} day${Math.abs(detail.daysAway ?? 0) === 1 ? "" : "s"} ago`
+          : detail.kind === "today"
+            ? "due again today"
+            : detail.kind === "tomorrow"
+              ? "due again tomorrow"
+              : `due again ${formatDay(item.nextDue)}`,
+    };
+  }
   const [draft, setDraft] = useState<Responsibility>({
     title: "",
     owner: "Me",
@@ -10744,7 +10785,12 @@ function ResponsibilitiesPage({
     payload: { responsibilities, history },
     hydrate: payload => {
       if (Array.isArray(payload.responsibilities))
-        setResponsibilities(payload.responsibilities as Responsibility[]);
+        setResponsibilities(
+          (payload.responsibilities as Responsibility[]).map((item, index) => ({
+            ...item,
+            id: item.id ?? `resp-${index}-${item.title}`,
+          }))
+        );
       if (Array.isArray(payload.history))
         setHistory(payload.history as Array<{ title: string; date: string }>);
     },
@@ -10754,8 +10800,9 @@ function ResponsibilitiesPage({
     if (!draft.title.trim()) return;
     setResponsibilities(current => [
       ...current,
-      { ...draft, title: draft.title.trim() },
+      { ...draft, id: `resp-${Date.now()}`, title: draft.title.trim() },
     ]);
+    toast(`Added “${draft.title.trim()}” · ${draft.cadence.toLowerCase()}`);
     setDraft({
       title: "",
       owner: "Me",
@@ -10764,25 +10811,26 @@ function ResponsibilitiesPage({
       done: false,
     });
   }
-  function toggleResponsibility(index: number) {
-    const item = responsibilities[index];
-    if (!item) return;
-    if (!item.done)
-      setHistory(current => [
-        {
-          title: item.title,
-          date: new Date().toLocaleDateString("en", {
-            month: "short",
-            day: "numeric",
-          }),
-        },
-        ...current,
-      ]);
+  function completeResponsibility(item: Responsibility) {
+    // Every responsibility repeats, so "done" means "done this time":
+    // record the moment, schedule the next one, stay on the list.
+    const nextDue = nextDueFrom(item.cadence, today);
+    setHistory(current => [{ title: item.title, date: today }, ...current]);
     setResponsibilities(current =>
-      current.map((entry, position) =>
-        position === index ? { ...entry, done: !entry.done } : entry
+      current.map(entry =>
+        entry.id === item.id
+          ? { ...entry, done: false, lastDone: today, nextDue }
+          : entry
       )
     );
+    toast(`“${item.title}” done · next by ${formatDay(nextDue)}`);
+  }
+  function removeResponsibility(item: Responsibility) {
+    setLastList(responsibilities);
+    setResponsibilities(current =>
+      current.filter(entry => entry.id !== item.id)
+    );
+    toast(`Removed “${item.title}”`);
   }
   return (
     <section
@@ -10799,7 +10847,8 @@ function ResponsibilitiesPage({
         </h2>
         <p className="page-intro">
           Keep recurring obligations distinct from one-off tasks. Name who owns
-          it, how often it comes around, and how you want to be reminded.
+          it and how often it comes around; each time you tick one off, the
+          next date is set from the cadence.
         </p>
         <div className="responsibility-quote">
           <Sparkles size={15} />
@@ -10851,7 +10900,8 @@ function ResponsibilitiesPage({
             </label>
           </div>
           <label>
-            Reminder preference
+            Reminder preference{" "}
+            <small>a note to yourself — this page doesn’t send reminders</small>
             <select
               value={draft.reminder}
               onChange={event =>
@@ -10874,32 +10924,68 @@ function ResponsibilitiesPage({
         <div className="responsibility-list">
           <div>
             <span>current responsibilities</span>
-            <b>{responsibilities.length} listed</b>
+            <b>
+              {responsibilities.length} listed
+              {lastList && (
+                <button
+                  type="button"
+                  className="local-undo"
+                  onClick={() => {
+                    setResponsibilities(lastList);
+                    setLastList(null);
+                  }}
+                >
+                  Undo
+                </button>
+              )}
+            </b>
           </div>
           {responsibilities.length === 0 ? (
             <small>
               Start with one repeating obligation that deserves a steadier home.
             </small>
           ) : (
-            responsibilities.map((item, index) => (
-              <article
-                className={cn(item.done && "done")}
-                key={`${item.title}-${index}`}
-              >
-                <button
-                  type="button"
-                  onClick={() => toggleResponsibility(index)}
+            responsibilities.map(item => {
+              const due = dueState(item);
+              return (
+                <article
+                  className={cn(due && `is-${due.kind}`)}
+                  key={item.id}
                 >
-                  {item.done ? "✓" : ""}
-                </button>
-                <p>
-                  <b>{item.title}</b>
-                  <small>
-                    {item.owner} · {item.cadence} · {item.reminder}
-                  </small>
-                </p>
-              </article>
-            ))
+                  <button
+                    type="button"
+                    onClick={() => completeResponsibility(item)}
+                    aria-label={`Mark ${item.title} done for now`}
+                    title="Done this time"
+                  >
+                    {""}
+                  </button>
+                  <p>
+                    <b>{item.title}</b>
+                    <small>
+                      {item.owner} · {item.cadence} · {item.reminder}
+                      {item.lastDone ? ` · last done ${formatDay(item.lastDone)}` : ""}
+                    </small>
+                    {due ? (
+                      <small className={cn("responsibility-due", `is-${due.kind}`)}>
+                        {due.label}
+                      </small>
+                    ) : (
+                      <small className="responsibility-due">not done yet</small>
+                    )}
+                  </p>
+                  <button
+                    type="button"
+                    className="responsibility-remove"
+                    onClick={() => removeResponsibility(item)}
+                    aria-label={`Remove ${item.title}`}
+                    title="Remove"
+                  >
+                    ×
+                  </button>
+                </article>
+              );
+            })
           )}
         </div>
         <div className="responsibility-history">
@@ -10915,7 +11001,7 @@ function ResponsibilitiesPage({
           ) : (
             history.slice(0, 3).map((item, index) => (
               <p key={`${item.title}-${index}`}>
-                {item.date} · {item.title}
+                {formatDay(item.date)} · {item.title}
               </p>
             ))
           )}

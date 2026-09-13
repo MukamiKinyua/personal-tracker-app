@@ -30925,3 +30925,60 @@ body {
   letter-spacing: 0;
   cursor: pointer;
 }
+
+.responsibility-list article.is-overdue {
+  box-shadow: inset 3px 0 0 #7d2946;
+}
+.responsibility-due {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.53rem;
+  font-weight: 700;
+  opacity: 0.85;
+}
+.responsibility-due.is-overdue {
+  color: #7d2946;
+  opacity: 1;
+}
+.responsibility-due.is-today,
+.responsibility-due.is-tomorrow {
+  color: #a8481f;
+  opacity: 1;
+}
+.responsibility-list .responsibility-remove {
+  margin-left: auto;
+  align-self: center;
+  border: 0;
+  padding: 0.15rem 0.45rem;
+  color: inherit;
+  background: transparent;
+  font-size: 0.85rem;
+  opacity: 0.6;
+  cursor: pointer;
+}
+.responsibility-list .responsibility-remove:hover,
+.responsibility-list .responsibility-remove:focus-visible {
+  opacity: 1;
+}
+.responsibility-list > div b .local-undo {
+  margin-left: 0.5rem;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  background: none;
+  font: inherit;
+  text-decoration: underline;
+  text-transform: none;
+  letter-spacing: 0;
+  cursor: pointer;
+}
+.responsibility-form label small {
+  font-weight: 500;
+  opacity: 0.8;
+}
+.responsibility-list article:has(.responsibility-remove) {
+  grid-template-columns: 27px 1fr auto;
+}
+.care-list article:has(.care-remove) {
+  grid-template-columns: 27px 1fr auto;
+}
