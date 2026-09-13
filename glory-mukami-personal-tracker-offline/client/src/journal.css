@@ -31131,3 +31131,38 @@ body {
   font-size: 0.56rem;
   opacity: 0.8;
 }
+
+.internships-list article.is-editing {
+  outline: 2px dashed currentColor;
+  outline-offset: 3px;
+  border-radius: 6px;
+  opacity: 0.85;
+}
+.internships-list article.is-closed {
+  opacity: 0.6;
+}
+.internships-list article.is-overdue:not(.is-closed) {
+  box-shadow: inset 3px 0 0 #7d2946;
+}
+.internships-list > div b .local-undo {
+  margin-left: 0.5rem;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  background: none;
+  font: inherit;
+  text-decoration: underline;
+  text-transform: none;
+  letter-spacing: 0;
+  cursor: pointer;
+}
+.internship-deadline {
+  font-weight: 700;
+}
+.internship-deadline.is-overdue {
+  color: #7d2946;
+}
+.internship-deadline.is-today,
+.internship-deadline.is-tomorrow {
+  color: #a8481f;
+}

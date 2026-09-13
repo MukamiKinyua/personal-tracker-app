@@ -6657,6 +6657,7 @@ function InternshipsPage({
   onCover: () => void;
 }) {
   type Application = {
+    id?: string;
     role: string;
     organization: string;
     deadline: string;
@@ -6664,9 +6665,14 @@ function InternshipsPage({
     followUp: string;
     status: string;
     reflection: string;
+    createdAt?: string;
+    updatedAt?: string;
   };
-  const [applications, setApplications] = useState<Application[]>([]);
-  const [draft, setDraft] = useState<Application>({
+  type ApplicationDraft = Pick<
+    Application,
+    "role" | "organization" | "deadline" | "material" | "followUp" | "status" | "reflection"
+  >;
+  const emptyApplication: ApplicationDraft = {
     role: "",
     organization: "",
     deadline: "",
@@ -6674,36 +6680,110 @@ function InternshipsPage({
     followUp: "",
     status: "Considering",
     reflection: "",
+  };
+  const [applications, setApplications] = useState<Application[]>([]);
+  const [lastApplications, setLastApplications] = useState<Application[] | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draft, setDraft] = useState<ApplicationDraft>(emptyApplication);
+  const today = sleepDateInputValue(new Date());
+  const formatDay = (value?: string) =>
+    value && /^\d{4}-\d{2}-\d{2}$/.test(value)
+      ? new Date(`${value}T12:00:00`).toLocaleDateString(undefined, {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        })
+      : null;
+  const closedStatuses = new Set(["Closed"]);
+  function deadlineChip(application: Application) {
+    if (!application.deadline) return null;
+    const detail = assignmentDueDetail(application.deadline, today);
+    if (closedStatuses.has(application.status) || application.status === "Applied" || application.status === "Interviewing")
+      return { kind: "done", label: `deadline was ${detail.exact}` };
+    const label =
+      detail.kind === "overdue"
+        ? `deadline passed · ${Math.abs(detail.daysAway ?? 0)} day${Math.abs(detail.daysAway ?? 0) === 1 ? "" : "s"} ago`
+        : detail.kind === "today"
+          ? "deadline today"
+          : detail.kind === "tomorrow"
+            ? "deadline tomorrow"
+            : `${detail.daysAway} days to deadline · ${detail.exact}`;
+    return { kind: detail.kind, label };
+  }
+  const sortedApplications = [...applications].sort((a, b) => {
+    const aClosed = closedStatuses.has(a.status) ? 1 : 0;
+    const bClosed = closedStatuses.has(b.status) ? 1 : 0;
+    if (aClosed !== bClosed) return aClosed - bClosed;
+    return (a.deadline || "9999").localeCompare(b.deadline || "9999");
   });
   useMongoJournalScope({
     scope: "internships",
     payload: { applications },
     hydrate: payload => {
       if (Array.isArray(payload.applications))
-        setApplications(payload.applications as Application[]);
+        setApplications(
+          (payload.applications as Application[]).map((item, index) => ({
+            ...item,
+            id: item.id ?? `application-${index}-${item.role}`,
+          }))
+        );
     },
   });
   function saveApplication(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!draft.role.trim() || !draft.organization.trim()) return;
-    setApplications(current => [
-      ...current,
-      {
-        ...draft,
-        role: draft.role.trim(),
-        organization: draft.organization.trim(),
-      },
-    ]);
+    const fields = {
+      ...draft,
+      role: draft.role.trim(),
+      organization: draft.organization.trim(),
+    };
+    if (editingId) {
+      setApplications(current =>
+        current.map(item =>
+          item.id === editingId ? { ...item, ...fields, updatedAt: today } : item
+        )
+      );
+      toast(`${fields.role} at ${fields.organization} · now ${fields.status.toLowerCase()}`);
+    } else {
+      setApplications(current => [
+        ...current,
+        { ...fields, id: `application-${Date.now()}`, createdAt: today },
+      ]);
+      toast(`${fields.role} at ${fields.organization} saved`);
+    }
+    setDraft(emptyApplication);
+    setEditingId(null);
+  }
+  function editApplication(item: Application) {
+    setEditingId(item.id ?? null);
     setDraft({
-      role: "",
-      organization: "",
-      deadline: "",
-      material: "",
-      followUp: "",
-      status: "Considering",
-      reflection: "",
+      role: item.role,
+      organization: item.organization,
+      deadline: item.deadline,
+      material: item.material,
+      followUp: item.followUp,
+      status: item.status,
+      reflection: item.reflection,
     });
   }
+  function setStatus(item: Application, status: string) {
+    setApplications(current =>
+      current.map(entry =>
+        entry.id === item.id ? { ...entry, status, updatedAt: today } : entry
+      )
+    );
+    toast(`${item.role} · ${status.toLowerCase()}`);
+  }
+  function removeApplication(item: Application) {
+    setLastApplications(applications);
+    setApplications(current => current.filter(entry => entry.id !== item.id));
+    if (editingId === item.id) {
+      setEditingId(null);
+      setDraft(emptyApplication);
+    }
+    toast(`Removed ${item.role} at ${item.organization}`);
+  }
+  const statusOrder = ["Considering", "Preparing", "Applied", "Interviewing", "Closed"];
   return (
     <section
       className="journal-spread internships-spread glass-scope"
@@ -6827,14 +6907,46 @@ function InternshipsPage({
               placeholder="What did you learn from this application?"
             />
           </label>
-          <Button type="submit" className="ink-button">
-            <Plus size={15} /> Save application
-          </Button>
+          <div className="career-form-actions">
+            <Button type="submit" className="ink-button">
+              <Plus size={15} />{" "}
+              {editingId ? "Save changes" : "Save application"}
+            </Button>
+            {editingId ? (
+              <button
+                type="button"
+                className="local-undo"
+                onClick={() => {
+                  setEditingId(null);
+                  setDraft(emptyApplication);
+                }}
+              >
+                Cancel edit
+              </button>
+            ) : null}
+          </div>
         </form>
         <div className="internships-list">
           <div>
             <span>application notes</span>
-            <b>{applications.length} roles</b>
+            <b>
+              {applications.length} roles
+              {applications.some(item => closedStatuses.has(item.status))
+                ? ` · ${applications.filter(item => !closedStatuses.has(item.status)).length} open`
+                : ""}
+              {lastApplications && (
+                <button
+                  type="button"
+                  className="local-undo"
+                  onClick={() => {
+                    setApplications(lastApplications);
+                    setLastApplications(null);
+                  }}
+                >
+                  Undo remove
+                </button>
+              )}
+            </b>
           </div>
           {applications.length === 0 ? (
             <small>
@@ -6842,16 +6954,34 @@ function InternshipsPage({
               pace.
             </small>
           ) : (
-            applications.map((application, index) => (
+            sortedApplications.map(application => {
+              const chip = deadlineChip(application);
+              const nextStatus =
+                statusOrder[statusOrder.indexOf(application.status) + 1];
+              return (
               <article
-                key={`${application.role}-${application.organization}-${index}`}
+                key={application.id}
+                className={cn(
+                  editingId === application.id && "is-editing",
+                  closedStatuses.has(application.status) && "is-closed",
+                  chip && `is-${chip.kind}`
+                )}
               >
-                <i>{application.organization.slice(0, 1)}</i>
+                <i aria-hidden="true">{application.organization.slice(0, 1)}</i>
                 <p>
                   <b>{application.role}</b>
                   <small>
-                    {application.organization} · {application.status} ·{" "}
-                    {application.deadline || "No deadline added"}
+                    {application.organization} · {application.status}
+                    {chip ? (
+                      <>
+                        {" · "}
+                        <span className={cn("internship-deadline", `is-${chip.kind}`)}>
+                          {chip.label}
+                        </span>
+                      </>
+                    ) : (
+                      " · no deadline added"
+                    )}
                   </small>
                   <em>
                     Materials:{" "}
@@ -6863,9 +6993,37 @@ function InternshipsPage({
                   <em>
                     Reflection: {application.reflection || "Add a reflection"}
                   </em>
+                  <small className="career-stamp">
+                    {formatDay(application.updatedAt)
+                      ? `Updated ${formatDay(application.updatedAt)}`
+                      : formatDay(application.createdAt)
+                        ? `Saved ${formatDay(application.createdAt)}`
+                        : "Saved before dates were kept"}
+                  </small>
+                  <span className="career-actions">
+                    {nextStatus ? (
+                      <button
+                        type="button"
+                        onClick={() => setStatus(application, nextStatus)}
+                      >
+                        → {nextStatus}
+                      </button>
+                    ) : null}
+                    <button type="button" onClick={() => editApplication(application)}>
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeApplication(application)}
+                      aria-label={`Remove ${application.role} at ${application.organization}`}
+                    >
+                      Remove
+                    </button>
+                  </span>
                 </p>
               </article>
-            ))
+              );
+            })
           )}
         </div>
       </div>
