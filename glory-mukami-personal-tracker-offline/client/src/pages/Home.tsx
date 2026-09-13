@@ -21213,13 +21213,26 @@ function ReflectionPage({
   onCover: () => void;
   onRecordReflection: (label: string) => void;
 }) {
-  const [period, setPeriod] = useState<"weekly" | "monthly">("weekly");
+  type ReflectionPeriod = "weekly" | "monthly";
+  type ReflectionDrafts = Record<
+    ReflectionPeriod,
+    { fields: Record<string, string>; savedAt: string | null }
+  >;
+  const emptyDrafts: ReflectionDrafts = {
+    weekly: { fields: {}, savedAt: null },
+    monthly: { fields: {}, savedAt: null },
+  };
+  const [period, setPeriod] = useState<ReflectionPeriod>("weekly");
   const [isWriting, setIsWriting] = useState(false);
-  const [draft, setDraft] = useState<Record<string, string>>({});
+  // One draft per rhythm, kept in the persisted scope. Switching tabs or
+  // leaving the page must never be how a half-written reflection is lost.
+  const [drafts, setDrafts] = useState<ReflectionDrafts>(emptyDrafts);
+  const draft = drafts[period].fields;
+  const draftSavedAt = drafts[period].savedAt;
   const [entries, setEntries] = useState<ReflectionEntry[]>([]);
   const [customPrompts, setCustomPrompts] = useState<
     Record<
-      "weekly" | "monthly",
+      ReflectionPeriod,
       Array<{ key: string; title: string; prompt: string }>
     >
   >({ weekly: [], monthly: [] });
@@ -21228,16 +21241,36 @@ function ReflectionPage({
   const [selectedArchive, setSelectedArchive] =
     useState<ReflectionEntry | null>(null);
   const [lastSaved, setLastSaved] = useState<ReflectionEntry | null>(null);
+  const auth = useAuth();
   useMongoJournalScope({
     scope: "reflections",
-    payload: { entries, customPrompts },
+    payload: { entries, customPrompts, drafts },
     hydrate: payload => {
       if (Array.isArray(payload.entries))
         setEntries(payload.entries as ReflectionEntry[]);
       if (payload.customPrompts && typeof payload.customPrompts === "object")
         setCustomPrompts(payload.customPrompts as typeof customPrompts);
+      if (payload.drafts && typeof payload.drafts === "object") {
+        const stored = payload.drafts as Partial<ReflectionDrafts>;
+        setDrafts({
+          weekly: stored.weekly ?? emptyDrafts.weekly,
+          monthly: stored.monthly ?? emptyDrafts.monthly,
+        });
+      }
     },
   });
+  function setDraftField(key: string, value: string) {
+    setDrafts(current => ({
+      ...current,
+      [period]: {
+        fields: { ...current[period].fields, [key]: value },
+        savedAt: new Date().toISOString(),
+      },
+    }));
+  }
+  function clearDraft(target: ReflectionPeriod) {
+    setDrafts(current => ({ ...current, [target]: emptyDrafts[target] }));
+  }
   const baseFields =
     period === "weekly"
       ? [
@@ -21290,27 +21323,67 @@ function ReflectionPage({
           },
         ];
   const fieldSet = [...baseFields, ...customPrompts[period]];
-  const hasDraft = Object.values(draft).some(Boolean);
+  const hasDraft = Object.values(draft).some(value => value.trim());
+  const otherPeriod: ReflectionPeriod =
+    period === "weekly" ? "monthly" : "weekly";
+  const otherHasDraft = Object.values(drafts[otherPeriod].fields).some(value =>
+    value.trim()
+  );
+  const draftWordCount = Object.values(draft)
+    .join(" ")
+    .split(/\s+/)
+    .filter(Boolean).length;
   const carryForward = reflectionCarryForward(entries);
   const archiveEntries = entries.filter(entry =>
     `${entry.period} ${entry.date} ${Object.values(entry.fields).join(" ")}`
       .toLowerCase()
       .includes(archiveQuery.toLowerCase())
   );
+  // Titles for every prompt key that has ever existed, so the archive can
+  // show "Your prompt: …" rather than "custom-1726…: …".
+  const promptTitles = new Map<string, string>();
+  for (const field of [...baseFields, ...customPrompts.weekly, ...customPrompts.monthly]) {
+    promptTitles.set(field.key, field.title);
+  }
+  for (const [key, title] of [
+    ["progress", "Progress summary"],
+    ["lessons", "Lessons"],
+    ["gratitude", "Gratitude"],
+    ["highlights", "Highlights"],
+    ["challenges", "Challenges"],
+    ["notes", "Notes"],
+    ["intentions", "Intentions"],
+  ]) {
+    if (!promptTitles.has(key)) promptTitles.set(key, title);
+  }
   function saveReflection() {
     if (!hasDraft) return;
     const saved = {
       period,
-      date: new Date().toISOString().slice(0, 10),
-      fields: draft,
+      date: sleepDateInputValue(new Date()),
+      fields: Object.fromEntries(
+        Object.entries(draft).filter(([, value]) => value.trim())
+      ),
     };
     setEntries(current => saveReflectionEntry(current, saved));
     setLastSaved(saved);
     onRecordReflection(
       `${period === "weekly" ? "Weekly" : "Monthly"} reflection saved`
     );
-    setDraft({});
+    clearDraft(period);
     setIsWriting(false);
+  }
+  function switchPeriod(next: ReflectionPeriod) {
+    setPeriod(next);
+    setIsWriting(false);
+    setLastSaved(null);
+  }
+  function formatSavedAt(iso: string) {
+    const at = new Date(iso);
+    const sameDay = at.toDateString() === new Date().toDateString();
+    return sameDay
+      ? at.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
+      : at.toLocaleDateString([], { month: "short", day: "numeric" });
   }
   function addPrompt() {
     const prompt = promptDraft.trim();
@@ -21362,38 +21435,40 @@ function ReflectionPage({
         </div>
       </div>
       <div className="spread-page reflection-prompts">
-        <div className="reflection-tabs">
+        <div className="reflection-tabs" role="tablist">
           <button
             className={cn(period === "weekly" && "active")}
             type="button"
-            onClick={() => {
-              setPeriod("weekly");
-              setIsWriting(false);
-              setDraft({});
-              setLastSaved(null);
-            }}
+            role="tab"
+            aria-selected={period === "weekly"}
+            onClick={() => switchPeriod("weekly")}
           >
             Weekly
+            {period !== "weekly" && otherHasDraft ? (
+              <small className="reflection-tab-draft">draft</small>
+            ) : null}
           </button>
           <button
             className={cn(period === "monthly" && "active")}
             type="button"
-            onClick={() => {
-              setPeriod("monthly");
-              setIsWriting(false);
-              setDraft({});
-              setLastSaved(null);
-            }}
+            role="tab"
+            aria-selected={period === "monthly"}
+            onClick={() => switchPeriod("monthly")}
           >
             Monthly
+            {period !== "monthly" && otherHasDraft ? (
+              <small className="reflection-tab-draft">draft</small>
+            ) : null}
           </button>
         </div>
         <div className="reflection-rhythm">
-          <span>
-            {isWriting
-              ? "A draft is open"
-              : hasDraft
-                ? "Your draft is saved locally"
+          <span aria-live="polite">
+            {hasDraft && draftSavedAt
+              ? `Draft kept on this device · ${draftWordCount} ${draftWordCount === 1 ? "word" : "words"} · last change ${formatSavedAt(draftSavedAt)}${
+                  auth.isAuthenticated ? " · syncs to your account" : ""
+                }`
+              : isWriting
+                ? "Every keystroke is kept as you go — leave whenever you like."
                 : "A quiet moment, when you are ready"}
           </span>
           <b>{period === "weekly" ? "Weekly review" : "Monthly review"}</b>
@@ -21414,15 +21489,12 @@ function ReflectionPage({
               <button
                 type="button"
                 onClick={() =>
-                  setDraft(current => ({
-                    ...current,
-                    progress: [
-                      current.progress,
-                      ...carryForward.map(item => item.text),
-                    ]
+                  setDraftField(
+                    "progress",
+                    [draft.progress, ...carryForward.map(item => item.text)]
                       .filter(Boolean)
-                      .join("\n"),
-                  }))
+                      .join("\n")
+                  )
                 }
               >
                 Bring into summary
@@ -21440,14 +21512,22 @@ function ReflectionPage({
                 <textarea
                   value={draft[field.key] || ""}
                   onChange={event =>
-                    setDraft(current => ({
-                      ...current,
-                      [field.key]: event.target.value,
-                    }))
+                    setDraftField(field.key, event.target.value)
                   }
                   placeholder="Write freely…"
+                  aria-label={field.title}
+                  rows={Math.min(
+                    18,
+                    Math.max(3, (draft[field.key] || "").split("\n").length + 1)
+                  )}
                 />
               )}
+              {!isWriting && draft[field.key]?.trim() ? (
+                <small className="reflection-draft-preview">
+                  Draft: {draft[field.key].trim().slice(0, 90)}
+                  {draft[field.key].trim().length > 90 ? "…" : ""}
+                </small>
+              ) : null}
             </div>
           </div>
         ))}
@@ -21467,12 +21547,26 @@ function ReflectionPage({
         {isWriting ? (
           <div className="reflection-actions">
             <button type="button" onClick={() => setIsWriting(false)}>
-              Save for later
+              Close — draft stays
             </button>
+            {hasDraft && (
+              <button
+                type="button"
+                className="reflection-discard"
+                onClick={() => {
+                  clearDraft(period);
+                  setIsWriting(false);
+                  toast("Draft discarded");
+                }}
+              >
+                Discard draft
+              </button>
+            )}
             <Button
               className="ink-button"
               type="button"
               onClick={saveReflection}
+              disabled={!hasDraft}
             >
               Save {period} reflection
             </Button>
@@ -21546,7 +21640,7 @@ function ReflectionPage({
                 .filter(([, value]) => value)
                 .map(([key, value]) => (
                   <small key={key}>
-                    <strong>{key.replace(/([A-Z])/g, " $1")}: </strong>
+                    <strong>{promptTitles.get(key) ?? "Your prompt"}: </strong>
                     {value}
                   </small>
                 ))}

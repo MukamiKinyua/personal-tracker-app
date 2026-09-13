@@ -946,7 +946,7 @@ button:focus-visible {
        padding itself is fluid across viewport width.
    Material matches the rest of the glass system: translucent white fill,
    backdrop blur, white text. */
-.contents-search {
+#root .contents-search {
   /* A separate, generic "first item as a frosted card" rule
      (.spread-page:last-child > label, among other targets - meant for a
      plain hint/status label as the first thing in a list column) also
@@ -983,41 +983,50 @@ button:focus-visible {
     0 0 24px rgba(0, 0, 0, 0.12);
   transition: border-color 160ms ease, background 160ms ease;
 }
-.contents-search svg {
+/* Every descendant selector below is also #root-prefixed and !important on
+   its colour/background, for the same reason as the pill itself: the same
+   generic first-item pass reaches inside it too (it targets the label as a
+   whole, but a plain `label input`/`label svg` rule elsewhere in the file
+   would just as easily catch these if one exists, and did for the pill
+   itself even without any descendant combinator). Not worth re-discovering
+   one at a time. */
+#root .contents-search svg {
   flex-shrink: 0;
+  color: rgba(255, 255, 255, 0.7) !important;
 }
-.contents-search:focus-within {
-  border-color: rgba(255, 255, 255, 0.7);
-  background: rgba(255, 255, 255, 0.3);
+#root .contents-search:focus-within {
+  border-color: rgba(255, 255, 255, 0.7) !important;
+  background: rgba(255, 255, 255, 0.3) !important;
 }
-.contents-search input {
+#root .contents-search input {
   flex: 1;
   border: 0;
-  background: transparent;
+  background: transparent !important;
   outline: none;
   font-size: 0.85rem;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.94);
+  color: rgba(255, 255, 255, 0.94) !important;
+  text-shadow: none !important;
   min-width: 0;
 }
-.contents-search input::placeholder {
-  color: rgba(255, 255, 255, 0.62);
+#root .contents-search input::placeholder {
+  color: rgba(255, 255, 255, 0.62) !important;
 }
-.contents-search-clear {
+#root .contents-search-clear {
   display: flex;
   align-items: center;
   justify-content: center;
   border: 0;
-  background: rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.22) !important;
   border-radius: 999px;
   width: 1.5rem;
   height: 1.5rem;
-  color: rgba(255, 255, 255, 0.94);
+  color: rgba(255, 255, 255, 0.94) !important;
   cursor: pointer;
   flex-shrink: 0;
 }
-.contents-search-clear:hover {
-  background: rgba(255, 255, 255, 0.34);
+#root .contents-search-clear:hover {
+  background: rgba(255, 255, 255, 0.34) !important;
 }
 /* The pill now floats out of flow, so the list needs its own clearance
    instead of relying on the search bar's old in-flow height + margin. */
@@ -4135,6 +4144,7 @@ button:focus-visible {
 .prompt textarea {
   width: 100%;
   min-height: 72px;
+  max-height: 60vh;
   margin-top: 0.45rem;
   border: 1px solid rgba(95, 72, 126, 0.17);
   border-radius: 10px;
@@ -4152,11 +4162,45 @@ button:focus-visible {
   gap: 0.5rem;
   margin-top: 1rem;
 }
-.reflection-actions > button:first-child {
+.reflection-actions > button:first-child,
+.reflection-actions > .reflection-discard {
   border: 0;
   color: #857688;
   background: transparent;
   font-size: 0.66rem;
+}
+.reflection-actions > .reflection-discard {
+  margin-right: auto;
+  color: #a05a66;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.reflection-actions > .ink-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.reflection-tab-draft {
+  margin-left: 0.35rem;
+  padding: 0.05rem 0.35rem;
+  border-radius: 999px;
+  background: rgba(240, 189, 93, 0.85);
+  color: #3a2338;
+  font-size: 0.5rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+.reflection-draft-preview {
+  display: block;
+  margin-top: 0.4rem;
+  padding: 0.4rem 0.55rem;
+  border-left: 2px solid rgba(95, 72, 126, 0.35);
+  color: #6a5a75;
+  font-size: 0.62rem;
+  font-style: italic;
+  line-height: 1.45;
+  white-space: pre-wrap;
 }
 .reflection-history {
   display: grid;
