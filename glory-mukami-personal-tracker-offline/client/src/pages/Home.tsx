@@ -6650,6 +6650,7 @@ function FamilyPage({
                   onClick={() => {
                     setPlans(lastFamilyPlans);
                     setLastFamilyPlans(null);
+                    toast("Family plan restored");
                   }}
                 >
                   Undo remove
