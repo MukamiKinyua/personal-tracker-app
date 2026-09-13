@@ -15270,7 +15270,6 @@ function GoalsWorkspacePage({
   );
   const [editingId, setEditingId] = useState<string | null>(null);
   const [currentGoalId, setCurrentGoalId] = useState<string | null>(null);
-  const [reviewText, setReviewText] = useState("");
   const [lastGoals, setLastGoals] = useState<GoalRecord[] | null>(null);
   const goalsToday = sleepDateInputValue(new Date());
   function deadlineDetail(goal: GoalRecord) {
@@ -15563,14 +15562,13 @@ function GoalsWorkspacePage({
         {goal.state !== "active" ? (
           <div className="goal-review-note">
             <input
-              value={currentGoal?.id === goal.id ? reviewText : goal.reviewNote}
-              onChange={event => {
-                setReviewText(event.target.value);
+              value={goal.reviewNote}
+              onChange={event =>
                 updateGoal(goal.id, item => ({
                   ...item,
                   reviewNote: event.target.value,
-                }));
-              }}
+                }))
+              }
               placeholder="Brief review note: what changed?"
             />
           </div>
@@ -15608,6 +15606,7 @@ function GoalsWorkspacePage({
                 onClick={() => {
                   setGoals(lastGoals);
                   setLastGoals(null);
+                  toast("Goal restored");
                 }}
               >
                 Undo remove
