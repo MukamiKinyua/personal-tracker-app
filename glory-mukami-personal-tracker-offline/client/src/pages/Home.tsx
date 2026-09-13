@@ -7011,45 +7011,109 @@ function CertificationsPage({
   onCover: () => void;
 }) {
   type Certification = {
+    id?: string;
     name: string;
     status: string;
     date: string;
     evidence: string;
     renewal: string;
     reflection: string;
+    createdAt?: string;
+    updatedAt?: string;
   };
-  const [certifications, setCertifications] = useState<Certification[]>([]);
-  const [draft, setDraft] = useState<Certification>({
+  type CertificationDraft = Pick<
+    Certification,
+    "name" | "status" | "date" | "evidence" | "renewal" | "reflection"
+  >;
+  const emptyCertDraft: CertificationDraft = {
     name: "",
     status: "Exploring",
     date: "",
     evidence: "",
     renewal: "",
     reflection: "",
-  });
+  };
+  const [certifications, setCertifications] = useState<Certification[]>([]);
+  const [lastCerts, setLastCerts] = useState<Certification[] | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draft, setDraft] = useState<CertificationDraft>(emptyCertDraft);
+  const today = sleepDateInputValue(new Date());
+  const formatDay = (value?: string) =>
+    value && /^\d{4}-\d{2}-\d{2}$/.test(value)
+      ? new Date(`${value}T12:00:00`).toLocaleDateString(undefined, {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        })
+      : null;
+  function dateChip(certification: Certification) {
+    if (!certification.date) return null;
+    const detail = assignmentDueDetail(certification.date, today);
+    const earned = certification.status === "Earned";
+    const label = earned
+      ? `earned ${detail.exact}`
+      : detail.kind === "overdue"
+        ? `date passed · ${Math.abs(detail.daysAway ?? 0)} day${Math.abs(detail.daysAway ?? 0) === 1 ? "" : "s"} ago`
+        : detail.kind === "today"
+          ? "today"
+          : detail.kind === "tomorrow"
+            ? "tomorrow"
+            : `${detail.daysAway} days away · ${detail.exact}`;
+    return { kind: earned ? "earned" : detail.kind, label };
+  }
   useMongoJournalScope({
     scope: "certifications",
     payload: { certifications },
     hydrate: payload => {
       if (Array.isArray(payload.certifications))
-        setCertifications(payload.certifications as Certification[]);
+        setCertifications(
+          (payload.certifications as Certification[]).map((item, index) => ({
+            ...item,
+            id: item.id ?? `cert-${index}-${item.name}`,
+          }))
+        );
     },
   });
   function saveCertification(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!draft.name.trim()) return;
-    setCertifications(current => [
-      ...current,
-      { ...draft, name: draft.name.trim() },
-    ]);
+    const fields = { ...draft, name: draft.name.trim() };
+    if (editingId) {
+      setCertifications(current =>
+        current.map(item =>
+          item.id === editingId ? { ...item, ...fields, updatedAt: today } : item
+        )
+      );
+      toast("Certification updated");
+    } else {
+      setCertifications(current => [
+        ...current,
+        { ...fields, id: `cert-${Date.now()}`, createdAt: today },
+      ]);
+      toast(`“${fields.name}” saved · ${fields.status.toLowerCase()}`);
+    }
+    setDraft(emptyCertDraft);
+    setEditingId(null);
+  }
+  function editCertification(item: Certification) {
+    setEditingId(item.id ?? null);
     setDraft({
-      name: "",
-      status: "Exploring",
-      date: "",
-      evidence: "",
-      renewal: "",
-      reflection: "",
+      name: item.name,
+      status: item.status,
+      date: item.date,
+      evidence: item.evidence,
+      renewal: item.renewal,
+      reflection: item.reflection,
     });
+  }
+  function removeCertification(item: Certification) {
+    setLastCerts(certifications);
+    setCertifications(current => current.filter(entry => entry.id !== item.id));
+    if (editingId === item.id) {
+      setEditingId(null);
+      setDraft(emptyCertDraft);
+    }
+    toast(`Removed “${item.name}”`);
   }
   return (
     <section
@@ -7152,14 +7216,43 @@ function CertificationsPage({
               placeholder="What did this teach you?"
             />
           </label>
-          <Button type="submit" className="ink-button">
-            <Plus size={15} /> Save certification
-          </Button>
+          <div className="career-form-actions">
+            <Button type="submit" className="ink-button">
+              <Plus size={15} />{" "}
+              {editingId ? "Save changes" : "Save certification"}
+            </Button>
+            {editingId ? (
+              <button
+                type="button"
+                className="local-undo"
+                onClick={() => {
+                  setEditingId(null);
+                  setDraft(emptyCertDraft);
+                }}
+              >
+                Cancel edit
+              </button>
+            ) : null}
+          </div>
         </form>
         <div className="certifications-list">
           <div>
             <span>credential notebook</span>
-            <b>{certifications.length} items</b>
+            <b>
+              {certifications.length} items
+              {lastCerts && (
+                <button
+                  type="button"
+                  className="local-undo"
+                  onClick={() => {
+                    setCertifications(lastCerts);
+                    setLastCerts(null);
+                  }}
+                >
+                  Undo remove
+                </button>
+              )}
+            </b>
           </div>
           {certifications.length === 0 ? (
             <small>
@@ -7167,13 +7260,28 @@ function CertificationsPage({
               proud to have earned.
             </small>
           ) : (
-            certifications.map((certification, index) => (
-              <article key={`${certification.name}-${index}`}>
-                <i>{certification.name.slice(0, 1)}</i>
+            certifications.map(certification => (
+              <article
+                key={certification.id}
+                className={cn(editingId === certification.id && "is-editing")}
+              >
+                <i aria-hidden="true">{certification.name.slice(0, 1)}</i>
                 <p>
                   <b>{certification.name}</b>
                   <small>
-                    {certification.status} · {certification.date || "Date open"}
+                    {certification.status} ·{" "}
+                    {dateChip(certification) ? (
+                      <span
+                        className={cn(
+                          "certification-date",
+                          `is-${dateChip(certification)!.kind}`
+                        )}
+                      >
+                        {dateChip(certification)!.label}
+                      </span>
+                    ) : (
+                      "date open"
+                    )}
                   </small>
                   <em>
                     Evidence: {certification.evidence || "Add an evidence note"}
@@ -7185,6 +7293,28 @@ function CertificationsPage({
                   <em>
                     Growth: {certification.reflection || "Add a growth note"}
                   </em>
+                  <small className="career-stamp">
+                    {formatDay(certification.updatedAt)
+                      ? `Updated ${formatDay(certification.updatedAt)}`
+                      : formatDay(certification.createdAt)
+                        ? `Saved ${formatDay(certification.createdAt)}`
+                        : "Saved before dates were kept"}
+                  </small>
+                  <span className="career-actions">
+                    <button
+                      type="button"
+                      onClick={() => editCertification(certification)}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeCertification(certification)}
+                      aria-label={`Remove ${certification.name}`}
+                    >
+                      Remove
+                    </button>
+                  </span>
                 </p>
               </article>
             ))

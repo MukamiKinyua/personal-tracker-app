@@ -31070,3 +31070,35 @@ body {
   letter-spacing: 0;
   cursor: pointer;
 }
+
+.certifications-list article.is-editing {
+  outline: 2px dashed currentColor;
+  outline-offset: 3px;
+  border-radius: 6px;
+  opacity: 0.85;
+}
+.certifications-list > div b .local-undo {
+  margin-left: 0.5rem;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  background: none;
+  font: inherit;
+  text-decoration: underline;
+  text-transform: none;
+  letter-spacing: 0;
+  cursor: pointer;
+}
+.certification-date {
+  font-weight: 700;
+}
+.certification-date.is-overdue {
+  color: #7d2946;
+}
+.certification-date.is-today,
+.certification-date.is-tomorrow {
+  color: #a8481f;
+}
+.certification-date.is-earned {
+  color: #3c7a5e;
+}
