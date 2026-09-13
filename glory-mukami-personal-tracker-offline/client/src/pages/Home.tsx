@@ -19716,13 +19716,15 @@ function CyclePage({
     symptoms: "",
   });
   const [contextDate, setContextDate] = useState(() =>
-    new Date().toISOString().slice(0, 10)
+    sleepDateInputValue(new Date())
   );
   const [contextSymptoms, setContextSymptoms] = useState<string[]>([]);
   const [contextTags, setContextTags] = useState<string[]>([]);
   const [customTag, setCustomTag] = useState("");
   const [contextNote, setContextNote] = useState("");
   const [contextEntries, setContextEntries] = useState<CycleContextEntry[]>([]);
+  const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
+  const auth = useAuth();
   useMongoJournalScope({
     scope: "cycle",
     payload: { entries, contextEntries },
@@ -19733,6 +19735,36 @@ function CyclePage({
         setContextEntries(payload.contextEntries as CycleContextEntry[]);
     },
   });
+  function removeEntry(id: string) {
+    setEntries(current => current.filter(entry => entry.id !== id));
+    toast("Cycle entry deleted");
+  }
+  function removeContext(id: string) {
+    setContextEntries(current => current.filter(entry => entry.id !== id));
+    toast("Daily context deleted");
+  }
+  function deleteAll() {
+    setEntries([]);
+    setContextEntries([]);
+    setConfirmDeleteAll(false);
+    toast("All cycle data deleted from this journal");
+  }
+  function downloadCycleData() {
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      cycles: entries,
+      dailyContext: contextEntries,
+    };
+    const url = URL.createObjectURL(
+      new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" })
+    );
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "cycle-tracker-export.json";
+    anchor.click();
+    URL.revokeObjectURL(url);
+    toast("Cycle data downloaded");
+  }
   const symptomOptions = [
     "Cramps",
     "Tenderness",
@@ -19781,15 +19813,49 @@ function CyclePage({
         </h2>
         <p className="page-intro">
           A private, gentle view of your cycle—shown as an estimate based on
-          your recent entries.
+          your recent entries. Regular, irregular, long, short, or paused: this
+          page keeps whatever pattern you have, and only ever averages what you
+          log.
         </p>
         <button
           type="button"
           className="ink-button cycle-log-button"
           onClick={() => setLogOpen(current => !current)}
+          aria-expanded={logOpen}
         >
           <Plus size={15} /> Log cycle entry
         </button>
+        <section className="cycle-privacy" aria-labelledby="cycle-privacy-title">
+          <span id="cycle-privacy-title">How this data is handled</span>
+          <ul>
+            <li>
+              <b>Where it lives:</b>{" "}
+              {auth.isAuthenticated
+                ? "on this device, and in your own account's database so it survives reinstalling. "
+                : "on this device only, until you sign in. "}
+              It is never shared with anyone else and nothing here is sent to a
+              third party.
+            </li>
+            <li>
+              <b>How long:</b> until you delete it. Nothing expires on its own.
+            </li>
+            <li>
+              <b>Delete:</b> any single entry below, or everything at once.
+            </li>
+            <li>
+              <b>Export:</b>{" "}
+              <button
+                type="button"
+                className="cycle-inline-link"
+                onClick={downloadCycleData}
+                disabled={entries.length === 0 && contextEntries.length === 0}
+              >
+                download everything on this page as a file
+              </button>{" "}
+              you keep.
+            </li>
+          </ul>
+        </section>
       </div>
       <div className="spread-page cycle-ring-page">
         <div className="cycle-ring">
@@ -19811,8 +19877,13 @@ function CyclePage({
           </span>
         </div>
         <p className="estimate-note">
-          {estimate?.wording ||
-            "Add a period entry to begin your private estimate."}
+          {estimate
+            ? `${estimate.wording} It assumes about ${estimate.averageCycle} days between starts${
+                estimate.cyclesUsed > 0
+                  ? `, averaged from ${estimate.cyclesUsed} recorded ${estimate.cyclesUsed === 1 ? "interval" : "intervals"}`
+                  : " until a second start is logged"
+              }. Bodies don’t run on schedules — treat it as a guess, not a rule.`
+            : "Add a period entry to begin your private estimate."}
         </p>
         <section className="cycle-daily-context">
           <div className="cycle-context-heading">
@@ -19899,12 +19970,22 @@ function CyclePage({
               <span>Recent context</span>
               {contextEntries.slice(0, 3).map(entry => (
                 <article key={entry.id}>
-                  <b>{entry.date}</b>
-                  <small>
-                    {[...entry.symptoms, ...entry.tags].join(" · ") ||
-                      "Private note"}
-                    {entry.note ? ` · ${entry.note}` : ""}
-                  </small>
+                  <div>
+                    <b>{entry.date}</b>
+                    <small>
+                      {[...entry.symptoms, ...entry.tags].join(" · ") ||
+                        "Private note"}
+                      {entry.note ? ` · ${entry.note}` : ""}
+                    </small>
+                  </div>
+                  <button
+                    type="button"
+                    className="cycle-remove"
+                    onClick={() => removeContext(entry.id)}
+                    aria-label={`Delete daily context from ${entry.date}`}
+                  >
+                    Delete
+                  </button>
                 </article>
               ))}
             </div>
@@ -19975,7 +20056,11 @@ function CyclePage({
             </div>
           </form>
         )}
-        <CycleCalendar entries={entries} />
+        <CycleCalendar
+          entries={entries}
+          predictedStart={estimate?.estimatedNextPeriod}
+          predictedLength={estimate?.averagePeriodLength}
+        />
         <div className="cycle-history">
           <div>
             <span>recent cycle history</span>
@@ -19998,8 +20083,44 @@ function CyclePage({
                   {entry.flow} flow · {entry.symptoms || "No symptoms recorded"}
                 </small>
               </p>
+              <button
+                type="button"
+                className="cycle-remove"
+                onClick={() => removeEntry(entry.id)}
+                aria-label={`Delete cycle entry starting ${entry.start}`}
+              >
+                Delete
+              </button>
             </article>
           ))}
+          {(entries.length > 0 || contextEntries.length > 0) && (
+            <div className="cycle-delete-all">
+              {confirmDeleteAll ? (
+                <>
+                  <span>
+                    Delete every cycle entry and daily context on this page?
+                    This can’t be undone.
+                  </span>
+                  <button type="button" onClick={deleteAll}>
+                    Yes, delete all
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDeleteAll(false)}
+                  >
+                    Keep it
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setConfirmDeleteAll(true)}
+                >
+                  Delete all cycle data
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </section>
@@ -20008,29 +20129,52 @@ function CyclePage({
 
 function CycleCalendar({
   entries,
+  predictedStart,
+  predictedLength = 5,
 }: {
   entries: Array<{ start: string; end: string }>;
+  predictedStart?: string;
+  predictedLength?: number;
 }) {
-  const [month, setMonth] = useState(7);
-  const [year, setYear] = useState(2026);
+  const today = new Date();
+  const [month, setMonth] = useState(today.getMonth());
+  const [year, setYear] = useState(today.getFullYear());
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const startsOn = new Date(year, month, 1).getDay();
+  const isThisMonth =
+    today.getFullYear() === year && today.getMonth() === month;
+
+  function collectDays(start: string, end: string) {
+    const days = new Set<number>();
+    const from = new Date(`${start}T12:00:00`);
+    const to = new Date(`${end}T12:00:00`);
+    for (let day = new Date(from); day <= to; day.setDate(day.getDate() + 1)) {
+      if (day.getFullYear() === year && day.getMonth() === month)
+        days.add(day.getDate());
+    }
+    return days;
+  }
   const loggedDays = new Set<number>();
   entries.forEach(entry => {
-    const start = new Date(`${entry.start}T12:00:00`);
-    const end = new Date(`${entry.end || entry.start}T12:00:00`);
-    for (
-      let day = new Date(start);
-      day <= end;
-      day.setDate(day.getDate() + 1)
-    ) {
-      if (day.getFullYear() === year && day.getMonth() === month)
-        loggedDays.add(day.getDate());
-    }
+    collectDays(entry.start, entry.end || entry.start).forEach(day =>
+      loggedDays.add(day)
+    );
   });
+  let predictedDays = new Set<number>();
+  if (predictedStart) {
+    const end = new Date(`${predictedStart}T12:00:00`);
+    end.setDate(end.getDate() + Math.max(1, predictedLength) - 1);
+    predictedDays = collectDays(predictedStart, sleepDateInputValue(end));
+    // A logged day is fact; a prediction never overrides it.
+    loggedDays.forEach(day => predictedDays.delete(day));
+  }
+
   const monthLabel = new Date(year, month, 1).toLocaleString("en", {
     month: "long",
     year: "numeric",
+  });
+  const monthName = new Date(year, month, 1).toLocaleString("en", {
+    month: "long",
   });
   function moveMonth(delta: number) {
     const next = new Date(year, month + delta, 1);
@@ -20038,7 +20182,11 @@ function CycleCalendar({
     setYear(next.getFullYear());
   }
   return (
-    <div className="cycle-calendar" aria-label="Private period calendar">
+    <div
+      className="cycle-calendar"
+      role="group"
+      aria-label="Private period calendar"
+    >
       <div className="cycle-calendar-heading">
         <button
           type="button"
@@ -20047,7 +20195,7 @@ function CycleCalendar({
         >
           ←
         </button>
-        <b>{monthLabel}</b>
+        <b aria-live="polite">{monthLabel}</b>
         <button
           type="button"
           onClick={() => moveMonth(1)}
@@ -20056,26 +20204,75 @@ function CycleCalendar({
           →
         </button>
       </div>
-      <div className="calendar-weekdays">
+      {!isThisMonth && (
+        <button
+          type="button"
+          className="cycle-calendar-today"
+          onClick={() => {
+            setMonth(today.getMonth());
+            setYear(today.getFullYear());
+          }}
+        >
+          Back to this month
+        </button>
+      )}
+      <div className="calendar-weekdays" aria-hidden="true">
         {["S", "M", "T", "W", "T", "F", "S"].map((day, index) => (
           <span key={`${day}-${index}`}>{day}</span>
         ))}
       </div>
       <div className="calendar-days">
         {Array.from({ length: startsOn }, (_, index) => (
-          <i key={`blank-${index}`} />
+          <i key={`blank-${index}`} aria-hidden="true" />
         ))}
         {Array.from({ length: daysInMonth }, (_, index) => index + 1).map(
-          day => (
-            <span className={cn(loggedDays.has(day) && "is-period")} key={day}>
-              {day}
-            </span>
-          )
+          day => {
+            const isToday = isThisMonth && today.getDate() === day;
+            const state = loggedDays.has(day)
+              ? "logged"
+              : predictedDays.has(day)
+                ? "predicted"
+                : "none";
+            const label = [
+              `${monthName} ${day}`,
+              isToday ? "today" : null,
+              state === "logged"
+                ? "logged period day"
+                : state === "predicted"
+                  ? "predicted period day"
+                  : null,
+            ]
+              .filter(Boolean)
+              .join(", ");
+            return (
+              <span
+                key={day}
+                className={cn(
+                  state === "logged" && "is-period",
+                  state === "predicted" && "is-predicted",
+                  isToday && "is-today"
+                )}
+                aria-label={label}
+                title={label}
+                aria-current={isToday ? "date" : undefined}
+              >
+                {day}
+              </span>
+            );
+          }
         )}
       </div>
-      <small>
-        <i /> Logged period day · private
-      </small>
+      <div className="cycle-calendar-key">
+        <small>
+          <i className="key-logged" /> Logged
+        </small>
+        <small>
+          <i className="key-predicted" /> Predicted
+        </small>
+        <small>
+          <i className="key-today" /> Today
+        </small>
+      </div>
     </div>
   );
 }

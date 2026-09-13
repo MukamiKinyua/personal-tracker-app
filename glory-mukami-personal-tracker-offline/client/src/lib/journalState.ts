@@ -208,6 +208,12 @@ function dayDifference(later: Date, earlier: Date) {
   );
 }
 
+function localDayKey(date: Date) {
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
 export function estimateCycle(
   logs: CycleLog[],
   today = new Date()
@@ -215,6 +221,12 @@ export function estimateCycle(
   cycleDay: number;
   phase: string;
   estimatedNextPeriod: string;
+  /** Average days from one start to the next; 28 until two starts exist. */
+  averageCycle: number;
+  /** Average logged period length in days; 5 until an entry has an end. */
+  averagePeriodLength: number;
+  /** How many start-to-start intervals the estimate rests on. */
+  cyclesUsed: number;
   wording: string;
 } | null {
   if (logs.length === 0) return null;
@@ -233,6 +245,17 @@ export function estimateCycle(
           cycleLengths.length
       )
     : 28;
+  const periodLengths = sorted
+    .filter(entry => entry.end && entry.end >= entry.start)
+    .map(
+      entry => dayDifference(dateAtNoon(entry.end!), dateAtNoon(entry.start)) + 1
+    );
+  const averagePeriodLength = periodLengths.length
+    ? Math.round(
+        periodLengths.reduce((total, length) => total + length, 0) /
+          periodLengths.length
+      )
+    : 5;
   const lastStart = dateAtNoon(sorted[0]!.start);
   const cycleDay = dayDifference(today, lastStart) + 1;
   const ovulationDay = Math.max(10, averageCycle - 14);
@@ -259,7 +282,10 @@ export function estimateCycle(
   return {
     cycleDay,
     phase,
-    estimatedNextPeriod: nextStart.toISOString().slice(0, 10),
+    estimatedNextPeriod: localDayKey(nextStart),
+    averageCycle,
+    averagePeriodLength,
+    cyclesUsed: cycleLengths.length,
     wording,
   };
 }

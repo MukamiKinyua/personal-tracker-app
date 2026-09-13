@@ -923,21 +923,72 @@ button:focus-visible {
   fill: #f1b633;
 }
 
+/* Was a plain light-mode bar pinned to the top of the right column only
+   (opaque-ish white, dark ink text - the same un-dark-moded pattern as the
+   quick-chips below it). Lifted out of that column entirely with
+   position:absolute - but its containing block is .contents-list, not the
+   full-width .journal-spread, because .spread-page (which .contents-list
+   also is) sets position:relative of its own, and .contents-list only spans
+   the right half of the spread. Two corrections against that, both against
+   the CSS spec's containing block for an absolutely positioned box, which
+   is the padding edge, not the border edge:
+     - left:50% + translateX(-50%) centres within .contents-list's own
+       720px half, landing the pill three-quarters of the way across the
+       full spread rather than in the true middle. left:0 instead puts the
+       box's centre at local x=0, i.e. .contents-list's own left edge - the
+       real midpoint of the two-page spread.
+     - that "left edge" is measured from .contents-list's padding box, and
+       .contents-list is also .spread-page, which carries its own
+       padding: clamp(1.5rem, 3.5vw, 3rem) on all four sides. Left
+       uncorrected the pill lands exactly that padding's width right of
+       centre. Subtracting the identical clamp expression cancels it - and
+       has to be the same expression, not a fixed px guess, because the
+       padding itself is fluid across viewport width.
+   Material matches the rest of the glass system: translucent white fill,
+   backdrop blur, white text. */
 .contents-search {
-  display: flex;
+  /* A separate, generic "first item as a frosted card" rule
+     (.spread-page:last-child > label, among other targets - meant for a
+     plain hint/status label as the first thing in a list column) also
+     matches this element, since .contents-search is both a <label> and the
+     first direct child of .contents-list. It carries no id but five
+     class/attribute/pseudo-class steps of specificity, which beats this
+     plain single-class selector outright regardless of source order, and
+     overwrote exactly the properties that mattered: display (to block,
+     collapsing the icon/input/clear-button row), padding, border,
+     background, color, text-shadow and backdrop-filter - its own light
+     pinkish glass card, not this one. !important on each property it also
+     sets is what actually wins here; specificity alone can't, short of
+     matching or exceeding five selector steps. */
+  position: absolute;
+  top: 1.5rem;
+  left: calc(-1 * clamp(1.5rem, 3.5vw, 3rem));
+  transform: translateX(-50%);
+  z-index: 6;
+  width: min(30rem, calc(100vw - 3rem));
+  box-sizing: border-box !important;
+  display: flex !important;
   align-items: center;
   gap: 0.6rem;
-  background: rgba(255, 255, 255, 0.55);
-  border: 1px solid var(--journal-line);
-  border-radius: 999px;
-  padding: 0.65rem 1rem;
-  margin-top: 1.6rem;
-  color: #6b5b6e;
+  background: rgba(255, 255, 255, 0.22) !important;
+  backdrop-filter: blur(20px) saturate(118%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(118%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.4) !important;
+  border-radius: 999px !important;
+  padding: 0.7rem 1.1rem !important;
+  color: rgba(255, 255, 255, 0.7) !important;
+  text-shadow: none !important;
+  box-shadow:
+    0 6px 20px rgba(0, 0, 0, 0.28),
+    0 0 24px rgba(0, 0, 0, 0.12);
   transition: border-color 160ms ease, background 160ms ease;
 }
+.contents-search svg {
+  flex-shrink: 0;
+}
 .contents-search:focus-within {
-  border-color: var(--journal-magenta);
-  background: #fff;
+  border-color: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.3);
 }
 .contents-search input {
   flex: 1;
@@ -945,27 +996,33 @@ button:focus-visible {
   background: transparent;
   outline: none;
   font-size: 0.85rem;
-  color: var(--journal-ink);
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.94);
   min-width: 0;
 }
 .contents-search input::placeholder {
-  color: #a596a4;
+  color: rgba(255, 255, 255, 0.62);
 }
 .contents-search-clear {
   display: flex;
   align-items: center;
   justify-content: center;
   border: 0;
-  background: rgba(57, 36, 84, 0.08);
+  background: rgba(255, 255, 255, 0.22);
   border-radius: 999px;
   width: 1.5rem;
   height: 1.5rem;
-  color: #6b5b6e;
+  color: rgba(255, 255, 255, 0.94);
   cursor: pointer;
   flex-shrink: 0;
 }
 .contents-search-clear:hover {
-  background: rgba(57, 36, 84, 0.16);
+  background: rgba(255, 255, 255, 0.34);
+}
+/* The pill now floats out of flow, so the list needs its own clearance
+   instead of relying on the search bar's old in-flow height + margin. */
+.contents-list {
+  padding-top: 5.5rem;
 }
 
 .contents-quick-section {
@@ -4227,24 +4284,179 @@ button:focus-visible {
   color: #70566b;
   font-size: 0.53rem;
 }
+.calendar-days span {
+  position: relative;
+}
 .calendar-days span.is-period {
   color: #fff;
   background: #d84095;
   box-shadow: 0 3px 7px rgba(199, 49, 133, 0.25);
+  font-weight: 800;
 }
-.cycle-calendar > small {
+.calendar-days span.is-predicted {
+  color: #a8317a;
+  border: 1.5px dashed #d84095;
+  font-style: italic;
+}
+.calendar-days span.is-today::after {
+  content: "";
+  position: absolute;
+  left: 22%;
+  right: 22%;
+  bottom: 2px;
+  height: 2px;
+  border-radius: 2px;
+  background: currentColor;
+}
+.calendar-days span.is-today {
+  font-weight: 800;
+  outline: 1.5px solid #70566b;
+  outline-offset: -1.5px;
+}
+.calendar-days span.is-period.is-today {
+  outline-color: #fff;
+}
+.cycle-calendar-today {
+  margin-top: 0.3rem;
+  border: 1px solid rgba(112, 86, 107, 0.35);
+  border-radius: 999px;
+  padding: 0.22rem 0.5rem;
+  color: #70566b;
+  background: transparent;
+  font-size: 0.52rem;
+  font-weight: 700;
+}
+.cycle-calendar-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  margin-top: 0.55rem;
+}
+.cycle-calendar-key small {
   display: flex;
   align-items: center;
   gap: 0.35rem;
-  margin-top: 0.55rem;
   color: #917b8f;
   font-size: 0.53rem;
 }
-.cycle-calendar > small i {
-  width: 7px;
-  height: 7px;
+.cycle-calendar-key i {
+  width: 9px;
+  height: 9px;
   border-radius: 50%;
+}
+.cycle-calendar-key .key-logged {
   background: #d84095;
+}
+.cycle-calendar-key .key-predicted {
+  border: 1.5px dashed #d84095;
+}
+.cycle-calendar-key .key-today {
+  border: 1.5px solid #70566b;
+  border-bottom-width: 3px;
+  border-radius: 3px;
+}
+.cycle-privacy {
+  margin-top: 0.9rem;
+  padding: 0.6rem 0.7rem;
+  border-radius: 10px;
+  border: 1px solid rgba(112, 86, 107, 0.22);
+  background: rgba(255, 255, 255, 0.55);
+}
+.cycle-privacy > span {
+  display: block;
+  margin-bottom: 0.35rem;
+  color: #70566b;
+  font-size: 0.55rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.cycle-privacy ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.28rem;
+}
+.cycle-privacy li {
+  color: #4f3a4c;
+  font-size: 0.56rem;
+  line-height: 1.45;
+}
+.cycle-privacy li b {
+  color: #3a2338;
+}
+.cycle-inline-link {
+  padding: 0;
+  border: 0;
+  color: #a8317a;
+  background: none;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.cycle-inline-link:disabled {
+  color: #917b8f;
+  text-decoration: none;
+  cursor: default;
+}
+.cycle-remove {
+  margin-left: auto;
+  align-self: flex-start;
+  border: 1px solid rgba(112, 86, 107, 0.3);
+  border-radius: 999px;
+  padding: 0.22rem 0.5rem;
+  color: #70566b;
+  background: transparent;
+  font-size: 0.52rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.cycle-remove:hover {
+  border-color: #a8317a;
+  color: #a8317a;
+}
+.cycle-context-history article {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+.cycle-context-history article > div {
+  display: grid;
+  gap: 0.1rem;
+  min-width: 0;
+}
+.cycle-delete-all {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+  margin-top: 0.7rem;
+  padding-top: 0.55rem;
+  border-top: 1px dashed rgba(83, 40, 95, 0.14);
+}
+.cycle-delete-all span {
+  flex: 1 1 100%;
+  color: #4f3a4c;
+  font-size: 0.56rem;
+  line-height: 1.45;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.cycle-delete-all button {
+  border: 1px solid rgba(112, 86, 107, 0.3);
+  border-radius: 999px;
+  padding: 0.28rem 0.6rem;
+  color: #70566b;
+  background: transparent;
+  font-size: 0.54rem;
+  font-weight: 700;
+}
+.cycle-delete-all button:first-of-type:not(:only-of-type) {
+  color: #fff;
+  background: #a8317a;
+  border-color: #a8317a;
 }
 
 .wellbeing-spread .wellbeing-intro {
@@ -11174,6 +11386,29 @@ button:focus-visible {
   }
   .contents-list {
     padding-top: 1.4rem;
+  }
+  /* Below 820px .journal-spread collapses to a single stacked column, so
+     the search bar's absolute position (measured against .contents-list)
+     would float over the Contents heading instead of the list beneath it.
+     Meant to put it back in normal flow with position:static, but a much
+     higher-specificity rule elsewhere -
+     `[data-journal-view]:not(...) .journal-spread > .spread-page:last-child
+     > *` (an id-free but 5-class/attribute selector) - forces
+     position:relative on every direct child of the right-hand page
+     regardless, so that's what actually wins here; position:static in this
+     rule never takes effect. Doesn't matter for what this needs: relative
+     with no offset renders identically to static for the element's own
+     position. What actually mattered and was missing is resetting left/top,
+     since the base rule's `left: calc(...)` still applies under
+     position:relative (it does nothing under static, which masked the gap
+     until measured). */
+  .contents-search {
+    position: relative;
+    left: auto;
+    top: auto;
+    transform: none;
+    width: 100%;
+    margin-top: 1.6rem;
   }
   .journal-actions {
     top: 1rem;

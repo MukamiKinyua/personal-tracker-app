@@ -160,8 +160,23 @@ describe("journal prototype interactions", () => {
       cycleDay: 8,
       phase: "Follicular",
       estimatedNextPeriod: "2026-08-31",
+      averageCycle: 28,
+      averagePeriodLength: 5,
+      cyclesUsed: 1,
     });
     expect(estimate?.wording).toBe("Estimated from limited cycle history.");
+  });
+
+  it("averages logged period lengths when entries have an end date", () => {
+    const estimate = estimateCycle(
+      [
+        { start: "2026-08-03", end: "2026-08-06" },
+        { start: "2026-07-06", end: "2026-07-11" },
+      ],
+      new Date("2026-08-10T12:00:00")
+    );
+    // 4 days and 6 days, so 5 on average.
+    expect(estimate?.averagePeriodLength).toBe(5);
   });
 
   it("uses variability-aware wording when recorded cycle intervals differ", () => {
