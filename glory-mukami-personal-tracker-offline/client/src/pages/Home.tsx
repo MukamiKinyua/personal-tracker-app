@@ -10188,42 +10188,95 @@ function PortfolioPage({
   onCover: () => void;
 }) {
   type PortfolioProject = {
+    id?: string;
     title: string;
     role: string;
     evidence: string;
     presentation: string;
     readiness: string;
+    createdAt?: string;
+    updatedAt?: string;
   };
-  const [projects, setProjects] = useState<PortfolioProject[]>([]);
-  const [draft, setDraft] = useState<PortfolioProject>({
+  type PortfolioDraft = Pick<
+    PortfolioProject,
+    "title" | "role" | "evidence" | "presentation" | "readiness"
+  >;
+  const emptyPortfolioDraft: PortfolioDraft = {
     title: "",
     role: "",
     evidence: "",
     presentation: "",
     readiness: "Private draft",
-  });
+  };
+  const [projects, setProjects] = useState<PortfolioProject[]>([]);
+  const [lastProjects, setLastProjects] = useState<PortfolioProject[] | null>(
+    null
+  );
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draft, setDraft] = useState<PortfolioDraft>(emptyPortfolioDraft);
+  const today = sleepDateInputValue(new Date());
+  const formatDay = (value?: string) =>
+    value && /^\d{4}-\d{2}-\d{2}$/.test(value)
+      ? new Date(`${value}T12:00:00`).toLocaleDateString(undefined, {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        })
+      : null;
   useMongoJournalScope({
     scope: "portfolio",
     payload: { projects },
     hydrate: payload => {
       if (Array.isArray(payload.projects))
-        setProjects(payload.projects as PortfolioProject[]);
+        setProjects(
+          (payload.projects as PortfolioProject[]).map((project, index) => ({
+            ...project,
+            id: project.id ?? `portfolio-${index}-${project.title}`,
+          }))
+        );
     },
   });
   function addProject(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!draft.title.trim()) return;
-    setProjects(current => [
-      ...current,
-      { ...draft, title: draft.title.trim() },
-    ]);
+    const fields = { ...draft, title: draft.title.trim() };
+    if (editingId) {
+      setProjects(current =>
+        current.map(project =>
+          project.id === editingId
+            ? { ...project, ...fields, updatedAt: today }
+            : project
+        )
+      );
+      toast("Project updated");
+    } else {
+      setProjects(current => [
+        ...current,
+        { ...fields, id: `portfolio-${Date.now()}`, createdAt: today },
+      ]);
+      toast(`“${fields.title}” added to the shelf`);
+    }
+    setDraft(emptyPortfolioDraft);
+    setEditingId(null);
+  }
+  function editProject(project: PortfolioProject) {
+    setEditingId(project.id ?? null);
     setDraft({
-      title: "",
-      role: "",
-      evidence: "",
-      presentation: "",
-      readiness: "Private draft",
+      title: project.title,
+      role: project.role,
+      evidence: project.evidence,
+      presentation: project.presentation,
+      readiness: project.readiness,
     });
+  }
+  function removeProject(project: PortfolioProject) {
+    setLastProjects(projects);
+    setProjects(current => current.filter(item => item.id !== project.id));
+    if (editingId === project.id) {
+      setEditingId(null);
+      setDraft(emptyPortfolioDraft);
+    }
+    toast(`Removed “${project.title}”`);
   }
   return (
     <section
@@ -10312,14 +10365,43 @@ function PortfolioPage({
               <option>Ready to share</option>
             </select>
           </label>
-          <Button type="submit" className="ink-button">
-            <Plus size={15} /> Save portfolio project
-          </Button>
+          <div className="career-form-actions">
+            <Button type="submit" className="ink-button">
+              <Plus size={15} />{" "}
+              {editingId ? "Save changes" : "Save portfolio project"}
+            </Button>
+            {editingId ? (
+              <button
+                type="button"
+                className="local-undo"
+                onClick={() => {
+                  setEditingId(null);
+                  setDraft(emptyPortfolioDraft);
+                }}
+              >
+                Cancel edit
+              </button>
+            ) : null}
+          </div>
         </form>
         <div className="portfolio-list">
           <div>
             <span>portfolio shelf</span>
-            <b>{projects.length} projects</b>
+            <b>
+              {projects.length} projects
+              {lastProjects && (
+                <button
+                  type="button"
+                  className="local-undo"
+                  onClick={() => {
+                    setProjects(lastProjects);
+                    setLastProjects(null);
+                  }}
+                >
+                  Undo remove
+                </button>
+              )}
+            </b>
           </div>
           {projects.length === 0 ? (
             <small>
@@ -10327,9 +10409,12 @@ function PortfolioPage({
               proud place.
             </small>
           ) : (
-            projects.map((project, index) => (
-              <article key={`${project.title}-${index}`}>
-                <i>{project.title.slice(0, 1)}</i>
+            projects.map(project => (
+              <article
+                key={project.id}
+                className={cn(editingId === project.id && "is-editing")}
+              >
+                <i aria-hidden="true">{project.title.slice(0, 1)}</i>
                 <p>
                   <b>{project.title}</b>
                   <small>
@@ -10341,6 +10426,25 @@ function PortfolioPage({
                     Presentation:{" "}
                     {project.presentation || "Add a presentation note"}
                   </em>
+                  <small className="career-stamp">
+                    {formatDay(project.updatedAt)
+                      ? `Updated ${formatDay(project.updatedAt)}`
+                      : formatDay(project.createdAt)
+                        ? `Added ${formatDay(project.createdAt)}`
+                        : "Added before dates were kept"}
+                  </small>
+                  <span className="career-actions">
+                    <button type="button" onClick={() => editProject(project)}>
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeProject(project)}
+                      aria-label={`Remove ${project.title}`}
+                    >
+                      Remove
+                    </button>
+                  </span>
                 </p>
               </article>
             ))
