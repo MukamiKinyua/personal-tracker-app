@@ -8428,17 +8428,56 @@ function HistoryPage({
   useEffect(() => {
     setSavedRecords(readPersistedHistoryRecords(window.localStorage, ownerKey));
   }, [ownerKey, recent.length]);
+  // Every module that records activity has a page; an entry can always be
+  // opened at its source, not only the ones read back from page storage.
+  const moduleViews: Record<string, View | undefined> = {
+    Productivity: "productivity",
+    Habits: "habits",
+    Learning: "learning",
+    Reflections: "reflections",
+    Wellbeing: "wellbeing",
+    Sleep: "sleep",
+    Nutrition: "nutrition",
+    Portrait: "portraits",
+    Tasks: "tasks",
+    Assignments: "assignments",
+    "Study Sessions": "studySessions",
+    Goals: "goals",
+    Time: "time",
+    Finances: "finances",
+    "Menstrual health": "cycle",
+    Water: "water",
+    Environment: "environment",
+    Responsibilities: "responsibilities",
+    Purchases: "purchases",
+    "Personal growth": "personalGrowth",
+    Documents: "documents",
+    Security: "security",
+  };
   const unifiedEntries = useMemo(
-    () => [
-      ...recent.map(entry => ({
-        ...entry,
-        detail: formatHistoryActivityMetric(entry.module, entry.amount),
-        view: undefined,
-      })),
-      ...savedRecords,
-    ],
+    () =>
+      [
+        ...recent.map(entry => ({
+          ...entry,
+          detail: formatHistoryActivityMetric(entry.module, entry.amount),
+          view: moduleViews[entry.module],
+        })),
+        ...savedRecords,
+      ].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
     [recent, savedRecords]
   );
+  function formatWhen(value: string) {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return date.toLocaleString([], {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      year: date.getFullYear() === new Date().getFullYear() ? undefined : "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  }
   const visibleEntries = useMemo(() => {
     const sensitiveModules = new Set([
       "Wellbeing",
@@ -8471,6 +8510,25 @@ function HistoryPage({
     () => historyModuleTotals(visibleEntries),
     [visibleEntries]
   );
+  function downloadHistoryCsv() {
+    const escape = (value: string) =>
+      /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+    const rows = filteredRecent.map(entry =>
+      [entry.createdAt, entry.module, entry.label, entry.detail]
+        .map(value => escape(String(value ?? "")))
+        .join(",")
+    );
+    const csv = ["saved_at,module,label,detail", ...rows].join("\n");
+    const url = URL.createObjectURL(
+      new Blob([csv], { type: "text/csv;charset=utf-8" })
+    );
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `history-${sleepDateInputValue(new Date())}.csv`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    toast(`${filteredRecent.length} record${filteredRecent.length === 1 ? "" : "s"} exported`);
+  }
   const destinations: Array<{ label: string; note: string; view: View }> = [
     {
       label: "Fitness & Portraits",
@@ -8609,6 +8667,15 @@ function HistoryPage({
             <span>durable journal activity</span>
             <b>
               {filteredRecent.length} shown · {visibleEntries.length} total
+              {filteredRecent.length > 0 && (
+                <button
+                  type="button"
+                  className="history-export"
+                  onClick={downloadHistoryCsv}
+                >
+                  Export shown as CSV
+                </button>
+              )}
             </b>
           </div>
           {visibleEntries.length === 0 ? (
@@ -8625,11 +8692,14 @@ function HistoryPage({
           ) : (
             filteredRecent.map(entry => (
               <article key={entry.id}>
-                <i>{entry.module.slice(0, 1)}</i>
+                <i aria-hidden="true">{entry.module.slice(0, 1)}</i>
                 <p>
                   <b>{entry.module}</b>
                   <small>
-                    {entry.label} · {entry.detail} · {entry.createdAt}
+                    {entry.label} · {entry.detail} ·{" "}
+                    <time dateTime={entry.createdAt}>
+                      {formatWhen(entry.createdAt)}
+                    </time>
                   </small>
                   {entry.view ? (
                     <button

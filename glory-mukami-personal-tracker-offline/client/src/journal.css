@@ -31368,3 +31368,19 @@ body {
   letter-spacing: 0;
   cursor: pointer;
 }
+
+.session-history > div b .history-export {
+  margin-left: 0.5rem;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  background: none;
+  font: inherit;
+  text-decoration: underline;
+  text-transform: none;
+  letter-spacing: 0;
+  cursor: pointer;
+}
+.session-history article time {
+  font-variant-numeric: tabular-nums;
+}
