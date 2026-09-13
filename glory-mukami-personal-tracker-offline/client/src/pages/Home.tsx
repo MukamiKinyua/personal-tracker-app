@@ -10960,6 +10960,27 @@ function PurchasesPage({
     },
   });
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [lastPurchases, setLastPurchases] = useState<Purchase[] | null>(null);
+  const today = sleepDateInputValue(new Date());
+  function returnWindow(purchase: Purchase) {
+    if (!purchase.returnDate || purchase.stage === "Returned") return null;
+    const detail = assignmentDueDetail(purchase.returnDate, today);
+    const label =
+      detail.kind === "overdue"
+        ? `Return window passed · ${Math.abs(detail.daysAway ?? 0)} day${Math.abs(detail.daysAway ?? 0) === 1 ? "" : "s"} ago`
+        : detail.kind === "today"
+          ? "Last day to return"
+          : detail.kind === "tomorrow"
+            ? "Return by tomorrow"
+            : `${detail.daysAway} days left to return`;
+    return { ...detail, label };
+  }
+  function removePurchase(purchase: Purchase) {
+    setLastPurchases(purchases);
+    setPurchases(current => current.filter(item => item.id !== purchase.id));
+    if (editingId === purchase.id) setEditingId(null);
+    toast(`Removed ${purchase.title}`);
+  }
   const [editDraft, setEditDraft] = useState<PurchaseDraft>({
     title: "",
     stage: "Planned",
@@ -10975,6 +10996,7 @@ function PurchasesPage({
       ...current,
       { id: `${Date.now()}`, ...draft, title: draft.title.trim() },
     ]);
+    toast(`${draft.title.trim()} added as ${draft.stage.toLowerCase()}`);
     setDraft({
       title: "",
       stage: "Planned",
@@ -10994,6 +11016,7 @@ function PurchasesPage({
       )
     );
     setEditingId(null);
+    toast("Purchase updated");
   }
   return (
     <section
@@ -11107,7 +11130,21 @@ function PurchasesPage({
         <div className="purchase-list">
           <div>
             <span>purchase notes</span>
-            <b>{purchases.length} saved</b>
+            <b>
+              {purchases.length} saved
+              {lastPurchases && (
+                <button
+                  type="button"
+                  className="local-undo"
+                  onClick={() => {
+                    setPurchases(lastPurchases);
+                    setLastPurchases(null);
+                  }}
+                >
+                  Undo remove
+                </button>
+              )}
+            </b>
           </div>
           {purchases.length === 0 ? (
             <small>
@@ -11122,6 +11159,7 @@ function PurchasesPage({
                   <div className="purchase-review-form">
                     <input
                       value={editDraft.title}
+                      aria-label="Item or purchase"
                       onChange={event =>
                         setEditDraft(current => ({
                           ...current,
@@ -11131,6 +11169,7 @@ function PurchasesPage({
                     />
                     <select
                       value={editDraft.stage}
+                      aria-label="Stage"
                       onChange={event =>
                         setEditDraft(current => ({
                           ...current,
@@ -11144,6 +11183,7 @@ function PurchasesPage({
                     </select>
                     <input
                       type="date"
+                      aria-label="Return-by date"
                       value={editDraft.returnDate}
                       onChange={event =>
                         setEditDraft(current => ({
@@ -11161,6 +11201,7 @@ function PurchasesPage({
                         }))
                       }
                       placeholder="Warranty note"
+                      aria-label="Warranty note"
                     />
                     <input
                       value={editDraft.receipt}
@@ -11171,6 +11212,7 @@ function PurchasesPage({
                         }))
                       }
                       placeholder="Receipt metadata"
+                      aria-label="Receipt metadata"
                     />
                     <input
                       value={editDraft.reflection}
@@ -11181,6 +11223,7 @@ function PurchasesPage({
                         }))
                       }
                       placeholder="Later reflection"
+                      aria-label="Later reflection"
                     />
                     <div>
                       <button type="button" onClick={() => setEditingId(null)}>
@@ -11199,26 +11242,52 @@ function PurchasesPage({
                     <b>{purchase.title}</b>
                     <small>
                       {purchase.stage}
-                      {purchase.returnDate
-                        ? ` · return by ${purchase.returnDate}`
-                        : ""}
+                      {purchase.returnDate ? (
+                        <>
+                          {" · "}
+                          {purchase.stage === "Returned" ? "return window was " : "return by "}
+                          <time dateTime={purchase.returnDate}>
+                            {assignmentDueDetail(purchase.returnDate, today).exact}
+                          </time>
+                        </>
+                      ) : null}
                     </small>
+                    {returnWindow(purchase) ? (
+                      <small
+                        className={cn(
+                          "purchase-return",
+                          `is-${returnWindow(purchase)!.kind}`
+                        )}
+                      >
+                        {returnWindow(purchase)!.label}
+                      </small>
+                    ) : null}
                     <em>Warranty: {purchase.warranty || "Not noted"}</em>
                     <em>Receipt metadata: {purchase.receipt || "Not noted"}</em>
                     <em>
                       Reflection: {purchase.reflection || "Not added yet"}
                     </em>
-                    <button
-                      type="button"
-                      className="review-purchase"
-                      onClick={() => {
-                        const { id: _id, ...saved } = purchase;
-                        setEditDraft(saved);
-                        setEditingId(purchase.id);
-                      }}
-                    >
-                      Review / update
-                    </button>
+                    <span className="purchase-actions">
+                      <button
+                        type="button"
+                        className="review-purchase"
+                        onClick={() => {
+                          const { id: _id, ...saved } = purchase;
+                          setEditDraft(saved);
+                          setEditingId(purchase.id);
+                        }}
+                      >
+                        Review / update
+                      </button>
+                      <button
+                        type="button"
+                        className="review-purchase purchase-remove"
+                        onClick={() => removePurchase(purchase)}
+                        aria-label={`Remove ${purchase.title}`}
+                      >
+                        Remove
+                      </button>
+                    </span>
                   </p>
                 )}
               </article>
