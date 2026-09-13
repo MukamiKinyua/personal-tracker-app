@@ -10140,15 +10140,27 @@ function InsightsPage({
       : reviewActivity.length >= 3
         ? "early evidence"
         : "too little for a pattern";
+  const visibleDays = Array.from(
+    new Set(
+      reviewActivity.map(entry => {
+        const date = new Date(entry.recordedOn ?? entry.createdAt);
+        return Number.isNaN(date.getTime())
+          ? entry.createdAt
+          : date.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+      })
+    )
+  );
   const visibleDates =
-    Array.from(new Set(reviewActivity.map(entry => entry.createdAt)))
-      .slice(0, 4)
-      .join(", ") || "No saved dates";
+    visibleDays.length === 0
+      ? "no saved days"
+      : visibleDays.length <= 4
+        ? visibleDays.join(", ")
+        : `${visibleDays.slice(0, 3).join(", ")} and ${visibleDays.length - 3} more day${visibleDays.length - 3 === 1 ? "" : "s"}`;
   const periodLabel: Record<AnalyticsPeriod, string> = {
     today: "Today",
     "7d": "Last 7 days",
     "30d": "Last 30 days",
-    all: "This open session",
+    all: "All time",
   };
   const insights = reviewActivity.length
     ? [
@@ -10156,7 +10168,7 @@ function InsightsPage({
           id: "local-ledger",
           label: "Direct local summary",
           title: `${activitySummary.recordCount} saved action${activitySummary.recordCount === 1 ? "" : "s"} across ${activitySummary.moduleSummaries.length} journal area${activitySummary.moduleSummaries.length === 1 ? "" : "s"}`,
-          source: `Source: ${activitySummary.recordCount} explicit saved entries from ${visibleDates}. This is a record summary, not a pattern or a judgement.`,
+          source: `Source: ${activitySummary.recordCount} explicit saved entries on ${visibleDates}. This is a record summary, not a pattern or a judgement.`,
           evidence: "direct records",
           destination: undefined,
         },
@@ -10178,7 +10190,7 @@ function InsightsPage({
           label: "Data availability",
           title: "No local activity record yet",
           source:
-            "Source: 0 connected actions saved in this open journal session. Analytics and Insights intentionally leave this empty instead of assuming a pattern.",
+            "Source: no saved actions in this period. Analytics and Insights intentionally leave this empty instead of assuming a pattern.",
           evidence: "not available",
           destination: undefined,
         },
@@ -10246,7 +10258,7 @@ function InsightsPage({
                     : option === "30d"
                       ? "30 days"
                       : option === "all"
-                        ? "Session"
+                        ? "All time"
                         : "Today"}
                 </button>
               )
@@ -10366,7 +10378,10 @@ function InsightsPage({
           <span>
             It can summarise or describe repeated local records. It does not
             infer health effects, productivity quality, security status, or a
-            reason behind an observation.
+            reason behind an observation. Evidence labels are counts, nothing
+            more: “descriptive” needs at least 6 saved actions in the period
+            (and 3 in an area for that area), “early” needs 3, and below 3
+            nothing is claimed. A comparison needs 3 in each source.
           </span>
         </section>
         {Object.values(muted).some(Boolean) ? (
