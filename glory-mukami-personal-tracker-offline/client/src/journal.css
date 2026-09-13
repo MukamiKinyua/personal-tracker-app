@@ -29441,7 +29441,7 @@ body {
 .integration-inline-link {
   padding: 0;
   border: 0;
-  color: #2f6b5d;
+  color: #f4c766;
   background: none;
   font: inherit;
   font-weight: 800;
@@ -30915,9 +30915,24 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-.care-list .care-remove {
+.care-list .care-actions {
   margin-left: auto;
   align-self: center;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.care-list .care-actions > button:first-child {
+  border: 1px solid rgba(57, 36, 84, 0.14);
+  border-radius: 7px;
+  padding: 0.15rem 0.45rem;
+  color: inherit;
+  background: transparent;
+  font-size: 0.56rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.care-list .care-remove {
   border: 0;
   padding: 0.15rem 0.45rem;
   color: inherit;
@@ -30929,6 +30944,9 @@ body {
 .care-list .care-remove:hover,
 .care-list .care-remove:focus-visible {
   opacity: 1;
+}
+.care-list article.is-editing {
+  box-shadow: inset 3px 0 0 var(--journal-plum, #392454);
 }
 .care-list > div b .local-undo {
   margin-left: 0.5rem;

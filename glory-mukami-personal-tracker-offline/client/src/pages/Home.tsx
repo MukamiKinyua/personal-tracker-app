@@ -12003,6 +12003,7 @@ function EnvironmentPage({
   const [items, setItems] = useState<CareItem[]>([]);
   const [lastItems, setLastItems] = useState<CareItem[] | null>(null);
   const [history, setHistory] = useState<CareMoment[]>([]);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const today = sleepDateInputValue(new Date());
   const formatDay = (value: string) =>
     /^\d{4}-\d{2}-\d{2}$/.test(value)
@@ -12037,11 +12038,44 @@ function EnvironmentPage({
   function addItem(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!draft.title.trim()) return;
-    setItems(current => [
-      ...current,
-      { ...draft, id: `care-${Date.now()}`, title: draft.title.trim() },
-    ]);
-    toast(`Added “${draft.title.trim()}”`);
+    const trimmedTitle = draft.title.trim();
+    if (editingId) {
+      setItems(current =>
+        current.map(entry =>
+          entry.id === editingId
+            ? { ...entry, ...draft, id: editingId, title: trimmedTitle }
+            : entry
+        )
+      );
+      toast(`Saved changes to “${trimmedTitle}”`);
+      setEditingId(null);
+    } else {
+      setItems(current => [
+        ...current,
+        { ...draft, id: `care-${Date.now()}`, title: trimmedTitle },
+      ]);
+      toast(`Added “${trimmedTitle}”`);
+    }
+    setDraft({
+      title: "",
+      area: "Workspace",
+      recurring: false,
+      supply: "",
+      done: false,
+    });
+  }
+  function editItem(item: CareItem) {
+    setEditingId(item.id ?? null);
+    setDraft({
+      title: item.title,
+      area: item.area,
+      recurring: item.recurring,
+      supply: item.supply,
+      done: item.done,
+    });
+  }
+  function cancelEdit() {
+    setEditingId(null);
     setDraft({
       title: "",
       area: "Workspace",
@@ -12054,10 +12088,12 @@ function EnvironmentPage({
     if (item.recurring) {
       // A repeating task is never done for good: completing it records a
       // moment and leaves it ready for next time.
-      setHistory(current => [
-        { title: item.title, date: today, recurring: true },
-        ...current,
-      ]);
+      setHistory(current =>
+        [
+          { title: item.title, date: today, recurring: true },
+          ...current,
+        ].slice(0, 200)
+      );
       setItems(current =>
         current.map(entry =>
           entry.id === item.id
@@ -12068,11 +12104,17 @@ function EnvironmentPage({
       toast(`“${item.title}” done today — it stays on the list`);
       return;
     }
-    if (!item.done)
-      setHistory(current => [
-        { title: item.title, date: today, recurring: false },
-        ...current,
-      ]);
+    if (!item.done) {
+      setHistory(current =>
+        [
+          { title: item.title, date: today, recurring: false },
+          ...current,
+        ].slice(0, 200)
+      );
+      toast(`“${item.title}” marked done`);
+    } else {
+      toast(`“${item.title}” reopened`);
+    }
     setItems(current =>
       current.map(entry =>
         entry.id === item.id ? { ...entry, done: !entry.done } : entry
@@ -12080,6 +12122,7 @@ function EnvironmentPage({
     );
   }
   function removeItem(item: CareItem) {
+    if (editingId === item.id) cancelEdit();
     setLastItems(items);
     setItems(current => current.filter(entry => entry.id !== item.id));
     toast(`Removed “${item.title}”`);
@@ -12169,9 +12212,17 @@ function EnvironmentPage({
               <small>Keep this task visible after completion.</small>
             </span>
           </label>
-          <Button type="submit" className="ink-button">
-            <Plus size={15} /> Add care task
-          </Button>
+          <div className="career-form-actions">
+            <Button type="submit" className="ink-button">
+              <Plus size={15} />{" "}
+              {editingId ? "Save changes" : "Add care task"}
+            </Button>
+            {editingId ? (
+              <button type="button" className="local-undo" onClick={cancelEdit}>
+                Cancel edit
+              </button>
+            ) : null}
+          </div>
         </form>
         <div className="care-list">
           <div>
@@ -12185,6 +12236,7 @@ function EnvironmentPage({
                   onClick={() => {
                     setItems(lastItems);
                     setLastItems(null);
+                    toast("Removal undone");
                   }}
                 >
                   Undo
@@ -12198,7 +12250,13 @@ function EnvironmentPage({
             </small>
           ) : (
             upkeep.map(item => (
-              <article className={cn(item.done && "done")} key={item.id}>
+              <article
+                className={cn(
+                  item.done && "done",
+                  editingId === item.id && "is-editing"
+                )}
+                key={item.id}
+              >
                 <button
                   type="button"
                   onClick={() => toggleItem(item)}
@@ -12225,15 +12283,20 @@ function EnvironmentPage({
                     {item.supply ? ` · Supply: ${item.supply}` : ""}
                   </small>
                 </p>
-                <button
-                  type="button"
-                  className="care-remove"
-                  onClick={() => removeItem(item)}
-                  aria-label={`Remove ${item.title}`}
-                  title="Remove"
-                >
-                  ×
-                </button>
+                <span className="care-actions">
+                  <button type="button" onClick={() => editItem(item)}>
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    className="care-remove"
+                    onClick={() => removeItem(item)}
+                    aria-label={`Remove ${item.title}`}
+                    title="Remove"
+                  >
+                    ×
+                  </button>
+                </span>
               </article>
             ))
           )}
@@ -15855,7 +15918,7 @@ function StudyWorkbenchPage({
       document.title = "Glory Mukami's Personal Tracker";
       return;
     }
-    document.title = `${isPaused ? "⏸" : run.mode === "break" ? "☕" : "●"} ${formatStudyTimer(remainingSeconds)} · study`;
+    document.title = `${isPaused ? "⏸" : run.mode === "break" ? "◐" : "●"} ${formatStudyTimer(remainingSeconds)} · study`;
     return () => {
       document.title = "Glory Mukami's Personal Tracker";
     };
