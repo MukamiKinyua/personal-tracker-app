@@ -10663,6 +10663,7 @@ function PortfolioPage({
                   onClick={() => {
                     setProjects(lastProjects);
                     setLastProjects(null);
+                    toast("Portfolio project restored");
                   }}
                 >
                   Undo remove
