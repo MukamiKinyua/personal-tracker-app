@@ -31102,3 +31102,32 @@ body {
 .certification-date.is-earned {
   color: #3c7a5e;
 }
+
+.cv-form textarea {
+  min-height: 3.2rem;
+  resize: vertical;
+}
+.cv-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+.cv-actions > button:not(.ink-button) {
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  border-radius: 999px;
+  padding: 0.42rem 0.7rem;
+  color: inherit;
+  background: transparent;
+  font-size: 0.6rem;
+  font-weight: 800;
+}
+.cv-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.cv-actions small {
+  flex: 1 1 100%;
+  font-size: 0.56rem;
+  opacity: 0.8;
+}

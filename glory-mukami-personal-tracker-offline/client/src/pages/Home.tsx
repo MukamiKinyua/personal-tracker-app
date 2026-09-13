@@ -6887,19 +6887,77 @@ function CvPage({
     education: "",
     readiness: "Drafting",
   });
-  const [saved, setSaved] = useState(false);
+  const [changedAt, setChangedAt] = useState<string | null>(null);
+  const auth = useAuth();
   useMongoJournalScope({
     scope: "cv",
-    payload: { profile },
+    payload: { profile, changedAt },
     hydrate: payload => {
       if (payload.profile && typeof payload.profile === "object")
-        setProfile(payload.profile as typeof profile);
+        setProfile(current => ({
+          ...current,
+          ...(payload.profile as Partial<typeof profile>),
+        }));
+      if (typeof payload.changedAt === "string") setChangedAt(payload.changedAt);
     },
   });
+  function update<Key extends keyof typeof profile>(
+    key: Key,
+    value: (typeof profile)[Key]
+  ) {
+    setProfile(current => ({ ...current, [key]: value }));
+    setChangedAt(new Date().toISOString());
+  }
+  const wordCount = [profile.summary, profile.experience, profile.skills, profile.education]
+    .join(" ")
+    .split(/\s+/)
+    .filter(Boolean).length;
+  const hasContent = wordCount > 0;
+  function outlineText() {
+    const section = (title: string, text: string) =>
+      text.trim() ? `## ${title}\n${text.trim()}\n` : "";
+    return [
+      "# CV outline",
+      `Readiness: ${profile.readiness}`,
+      "",
+      section("Profile summary", profile.summary),
+      section("Experience", profile.experience),
+      section("Skills", profile.skills),
+      section("Education & learning", profile.education),
+    ]
+      .filter(Boolean)
+      .join("\n")
+      .trim() + "\n";
+  }
+  async function copyOutline() {
+    try {
+      await navigator.clipboard.writeText(outlineText());
+      toast("CV outline copied as text");
+    } catch {
+      toast("Couldn’t reach the clipboard — use Download instead");
+    }
+  }
+  function downloadOutline() {
+    const url = URL.createObjectURL(
+      new Blob([outlineText()], { type: "text/markdown;charset=utf-8" })
+    );
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `cv-outline-${sleepDateInputValue(new Date())}.md`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    toast("CV outline downloaded");
+  }
   function saveProfile(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setSaved(true);
   }
+  const formatWhen = (value: string) =>
+    new Date(value).toLocaleString([], {
+      day: "numeric",
+      month: "short",
+      hour: "numeric",
+      minute: "2-digit",
+    });
   return (
     <section className="journal-spread cv-spread glass-scope" aria-labelledby="cv-title">
       <div className="spread-page cv-intro">
@@ -6912,15 +6970,15 @@ function CvPage({
         </h2>
         <p className="page-intro">
           Shape a private CV outline around your strengths, evidence, and
-          education. This prototype keeps it local and does not publish or
-          submit it anywhere.
+          education. It is never published or submitted anywhere; copy or
+          download it when you want to use it.
         </p>
-        <div className="cv-signal">
+        <div className="cv-signal" aria-live="polite">
           <Sparkles size={15} />
           <span>
-            {saved
-              ? "Local CV outline saved"
-              : "Build a private working outline"}
+            {changedAt
+              ? `Saved as you type · ${wordCount} word${wordCount === 1 ? "" : "s"} · last change ${formatWhen(changedAt)}${auth.isAuthenticated ? " · synced to your account" : " · on this device"}`
+              : "Saved as you type — nothing to press"}
           </span>
         </div>
       </div>
@@ -6930,73 +6988,71 @@ function CvPage({
             Profile summary
             <textarea
               value={profile.summary}
-              onChange={event =>
-                setProfile(current => ({
-                  ...current,
-                  summary: event.target.value,
-                }))
-              }
+              onChange={event => update("summary", event.target.value)}
               placeholder="The work you want to be known for"
+              rows={4}
             />
           </label>
           <label>
             Experience evidence
-            <input
+            <textarea
               value={profile.experience}
-              onChange={event =>
-                setProfile(current => ({
-                  ...current,
-                  experience: event.target.value,
-                }))
-              }
-              placeholder="Role, project, impact, or responsibility"
+              onChange={event => update("experience", event.target.value)}
+              placeholder="Role, project, impact, or responsibility — one per line"
+              rows={4}
             />
           </label>
           <label>
             Skills
-            <input
+            <textarea
               value={profile.skills}
-              onChange={event =>
-                setProfile(current => ({
-                  ...current,
-                  skills: event.target.value,
-                }))
-              }
+              onChange={event => update("skills", event.target.value)}
               placeholder="Tools, strengths, or capabilities"
+              rows={3}
             />
           </label>
           <label>
             Education & learning
-            <input
+            <textarea
               value={profile.education}
-              onChange={event =>
-                setProfile(current => ({
-                  ...current,
-                  education: event.target.value,
-                }))
-              }
+              onChange={event => update("education", event.target.value)}
               placeholder="Programme, course, credential, or study focus"
+              rows={3}
             />
           </label>
           <label>
             Application readiness
             <select
               value={profile.readiness}
-              onChange={event =>
-                setProfile(current => ({
-                  ...current,
-                  readiness: event.target.value,
-                }))
-              }
+              onChange={event => update("readiness", event.target.value)}
             >
               <option>Drafting</option>
               <option>Needs a review</option>
               <option>Ready to tailor</option>
             </select>
           </label>
-          <Button type="submit" className="ink-button">
-            <Plus size={15} /> Save CV outline
-          </Button>
+          <div className="cv-actions">
+            <Button
+              type="button"
+              className="ink-button"
+              onClick={copyOutline}
+              disabled={!hasContent}
+            >
+              Copy as text
+            </Button>
+            <button
+              type="button"
+              onClick={downloadOutline}
+              disabled={!hasContent}
+            >
+              Download .md
+            </button>
+            <small>
+              {hasContent
+                ? "Plain text with headings — paste it into any CV template."
+                : "Write something above and it can be copied or downloaded."}
+            </small>
+          </div>
         </form>
       </div>
     </section>
