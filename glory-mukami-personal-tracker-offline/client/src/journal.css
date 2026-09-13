@@ -31482,3 +31482,16 @@ button.attention-row:focus-visible {
 .wellbeing-card .wellbeing-score {
   font-size: 1.05rem;
 }
+
+.notification-sample-note {
+  display: block;
+  margin: 0.2rem 0 0.7rem;
+  padding: 0.45rem 0.6rem;
+  border-left: 2px solid currentColor;
+  font-size: 0.57rem;
+  line-height: 1.45;
+  opacity: 0.85;
+}
+.local-reminder-row time {
+  font-variant-numeric: tabular-nums;
+}

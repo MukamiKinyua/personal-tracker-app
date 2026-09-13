@@ -8880,14 +8880,20 @@ function NotificationPreviewPage({
   localReminders: LocalReminder[];
   setLocalReminders: React.Dispatch<React.SetStateAction<LocalReminder[]>>;
 }) {
+  // Sample wording only — these six cards show how much a reminder from
+  // each area would reveal under the chosen preview mode. They are not
+  // real reminders and none of these items exist in the journal.
   const reminders = [
-    ["assignments", "Assignment", "Database design brief due tomorrow"],
-    ["habits", "Habit", "Evening reset is ready"],
-    ["period", "Period", "Cycle check-in"],
-    ["documents", "Document", "Passport renewal is approaching"],
-    ["responsibilities", "Responsibility", "Review household supplies"],
-    ["security", "Security", "Main email security review"],
+    ["assignments", "Assignment", "Sample: an assignment is due tomorrow"],
+    ["habits", "Habit", "Sample: an evening habit is ready"],
+    ["period", "Period", "Sample: cycle check-in"],
+    ["documents", "Document", "Sample: a document renewal is approaching"],
+    ["responsibilities", "Responsibility", "Sample: a recurring task is due"],
+    ["security", "Security", "Sample: a security review is due"],
   ] as const;
+  const [lastReminders, setLastReminders] = useState<LocalReminder[] | null>(
+    null
+  );
   const [permission, setPermission] = useState<
     NotificationPermission | "unsupported"
   >(() =>
@@ -8963,9 +8969,16 @@ function NotificationPreviewPage({
       </div>
       <div className="spread-page notifications-page">
         <div className="notification-preview-title">
-          <span>local reminder preferences</span>
+          <span>how a reminder would read</span>
           <b>Preview mode: {previewMode}</b>
         </div>
+        <small className="notification-sample-note">
+          Sample wording, not real reminders: these show how much each area
+          would reveal on a lock screen under the preview mode above. The
+          on/off and timing choices are saved, but they are not yet connected
+          to any page’s dates — nothing here schedules on its own. Only the
+          reminders you add further down actually fire.
+        </small>
         {reminders.map(([key, kind, detail]) => {
           const preference = preferences[key];
           return (
@@ -8978,7 +8991,7 @@ function NotificationPreviewPage({
             >
               <i>{kind.slice(0, 1)}</i>
               <p>
-                <b>Glory Mukami’s Personal Tracker</b>
+                <b>Sample · {kind}</b>
                 <small>
                   {preference.enabled
                     ? visibleText(kind, detail)
@@ -9103,6 +9116,18 @@ function NotificationPreviewPage({
             </small>
           )}
           <div className="local-reminder-list">
+            {lastReminders && (
+              <button
+                type="button"
+                className="local-undo"
+                onClick={() => {
+                  setLocalReminders(lastReminders);
+                  setLastReminders(null);
+                }}
+              >
+                Undo remove
+              </button>
+            )}
             {localReminders.length === 0 ? (
               <small>
                 No local reminders yet. Add one when a date deserves a gentle
@@ -9125,14 +9150,26 @@ function NotificationPreviewPage({
                       <b>{reminder.title}</b>
                       <small>
                         {reminder.kind} ·{" "}
-                        {new Date(reminder.dueAt).toLocaleString()}
+                        <time dateTime={new Date(reminder.dueAt).toISOString()}>
+                          {new Date(reminder.dueAt).toLocaleString([], {
+                            weekday: "short",
+                            day: "numeric",
+                            month: "short",
+                            hour: "numeric",
+                            minute: "2-digit",
+                          })}
+                        </time>
                       </small>
                       <em>
                         {reminder.completed
                           ? "Completed"
                           : reminder.deliveredAt
-                            ? "Checked by this browser"
-                            : "Pending"}
+                            ? reminder.deliveredAt - reminder.dueAt > 60_000
+                              ? `Shown late, at ${new Date(reminder.deliveredAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} — this tab wasn't open at the due time`
+                              : `Shown at ${new Date(reminder.deliveredAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
+                            : reminder.dueAt < Date.now()
+                              ? "Due — will show as soon as this tab is open"
+                              : "Pending · fires while this tab is open"}
                       </em>
                     </div>
                     <div>
@@ -9170,11 +9207,14 @@ function NotificationPreviewPage({
                       </button>
                       <button
                         type="button"
-                        onClick={() =>
+                        onClick={() => {
+                          setLastReminders(localReminders);
                           setLocalReminders(current =>
                             current.filter(item => item.id !== reminder.id)
-                          )
-                        }
+                          );
+                          toast(`Removed reminder “${reminder.title}”`);
+                        }}
+                        aria-label={`Remove reminder ${reminder.title}`}
                       >
                         Remove
                       </button>
@@ -9185,10 +9225,13 @@ function NotificationPreviewPage({
           </div>
         </section>
         <small className="notification-footnote">
-          These assignment, habit, period, document, responsibility, and
-          security choices now have a durable local preference and reminder
-          queue. Automatic delivery remains best-effort within browser limits;
-          guaranteed delivery and native widgets are intentionally deferred.
+          What is true today: the reminders you add above fire while this
+          site is open in a tab, as a browser notification if you allowed it
+          and as an in-page notice otherwise; one that falls due while the
+          tab is closed shows the next time it opens, marked late. The
+          per-area on/off and timing preferences are saved but do not yet
+          schedule anything from your pages’ dates. There is no
+          operating-system or background delivery.
         </small>
       </div>
     </section>
