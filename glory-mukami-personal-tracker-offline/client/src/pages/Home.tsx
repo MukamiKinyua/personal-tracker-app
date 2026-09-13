@@ -852,18 +852,29 @@ type InsightActivity = {
 };
 /**
  * Activity saved before createdAt was an instant holds "Sep 13"-style
- * strings, and recordedOn may be a UTC day. Rebuild createdAt from the
- * recorded day so sorting and formatting work; leave recordedOn as it is —
- * a day off in old data is better than a guessed correction.
+ * strings, and some rows have no recordedOn at all. Rebuild whichever half
+ * is missing from the other — createdAt from the recorded day so sorting
+ * and formatting work, recordedOn from the instant's local day so the
+ * period filters (which read recordedOn only) stop dropping the row. An
+ * existing recordedOn is left as it is: a day off in old data is better
+ * than a guessed correction.
  */
 function normalizeInsightActivity(records: InsightActivity[]): InsightActivity[] {
   return records.map(record => {
-    const isInstant = /^d{4}-d{2}-d{2}T/.test(record.createdAt);
-    if (isInstant) return record;
-    const day = record.recordedOn && /^d{4}-d{2}-d{2}$/.test(record.recordedOn)
-      ? record.recordedOn
-      : null;
-    return day ? { ...record, createdAt: `${day}T12:00:00.000Z` } : record;
+    const isInstant = /^\d{4}-\d{2}-\d{2}T/.test(record.createdAt);
+    const hasDay =
+      typeof record.recordedOn === "string" &&
+      /^\d{4}-\d{2}-\d{2}$/.test(record.recordedOn);
+    if (isInstant && hasDay) return record;
+    if (isInstant) {
+      const at = new Date(record.createdAt);
+      return Number.isNaN(at.getTime())
+        ? record
+        : { ...record, recordedOn: localCalendarDay(at) };
+    }
+    return hasDay
+      ? { ...record, createdAt: `${record.recordedOn}T12:00:00.000Z` }
+      : record;
   });
 }
 
@@ -9660,7 +9671,11 @@ function InsightsPage({
   const visibleDays = Array.from(
     new Set(
       reviewActivity.map(entry => {
-        const date = new Date(entry.recordedOn ?? entry.createdAt);
+        // recordedOn is a local calendar day; parsing it bare would read it
+        // as UTC midnight and show the previous day west of Greenwich.
+        const date = entry.recordedOn
+          ? new Date(`${entry.recordedOn}T12:00:00`)
+          : new Date(entry.createdAt);
         return Number.isNaN(date.getTime())
           ? entry.createdAt
           : date.toLocaleDateString(undefined, { day: "numeric", month: "short" });
