@@ -1,3 +1,4 @@
+import { apiUrl, readSessionToken } from "@/lib/api";
 import { trpc } from "@/lib/trpc";
 import { COOKIE_NAME, UNAUTHED_ERR_MSG } from "@shared/const";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -43,9 +44,14 @@ queryClient.getMutationCache().subscribe(event => {
 const trpcClient = trpc.createClient({
   links: [
     httpBatchLink({
-      url: "/api/trpc",
+      url: apiUrl("/api/trpc"),
       transformer: superjson,
       headers() {
+        // This server's own session, carried as a bearer token so the Android
+        // build works without relying on cross-site cookies in a WebView.
+        const session = readSessionToken();
+        if (session) return { Authorization: `Bearer ${session}` };
+
         // Preview auto-login fallback: when the browser blocks iframe cookies
         // (Safari ITP / private browsing / WebView), the runtime mirrors the
         // session into sessionStorage so we can forward it as a Bearer token.

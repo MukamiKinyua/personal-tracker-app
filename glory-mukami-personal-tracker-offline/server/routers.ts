@@ -92,6 +92,9 @@ export const appRouter = router({
           name: user.name,
           email: user.email,
           picture: user.picture,
+          // Returned as well as set, for clients that cannot rely on the
+          // cookie reaching a server on another origin (the Android build).
+          sessionToken: token,
         };
       }),
     /**

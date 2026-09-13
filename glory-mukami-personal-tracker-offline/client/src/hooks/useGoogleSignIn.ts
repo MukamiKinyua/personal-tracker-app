@@ -12,6 +12,7 @@
  * only ever a claim; the server verifies it before believing anything.
  */
 
+import { storeSessionToken } from "@/lib/api";
 import { trpc } from "@/lib/trpc";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -115,8 +116,11 @@ export function useGoogleSignIn(clientId?: string): SignInState {
       setBusy(true);
       setError(undefined);
       try {
-        await signInMutation.mutateAsync({ idToken });
-        // The session cookie is set; re-read who we are rather than assuming.
+        const signedIn = await signInMutation.mutateAsync({ idToken });
+        // Kept beside the cookie, for the build where cookies cannot be
+        // relied on. Same token, same lifetime.
+        storeSessionToken(signedIn.sessionToken);
+        // The session is set; re-read who we are rather than assuming.
         await utils.auth.me.invalidate();
       } catch (caught) {
         const message =

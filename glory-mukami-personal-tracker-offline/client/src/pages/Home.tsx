@@ -44,6 +44,7 @@ import { JournalCalendar } from "@/components/JournalCalendar";
 import { SettingsPanel } from "@/components/SettingsPanel";
 import { DayPlanner } from "@/components/DayPlanner";
 import { WorkoutStudio } from "@/components/WorkoutStudio";
+import { apiUrl, authHeaders } from "@/lib/api";
 import { useRecordStore } from "@/contexts/RecordStoreContext";
 import type { AnyRecord } from "@/lib/core/recordStore";
 import { toCSV } from "@/lib/core/exportData";
@@ -11823,6 +11824,7 @@ function PurchasesPage({
                   onClick={() => {
                     setPurchases(lastPurchases);
                     setLastPurchases(null);
+                    toast("Purchase restored");
                   }}
                 >
                   Undo remove
@@ -13178,6 +13180,9 @@ function DocumentRenewalPage({
     );
   }
   function previewAuthHeader(): Record<string, string> {
+    // This server's own session first; the Manus preview mirror after.
+    const own = authHeaders();
+    if (own.Authorization) return own;
     try {
       const raw = sessionStorage.getItem("manus-cookie");
       const prefix = `${COOKIE_NAME}=`;
@@ -13219,7 +13224,7 @@ function DocumentRenewalPage({
     setUploadingId(record.id);
     setUploadMessage(null);
     try {
-      const response = await fetch("/api/documents/upload", {
+      const response = await fetch(apiUrl("/api/documents/upload"), {
         method: "POST",
         credentials: "include",
         headers: {
@@ -16114,7 +16119,7 @@ function StudyWorkbenchPage({
                   : isBreak
                     ? isPaused
                       ? "⏸ Break paused"
-                      : "☕ Break running"
+                      : "◐ Break running"
                     : isRunning
                       ? "● Focus running"
                       : isPaused
@@ -19973,7 +19978,7 @@ function HabitsPage({
                               : undefined
                           }
                         >
-                          🔥 {streak}-day streak
+                          {streak}-day streak
                           {inDanger ? " · today still open" : ""}
                         </span>
                       )}

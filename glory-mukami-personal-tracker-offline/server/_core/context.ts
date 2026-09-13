@@ -39,9 +39,18 @@ async function userFromSession(
   // so `req.cookies` is always undefined and reading it would silently mean
   // nobody is ever signed in.
   const header = req.headers?.cookie;
-  if (!header) return null;
+  const fromCookie = header ? parseCookies(header)[COOKIE_NAME] : undefined;
 
-  const raw = parseCookies(header)[COOKIE_NAME];
+  // The same token may arrive as a bearer header instead: the Android build
+  // is served from inside the APK and cannot depend on a cookie for another
+  // origin surviving its WebView. Either carries identical claims.
+  const authorization = req.headers?.authorization;
+  const fromHeader =
+    typeof authorization === "string" && authorization.startsWith("Bearer ")
+      ? authorization.slice("Bearer ".length).trim()
+      : undefined;
+
+  const raw = fromCookie ?? fromHeader;
   if (!raw) return null;
 
   const claims = await readSessionToken(raw);
