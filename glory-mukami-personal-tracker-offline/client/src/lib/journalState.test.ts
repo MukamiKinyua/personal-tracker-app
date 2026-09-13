@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   addPracticeSession,
+  practiceProgress,
+  practiceTotals,
   adjustManualCountdown,
   activePageAfterNavigation,
   renameNamedEntry,
@@ -86,7 +88,9 @@ describe("journal prototype interactions", () => {
     );
 
     expect(updated.practice).toBe(4);
-    expect(updated.progress).toBe(28);
+    // A logged session is evidence of practice, not of progress; the
+    // estimate the user typed stays exactly what they typed.
+    expect(updated.progress).toBe(24);
     expect(updated.logs).toEqual([
       {
         date: "2026-08-24",
@@ -94,6 +98,38 @@ describe("journal prototype interactions", () => {
         note: "Practised conditional phrases.",
       },
     ]);
+  });
+
+  it("derives progress from milestones when any exist, else uses the estimate", () => {
+    expect(practiceProgress({ practice: 0, progress: 37, logs: [] })).toEqual({
+      source: "estimate",
+      percent: 37,
+    });
+    expect(
+      practiceProgress({
+        practice: 0,
+        progress: 37,
+        logs: [],
+        milestones: [
+          { id: "a", label: "Read chapter 1", done: true },
+          { id: "b", label: "Build a demo", done: true },
+          { id: "c", label: "Teach it to someone", done: false },
+        ],
+      })
+    ).toEqual({ source: "milestones", percent: 67, done: 2, total: 3 });
+  });
+
+  it("totals practice minutes and finds the most recent date", () => {
+    expect(
+      practiceTotals({
+        practice: 2,
+        progress: 0,
+        logs: [
+          { date: "2026-08-20", minutes: 25, note: "" },
+          { date: "2026-08-24", minutes: 40, note: "" },
+        ],
+      })
+    ).toEqual({ sessions: 2, minutes: 65, lastDate: "2026-08-24" });
   });
 
   it("saves complete structured weekly and monthly reflection fields", () => {

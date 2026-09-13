@@ -232,6 +232,9 @@ import {
 } from "../lib/workoutStudio";
 import {
   addPracticeSession,
+  practiceProgress,
+  practiceTotals,
+  type PracticeMilestone,
   adjustManualCountdown,
   activePageAfterNavigation,
   estimateCycle,
@@ -5048,7 +5051,12 @@ function LearningWorkbenchPage({
   onCover: () => void;
   onRecordPractice: (minutes: number, label: string) => void;
 }) {
-  type PracticeEntry = { date: string; minutes: number; note: string };
+  type PracticeEntry = {
+    date: string;
+    minutes: number;
+    note: string;
+    link?: string;
+  };
   type Skill = {
     id: string;
     name: string;
@@ -5056,12 +5064,15 @@ function LearningWorkbenchPage({
     level: string;
     progress: number;
     color: string;
+    /** Legacy single "next action" text; kept as the smallest next step. */
     milestone: string;
+    milestones?: PracticeMilestone[];
     practice: number;
     resources: string;
     notes: string;
     logs: PracticeEntry[];
   };
+  const [milestoneDraft, setMilestoneDraft] = useState("");
   const [skills, setSkills] = useState<Skill[]>([]);
   const [activeSkillId, setActiveSkillId] = useState("javascript");
   const [skillFormOpen, setSkillFormOpen] = useState(false);
@@ -5086,9 +5097,10 @@ function LearningWorkbenchPage({
     notes: "",
   });
   const [logDraft, setLogDraft] = useState({
-    date: new Date().toISOString().slice(0, 10),
+    date: sleepDateInputValue(new Date()),
     minutes: "25",
     note: "",
+    link: "",
   });
   const activeSkill =
     skills.find(skill => skill.id === activeSkillId) || skills[0];
@@ -5153,10 +5165,12 @@ function LearningWorkbenchPage({
   function savePractice() {
     if (!activeSkill) return;
     const minutes = Math.max(1, Number(logDraft.minutes) || 0);
-    const entry = {
-      date: logDraft.date || new Date().toISOString().slice(0, 10),
+    const link = logDraft.link.trim();
+    const entry: PracticeEntry = {
+      date: logDraft.date || sleepDateInputValue(new Date()),
       minutes,
       note: logDraft.note.trim() || "Focused practice session.",
+      ...(link ? { link } : {}),
     };
     setSkills(current =>
       current.map(skill =>
@@ -5165,12 +5179,14 @@ function LearningWorkbenchPage({
     );
     onRecordPractice(minutes, `${activeSkill.name} practice`);
     setLogDraft({
-      date: new Date().toISOString().slice(0, 10),
+      date: sleepDateInputValue(new Date()),
       minutes: "25",
       note: "",
+      link: "",
     });
     setLogOpen(false);
     setHistoryOpen(true);
+    toast(`${minutes} min of ${activeSkill.name} logged`);
   }
   function updateProgress(value: number) {
     if (!activeSkill) return;
@@ -5180,6 +5196,40 @@ function LearningWorkbenchPage({
       )
     );
   }
+  function updateActiveSkill(update: (skill: Skill) => Skill) {
+    if (!activeSkill) return;
+    setSkills(current =>
+      current.map(skill => (skill.id === activeSkill.id ? update(skill) : skill))
+    );
+  }
+  function addMilestone() {
+    const label = milestoneDraft.trim();
+    if (!label) return;
+    updateActiveSkill(skill => ({
+      ...skill,
+      milestones: [
+        ...(skill.milestones ?? []),
+        { id: `${Date.now()}-milestone`, label, done: false },
+      ],
+    }));
+    setMilestoneDraft("");
+  }
+  function toggleMilestone(id: string) {
+    updateActiveSkill(skill => ({
+      ...skill,
+      milestones: (skill.milestones ?? []).map(item =>
+        item.id === id ? { ...item, done: !item.done } : item
+      ),
+    }));
+  }
+  function removeMilestone(id: string) {
+    updateActiveSkill(skill => ({
+      ...skill,
+      milestones: (skill.milestones ?? []).filter(item => item.id !== id),
+    }));
+  }
+  const progress = activeSkill ? practiceProgress(activeSkill) : null;
+  const totals = activeSkill ? practiceTotals(activeSkill) : null;
   return (
     <section
       className="journal-spread learning-spread glass-scope"
@@ -5244,11 +5294,15 @@ function LearningWorkbenchPage({
                   setLogOpen(false);
                 }}
               >
-                <i style={{ background: skill.color }} />
+                <i style={{ background: skill.color }} aria-hidden="true" />
                 <span>
                   <b>{skill.name}</b>
                   <small>
-                    {skill.progress}% · {skill.level}
+                    {practiceProgress(skill).percent}%
+                    {practiceProgress(skill).source === "milestones"
+                      ? " of milestones"
+                      : " estimated"}{" "}
+                    · {skill.level}
                   </small>
                 </span>
               </button>
@@ -5373,21 +5427,101 @@ function LearningWorkbenchPage({
               </div>
               <div className="learning-progress-control">
                 <div>
-                  <span>Progress, as you define it</span>
-                  <b>{activeSkill.progress}%</b>
+                  <span>
+                    {progress?.source === "milestones"
+                      ? "Progress, from your milestones"
+                      : "Progress, as you estimate it"}
+                  </span>
+                  <b>
+                    {progress?.percent ?? 0}%
+                    {progress?.source === "milestones"
+                      ? ` · ${progress.done} of ${progress.total}`
+                      : ""}
+                  </b>
                 </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={activeSkill.progress}
-                  onChange={event => updateProgress(Number(event.target.value))}
-                  style={{ accentColor: activeSkill.color }}
-                />
+                {progress?.source === "milestones" ? (
+                  <div
+                    className="learning-progress-bar"
+                    role="progressbar"
+                    aria-valuemin={0}
+                    aria-valuemax={progress.total}
+                    aria-valuenow={progress.done}
+                    aria-valuetext={`${progress.done} of ${progress.total} milestones done, ${progress.percent}%`}
+                  >
+                    <i
+                      style={{
+                        width: `${progress.percent}%`,
+                        background: activeSkill.color,
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={activeSkill.progress}
+                    onChange={event =>
+                      updateProgress(Number(event.target.value))
+                    }
+                    style={{ accentColor: activeSkill.color }}
+                    aria-label="Your progress estimate"
+                    aria-valuetext={`${activeSkill.progress} percent, your own estimate`}
+                  />
+                )}
                 <small>
-                  This is your own progress estimate—not a prediction or course
-                  score.
+                  {progress?.source === "milestones"
+                    ? `${progress.percent}% is simply ${progress.done} ticked of ${progress.total} milestones you wrote. Untick or remove one and it moves back — nothing is inferred.`
+                    : "A number you set by hand, not a prediction or a course score. Add milestones below and it becomes a count of them instead."}
                 </small>
+              </div>
+              <div className="learning-milestones">
+                <div>
+                  <span>Milestones</span>
+                  <b>
+                    {(activeSkill.milestones ?? []).length
+                      ? `${(activeSkill.milestones ?? []).filter(item => item.done).length} done`
+                      : "None yet"}
+                  </b>
+                </div>
+                {(activeSkill.milestones ?? []).map(item => (
+                  <div className="learning-milestone-row" key={item.id}>
+                    <button
+                      type="button"
+                      className={cn(item.done && "done")}
+                      onClick={() => toggleMilestone(item.id)}
+                      aria-pressed={item.done}
+                    >
+                      <span aria-hidden="true">{item.done ? "✓" : ""}</span>
+                      {item.label}
+                    </button>
+                    <button
+                      type="button"
+                      className="learning-milestone-remove"
+                      onClick={() => removeMilestone(item.id)}
+                      aria-label={`Remove milestone ${item.label}`}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+                <div className="learning-milestone-add">
+                  <input
+                    value={milestoneDraft}
+                    onChange={event => setMilestoneDraft(event.target.value)}
+                    onKeyDown={event => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        addMilestone();
+                      }
+                    }}
+                    placeholder="A concrete step, e.g. build a working demo"
+                    aria-label="New milestone"
+                  />
+                  <button type="button" onClick={addMilestone}>
+                    Add milestone
+                  </button>
+                </div>
               </div>
             </section>
             <section className="learning-practice-session">
@@ -5436,12 +5570,25 @@ function LearningWorkbenchPage({
                     }
                     placeholder="What did you practice?"
                   />
+                  <input
+                    type="url"
+                    inputMode="url"
+                    value={logDraft.link}
+                    onChange={event =>
+                      setLogDraft(current => ({
+                        ...current,
+                        link: event.target.value,
+                      }))
+                    }
+                    placeholder="Evidence link, optional — a repo, doc, recording"
+                    aria-label="Evidence link"
+                  />
                   <div>
                     <button type="button" onClick={() => setLogOpen(false)}>
                       Cancel
                     </button>
                     <button type="button" onClick={savePractice}>
-                      Save local practice
+                      Save practice
                     </button>
                   </div>
                 </div>
@@ -5463,6 +5610,15 @@ function LearningWorkbenchPage({
                     : `View all ${activeSkill.logs.length}`}
                 </button>
               </div>
+              {totals && totals.sessions > 0 && (
+                <p className="learning-totals">
+                  {totals.sessions} session{totals.sessions === 1 ? "" : "s"} ·{" "}
+                  {totals.minutes >= 60
+                    ? `${Math.floor(totals.minutes / 60)} h ${totals.minutes % 60} min`
+                    : `${totals.minutes} min`}{" "}
+                  in all · last practised {totals.lastDate}
+                </p>
+              )}
               {activeSkill.logs.length ? (
                 activeSkill.logs
                   .slice(0, historyOpen ? activeSkill.logs.length : 3)
@@ -5471,11 +5627,25 @@ function LearningWorkbenchPage({
                       <b>
                         {entry.date} · {entry.minutes} min
                       </b>
-                      <small>{entry.note}</small>
+                      <small>
+                        {entry.note}
+                        {entry.link ? (
+                          <>
+                            {" · "}
+                            <a
+                              href={entry.link}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              evidence ↗
+                            </a>
+                          </>
+                        ) : null}
+                      </small>
                     </article>
                   ))
               ) : (
-                <small>Your local practice notes will appear here.</small>
+                <small>Your practice notes will appear here.</small>
               )}
             </section>
           </>

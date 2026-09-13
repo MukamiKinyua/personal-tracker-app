@@ -112,14 +112,25 @@ export type PracticeSession = {
   date: string;
   minutes: number;
   note: string;
+  /** Optional evidence — a link to the thing that was made or read. */
+  link?: string;
 };
+
+export type PracticeMilestone = { id: string; label: string; done: boolean };
 
 export type PracticeTrack = {
   practice: number;
+  /** The user's own estimate; used only when no milestones are defined. */
   progress: number;
   logs: PracticeSession[];
+  milestones?: PracticeMilestone[];
 };
 
+/**
+ * Logging a session no longer nudges the progress number. Progress is either
+ * the user's stated estimate or a count of ticked milestones — never a hidden
+ * increment that makes the figure look more measured than it is.
+ */
 export function addPracticeSession<T extends PracticeTrack>(
   skill: T,
   session: PracticeSession
@@ -127,9 +138,37 @@ export function addPracticeSession<T extends PracticeTrack>(
   return {
     ...skill,
     practice: skill.practice + 1,
-    progress: Math.min(100, skill.progress + 4),
     logs: [session, ...skill.logs],
   };
+}
+
+export type PracticeProgress =
+  | { source: "milestones"; percent: number; done: number; total: number }
+  | { source: "estimate"; percent: number };
+
+export function practiceProgress(skill: PracticeTrack): PracticeProgress {
+  const milestones = skill.milestones ?? [];
+  if (milestones.length > 0) {
+    const done = milestones.filter(item => item.done).length;
+    return {
+      source: "milestones",
+      percent: Math.round((done / milestones.length) * 100),
+      done,
+      total: milestones.length,
+    };
+  }
+  return {
+    source: "estimate",
+    percent: Math.min(100, Math.max(0, Math.round(skill.progress))),
+  };
+}
+
+export function practiceTotals(skill: PracticeTrack) {
+  const minutes = skill.logs.reduce((total, log) => total + log.minutes, 0);
+  const last = [...skill.logs].sort((a, b) =>
+    b.date.localeCompare(a.date)
+  )[0];
+  return { sessions: skill.logs.length, minutes, lastDate: last?.date ?? null };
 }
 
 export type ReflectionEntry = {

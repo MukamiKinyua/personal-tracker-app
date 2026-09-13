@@ -25729,6 +25729,120 @@ body {
 .learning-progress-control input {
   width: 100%;
 }
+.learning-progress-bar {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 248, 251, 0.22);
+}
+.learning-progress-bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  transition: width 200ms ease-out;
+}
+.learning-milestones {
+  display: grid;
+  gap: 0.34rem;
+  margin-top: 0.7rem;
+  padding-top: 0.6rem;
+  border-top: 1px dashed rgba(255, 248, 251, 0.3);
+}
+.learning-milestones > div:first-child {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+.learning-milestones > div:first-child span {
+  color: #fff8fb;
+  font-size: 0.6rem;
+  font-weight: 880;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+.learning-milestones > div:first-child b {
+  color: rgba(255, 248, 251, 0.85);
+  font-size: 0.6rem;
+}
+.learning-milestone-row {
+  display: flex;
+  gap: 0.3rem;
+  align-items: stretch;
+}
+.learning-milestone-row > button:first-child {
+  flex: 1 1 auto;
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  border: 1px solid rgba(255, 248, 251, 0.38);
+  border-radius: 8px;
+  padding: 0.4rem 0.55rem;
+  color: #fff8fb;
+  background: rgba(10, 5, 12, 0.25);
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-align: left;
+}
+.learning-milestone-row > button:first-child > span {
+  display: grid;
+  place-items: center;
+  width: 1rem;
+  height: 1rem;
+  border: 1px solid rgba(255, 248, 251, 0.6);
+  border-radius: 4px;
+  font-size: 0.6rem;
+}
+.learning-milestone-row > button:first-child.done {
+  text-decoration: line-through;
+  opacity: 0.8;
+}
+.learning-milestone-row > button:first-child.done > span {
+  background: #fff8fb;
+  color: #44102f;
+}
+.learning-milestone-remove {
+  border: 1px solid rgba(255, 248, 251, 0.3);
+  border-radius: 8px;
+  padding: 0 0.55rem;
+  color: rgba(255, 248, 251, 0.8);
+  background: transparent;
+  font-size: 0.8rem;
+}
+.learning-milestone-add {
+  display: flex;
+  gap: 0.34rem;
+}
+.learning-milestone-add input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 1px solid rgba(255, 248, 251, 0.38);
+  border-radius: 8px;
+  padding: 0.42rem 0.5rem;
+  color: #fff8fb;
+  background: rgba(10, 5, 12, 0.35);
+  font: inherit;
+  font-size: 0.64rem;
+}
+.learning-milestone-add button {
+  border: 1px solid rgba(255, 248, 251, 0.5);
+  border-radius: 8px;
+  padding: 0.4rem 0.6rem;
+  color: #44102f;
+  background: #ffd2e4;
+  font-size: 0.58rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.learning-totals {
+  margin: 0 0 0.3rem;
+  color: rgba(255, 248, 251, 0.85);
+  font-size: 0.6rem;
+  font-variant-numeric: tabular-nums;
+}
+.learning-history article small a {
+  color: #ffd2e4;
+  font-weight: 700;
+}
 .learning-practice-session > button {
   justify-self: start;
 }
