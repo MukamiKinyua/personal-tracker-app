@@ -5742,6 +5742,7 @@ function AchievementsPage({
                   onClick={() => {
                     setAchievements(lastAchievements);
                     setLastAchievements(null);
+                    toast("Achievement restored");
                   }}
                 >
                   Undo remove
