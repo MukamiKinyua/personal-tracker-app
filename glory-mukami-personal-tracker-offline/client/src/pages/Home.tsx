@@ -7947,15 +7947,20 @@ function HistoryPage({
     [recent, savedRecords]
   );
   function formatWhen(value: string) {
-    const date = new Date(value);
+    // Most "saved-record" sources (Achievements, Hobbies, Career, …) only
+    // ever stored a bare "YYYY-MM-DD", never a time. Parsing that plain
+    // reads it as UTC midnight — a day early west of Greenwich — and
+    // showing an hour/minute on it invents a time of day that never
+    // happened. Anchor to local noon and drop the clock for those.
+    const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(value);
+    const date = isDateOnly ? new Date(`${value}T12:00:00`) : new Date(value);
     if (Number.isNaN(date.getTime())) return value;
     return date.toLocaleString([], {
       weekday: "short",
       day: "numeric",
       month: "short",
       year: date.getFullYear() === new Date().getFullYear() ? undefined : "numeric",
-      hour: "numeric",
-      minute: "2-digit",
+      ...(isDateOnly ? {} : { hour: "numeric", minute: "2-digit" }),
     });
   }
   const visibleEntries = useMemo(() => {
