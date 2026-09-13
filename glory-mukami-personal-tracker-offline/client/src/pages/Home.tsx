@@ -11332,6 +11332,7 @@ function ResponsibilitiesPage({
     []
   );
   const [lastList, setLastList] = useState<Responsibility[] | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [history, setHistory] = useState<
     Array<{ title: string; date: string }>
   >([]);
@@ -11397,11 +11398,46 @@ function ResponsibilitiesPage({
   function addResponsibility(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!draft.title.trim()) return;
-    setResponsibilities(current => [
-      ...current,
-      { ...draft, id: `resp-${Date.now()}`, title: draft.title.trim() },
-    ]);
-    toast(`Added “${draft.title.trim()}” · ${draft.cadence.toLowerCase()}`);
+    const trimmedTitle = draft.title.trim();
+    if (editingId) {
+      setResponsibilities(current =>
+        current.map(entry =>
+          entry.id === editingId
+            ? { ...entry, ...draft, id: editingId, title: trimmedTitle }
+            : entry
+        )
+      );
+      toast(`Saved changes to “${trimmedTitle}”`);
+      setEditingId(null);
+    } else {
+      setResponsibilities(current => [
+        ...current,
+        { ...draft, id: `resp-${Date.now()}`, title: trimmedTitle },
+      ]);
+      toast(`Added “${trimmedTitle}” · ${draft.cadence.toLowerCase()}`);
+    }
+    setDraft({
+      title: "",
+      owner: "Me",
+      cadence: "Weekly",
+      reminder: "Day before",
+      done: false,
+    });
+  }
+  function editResponsibility(item: Responsibility) {
+    setEditingId(item.id ?? null);
+    setDraft({
+      title: item.title,
+      owner: item.owner,
+      cadence: item.cadence,
+      reminder: item.reminder,
+      done: item.done,
+      lastDone: item.lastDone,
+      nextDue: item.nextDue,
+    });
+  }
+  function cancelResponsibilityEdit() {
+    setEditingId(null);
     setDraft({
       title: "",
       owner: "Me",
@@ -11414,7 +11450,9 @@ function ResponsibilitiesPage({
     // Every responsibility repeats, so "done" means "done this time":
     // record the moment, schedule the next one, stay on the list.
     const nextDue = nextDueFrom(item.cadence, today);
-    setHistory(current => [{ title: item.title, date: today }, ...current]);
+    setHistory(current =>
+      [{ title: item.title, date: today }, ...current].slice(0, 200)
+    );
     setResponsibilities(current =>
       current.map(entry =>
         entry.id === item.id
@@ -11425,6 +11463,7 @@ function ResponsibilitiesPage({
     toast(`“${item.title}” done · next by ${formatDay(nextDue)}`);
   }
   function removeResponsibility(item: Responsibility) {
+    if (editingId === item.id) cancelResponsibilityEdit();
     setLastList(responsibilities);
     setResponsibilities(current =>
       current.filter(entry => entry.id !== item.id)
@@ -11516,9 +11555,21 @@ function ResponsibilitiesPage({
               <option>No reminder</option>
             </select>
           </label>
-          <Button className="ink-button" type="submit">
-            <Plus size={15} /> Add responsibility
-          </Button>
+          <div className="career-form-actions">
+            <Button className="ink-button" type="submit">
+              <Plus size={15} />{" "}
+              {editingId ? "Save changes" : "Add responsibility"}
+            </Button>
+            {editingId ? (
+              <button
+                type="button"
+                className="local-undo"
+                onClick={cancelResponsibilityEdit}
+              >
+                Cancel edit
+              </button>
+            ) : null}
+          </div>
         </form>
         <div className="responsibility-list">
           <div>
@@ -11532,6 +11583,7 @@ function ResponsibilitiesPage({
                   onClick={() => {
                     setResponsibilities(lastList);
                     setLastList(null);
+                    toast("Removal undone");
                   }}
                 >
                   Undo
@@ -11548,7 +11600,10 @@ function ResponsibilitiesPage({
               const due = dueState(item);
               return (
                 <article
-                  className={cn(due && `is-${due.kind}`)}
+                  className={cn(
+                    due && `is-${due.kind}`,
+                    editingId === item.id && "is-editing"
+                  )}
                   key={item.id}
                 >
                   <button
@@ -11573,15 +11628,20 @@ function ResponsibilitiesPage({
                       <small className="responsibility-due">not done yet</small>
                     )}
                   </p>
-                  <button
-                    type="button"
-                    className="responsibility-remove"
-                    onClick={() => removeResponsibility(item)}
-                    aria-label={`Remove ${item.title}`}
-                    title="Remove"
-                  >
-                    ×
-                  </button>
+                  <span className="care-actions">
+                    <button type="button" onClick={() => editResponsibility(item)}>
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      className="responsibility-remove"
+                      onClick={() => removeResponsibility(item)}
+                      aria-label={`Remove ${item.title}`}
+                      title="Remove"
+                    >
+                      ×
+                    </button>
+                  </span>
                 </article>
               );
             })

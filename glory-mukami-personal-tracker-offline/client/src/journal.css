@@ -30783,6 +30783,7 @@ body {
 .studio-week b,
 .studio-records b {
   color: #fffaf2;
+  font-size: 0.7rem;
 }
 
 .studio-heading small,
@@ -30790,6 +30791,7 @@ body {
 .studio-week small,
 .studio-records small {
   color: rgba(255, 250, 242, 0.78);
+  font-size: 0.6rem;
 }
 
 .studio-note {
@@ -31033,9 +31035,24 @@ body {
   color: #a8481f;
   opacity: 1;
 }
-.responsibility-list .responsibility-remove {
+.responsibility-list .care-actions {
   margin-left: auto;
   align-self: center;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.responsibility-list .care-actions > button:first-child {
+  border: 1px solid rgba(91, 104, 160, 0.3);
+  border-radius: 7px;
+  padding: 0.15rem 0.45rem;
+  color: inherit;
+  background: transparent;
+  font-size: 0.56rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.responsibility-list .responsibility-remove {
   border: 0;
   padding: 0.15rem 0.45rem;
   color: inherit;
@@ -31047,6 +31064,9 @@ body {
 .responsibility-list .responsibility-remove:hover,
 .responsibility-list .responsibility-remove:focus-visible {
   opacity: 1;
+}
+.responsibility-list article.is-editing {
+  box-shadow: inset 3px 0 0 #6574b1;
 }
 .responsibility-list > div b .local-undo {
   margin-left: 0.5rem;
