@@ -11238,16 +11238,26 @@ function EnvironmentPage({
   onCover: () => void;
 }) {
   type CareItem = {
+    id?: string;
     title: string;
     area: string;
     recurring: boolean;
     supply: string;
     done: boolean;
+    lastDone?: string;
   };
+  type CareMoment = { title: string; date: string; recurring: boolean };
   const [items, setItems] = useState<CareItem[]>([]);
-  const [history, setHistory] = useState<
-    Array<{ title: string; date: string; recurring: boolean }>
-  >([]);
+  const [lastItems, setLastItems] = useState<CareItem[] | null>(null);
+  const [history, setHistory] = useState<CareMoment[]>([]);
+  const today = sleepDateInputValue(new Date());
+  const formatDay = (value: string) =>
+    /^\d{4}-\d{2}-\d{2}$/.test(value)
+      ? new Date(`${value}T12:00:00`).toLocaleDateString(undefined, {
+          day: "numeric",
+          month: "short",
+        })
+      : value;
   const [draft, setDraft] = useState<CareItem>({
     title: "",
     area: "Workspace",
@@ -11259,21 +11269,26 @@ function EnvironmentPage({
     scope: "environment",
     payload: { items, history },
     hydrate: payload => {
-      if (Array.isArray(payload.items)) setItems(payload.items as CareItem[]);
-      if (Array.isArray(payload.history))
-        setHistory(
-          payload.history as Array<{
-            title: string;
-            date: string;
-            recurring: boolean;
-          }>
+      if (Array.isArray(payload.items))
+        setItems(
+          (payload.items as CareItem[]).map((item, index) => ({
+            ...item,
+            // Items saved before ids existed get a stable one on load.
+            id: item.id ?? `care-${index}-${item.title}`,
+          }))
         );
+      if (Array.isArray(payload.history))
+        setHistory(payload.history as CareMoment[]);
     },
   });
   function addItem(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!draft.title.trim()) return;
-    setItems(current => [...current, { ...draft, title: draft.title.trim() }]);
+    setItems(current => [
+      ...current,
+      { ...draft, id: `care-${Date.now()}`, title: draft.title.trim() },
+    ]);
+    toast(`Added “${draft.title.trim()}”`);
     setDraft({
       title: "",
       area: "Workspace",
@@ -11282,28 +11297,42 @@ function EnvironmentPage({
       done: false,
     });
   }
-  function toggleItem(index: number) {
-    const item = items[index];
-    if (!item) return;
+  function toggleItem(item: CareItem) {
+    if (item.recurring) {
+      // A repeating task is never done for good: completing it records a
+      // moment and leaves it ready for next time.
+      setHistory(current => [
+        { title: item.title, date: today, recurring: true },
+        ...current,
+      ]);
+      setItems(current =>
+        current.map(entry =>
+          entry.id === item.id
+            ? { ...entry, done: false, lastDone: today }
+            : entry
+        )
+      );
+      toast(`“${item.title}” done today — it stays on the list`);
+      return;
+    }
     if (!item.done)
       setHistory(current => [
-        {
-          title: item.title,
-          date: new Date().toLocaleDateString("en", {
-            month: "short",
-            day: "numeric",
-          }),
-          recurring: item.recurring,
-        },
+        { title: item.title, date: today, recurring: false },
         ...current,
       ]);
     setItems(current =>
-      current.map((entry, position) =>
-        position === index ? { ...entry, done: !entry.done } : entry
+      current.map(entry =>
+        entry.id === item.id ? { ...entry, done: !entry.done } : entry
       )
     );
   }
+  function removeItem(item: CareItem) {
+    setLastItems(items);
+    setItems(current => current.filter(entry => entry.id !== item.id));
+    toast(`Removed “${item.title}”`);
+  }
   const upkeep = items.filter(item => !item.done || item.recurring);
+  const completedOnce = items.filter(item => item.done && !item.recurring);
   return (
     <section
       className="journal-spread environment-spread glass-scope"
@@ -11394,34 +11423,97 @@ function EnvironmentPage({
         <div className="care-list">
           <div>
             <span>current upkeep</span>
-            <b>{upkeep.length} visible</b>
+            <b>
+              {upkeep.length} visible
+              {lastItems && (
+                <button
+                  type="button"
+                  className="local-undo"
+                  onClick={() => {
+                    setItems(lastItems);
+                    setLastItems(null);
+                  }}
+                >
+                  Undo
+                </button>
+              )}
+            </b>
           </div>
           {upkeep.length === 0 ? (
             <small>
               Start with one small task that would make your space feel lighter.
             </small>
           ) : (
-            upkeep.map(item => {
-              const index = items.indexOf(item);
-              return (
-                <article
-                  className={cn(item.done && "done")}
-                  key={`${item.title}-${index}`}
+            upkeep.map(item => (
+              <article className={cn(item.done && "done")} key={item.id}>
+                <button
+                  type="button"
+                  onClick={() => toggleItem(item)}
+                  aria-label={
+                    item.recurring
+                      ? `Mark ${item.title} done today`
+                      : item.done
+                        ? `Reopen ${item.title}`
+                        : `Mark ${item.title} done`
+                  }
+                  aria-pressed={item.done}
                 >
-                  <button type="button" onClick={() => toggleItem(index)}>
-                    {item.done ? "✓" : ""}
+                  {item.done ? "✓" : ""}
+                </button>
+                <p>
+                  <b>{item.title}</b>
+                  <small>
+                    {item.area}
+                    {item.recurring
+                      ? item.lastDone
+                        ? ` · repeats · last done ${formatDay(item.lastDone)}`
+                        : " · repeats · not done yet"
+                      : ""}
+                    {item.supply ? ` · Supply: ${item.supply}` : ""}
+                  </small>
+                </p>
+                <button
+                  type="button"
+                  className="care-remove"
+                  onClick={() => removeItem(item)}
+                  aria-label={`Remove ${item.title}`}
+                  title="Remove"
+                >
+                  ×
+                </button>
+              </article>
+            ))
+          )}
+          {completedOnce.length > 0 && (
+            <details className="care-completed">
+              <summary>
+                {completedOnce.length} one-time task
+                {completedOnce.length === 1 ? "" : "s"} completed
+              </summary>
+              {completedOnce.map(item => (
+                <article className="done" key={item.id}>
+                  <button
+                    type="button"
+                    onClick={() => toggleItem(item)}
+                    aria-label={`Reopen ${item.title}`}
+                  >
+                    ✓
                   </button>
                   <p>
                     <b>{item.title}</b>
-                    <small>
-                      {item.area}
-                      {item.recurring ? " · repeats" : ""}
-                      {item.supply ? ` · Supply: ${item.supply}` : ""}
-                    </small>
+                    <small>{item.area} · tap ✓ to reopen</small>
                   </p>
+                  <button
+                    type="button"
+                    className="care-remove"
+                    onClick={() => removeItem(item)}
+                    aria-label={`Remove ${item.title}`}
+                  >
+                    ×
+                  </button>
                 </article>
-              );
-            })
+              ))}
+            </details>
           )}
         </div>
         <div className="care-history">
@@ -11437,7 +11529,7 @@ function EnvironmentPage({
             history.slice(0, 3).map((entry, index) => (
               <p key={`${entry.title}-${index}`}>
                 <b>
-                  {entry.date} · {entry.title}
+                  {formatDay(entry.date)} · {entry.title}
                 </b>
                 <small>
                   {entry.recurring
