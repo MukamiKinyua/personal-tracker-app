@@ -29,6 +29,7 @@ import {
 import {
   getMongoJournalState,
   listMongoJournalEvents,
+  purgeMongoJournalForOwner,
   recordMongoJournalEvent,
   upsertMongoJournalState,
 } from "./mongoJournal";
@@ -105,6 +106,10 @@ export const appRouter = router({
       .input(z.object({ confirm: z.literal("delete everything") }))
       .mutation(async ({ ctx }) => {
         const deleted = await purgeOwner(ctx.user.id);
+        // Page workspaces and events live in their own collections; without
+        // this the cycle, finance and wellbeing pages survived account
+        // deletion.
+        const journal = await purgeMongoJournalForOwner(ctx.user.id);
         await purgeDevices(ctx.user.id);
         await deleteUser(ctx.user.id);
 
@@ -112,7 +117,11 @@ export const appRouter = router({
           ...getSessionCookieOptions(ctx.req),
           maxAge: -1,
         });
-        return { deleted };
+        return {
+          deleted,
+          workspaces: journal.states,
+          events: journal.events,
+        };
       }),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);

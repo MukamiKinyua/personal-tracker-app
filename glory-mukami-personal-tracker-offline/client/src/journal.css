@@ -9162,6 +9162,119 @@ button:focus-visible {
   border-radius: 9px;
   background: #f5e9f2;
 }
+.privacy-delete {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 0.9rem;
+  padding: 0.65rem 0.7rem;
+  border: 1px solid rgba(125, 41, 70, 0.35);
+  border-radius: 10px;
+  background: rgba(255, 245, 248, 0.9);
+}
+.privacy-delete > div:first-child {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+.privacy-delete > div:first-child span {
+  color: #7d2946;
+  font-size: 0.55rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.privacy-delete > div:first-child b {
+  color: #5a3a48;
+  font-size: 0.58rem;
+}
+.privacy-delete > p {
+  margin: 0;
+  color: #5a3a48;
+  font-size: 0.57rem;
+  line-height: 1.45;
+}
+.privacy-delete code {
+  padding: 0.05rem 0.3rem;
+  border-radius: 4px;
+  background: rgba(125, 41, 70, 0.12);
+  font-size: 0.55rem;
+}
+.privacy-delete-options {
+  display: grid;
+  gap: 0.45rem;
+}
+.privacy-delete-options article {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid rgba(125, 41, 70, 0.25);
+  border-radius: 8px;
+  background: #fff;
+}
+.privacy-delete-options b {
+  color: #3f2430;
+  font-size: 0.6rem;
+}
+.privacy-delete-options small {
+  color: #5a3a48;
+  font-size: 0.55rem;
+  line-height: 1.45;
+}
+.privacy-delete-options button,
+.privacy-delete-confirm button {
+  justify-self: start;
+  border: 1px solid rgba(125, 41, 70, 0.5);
+  border-radius: 999px;
+  padding: 0.38rem 0.7rem;
+  color: #7d2946;
+  background: #fff;
+  font-size: 0.58rem;
+  font-weight: 800;
+}
+.privacy-delete-options button:disabled,
+.privacy-delete-confirm button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.privacy-delete-confirm {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.6rem 0.65rem;
+  border: 2px solid #7d2946;
+  border-radius: 9px;
+  background: #fff;
+}
+.privacy-delete-confirm > b {
+  color: #7d2946;
+  font-size: 0.64rem;
+}
+.privacy-delete-confirm label {
+  display: grid;
+  gap: 0.25rem;
+  color: #3f2430;
+  font-size: 0.57rem;
+  font-weight: 700;
+}
+.privacy-delete-confirm input {
+  border: 1px solid rgba(125, 41, 70, 0.45);
+  border-radius: 8px;
+  padding: 0.45rem 0.55rem;
+  color: #3f2430;
+  background: #fff;
+  font: inherit;
+  font-size: 0.68rem;
+}
+.privacy-delete-confirm > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.privacy-delete-confirm button.is-danger {
+  color: #fff;
+  background: #7d2946;
+  border-color: #7d2946;
+}
 .privacy-summary span {
   color: #a2668f;
   font-size: 0.53rem;

@@ -101,6 +101,26 @@ export async function upsertMongoJournalState(
   return getMongoJournalState(ownerId, scope);
 }
 
+/**
+ * Removes every page workspace and event for an owner. Account deletion must
+ * call this as well as the records purge: the workspaces hold the cycle,
+ * finance, wellbeing and reflection pages, which are the most sensitive data
+ * the journal keeps.
+ */
+export async function purgeMongoJournalForOwner(
+  ownerId: number
+): Promise<{ states: number; events: number }> {
+  const { states, events } = await collections();
+  const [stateResult, eventResult] = await Promise.all([
+    states.deleteMany({ ownerId }),
+    events.deleteMany({ ownerId }),
+  ]);
+  return {
+    states: stateResult.deletedCount ?? 0,
+    events: eventResult.deletedCount ?? 0,
+  };
+}
+
 export async function listMongoJournalEvents(
   ownerId: number,
   limit: number,

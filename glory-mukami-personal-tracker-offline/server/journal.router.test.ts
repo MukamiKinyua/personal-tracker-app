@@ -10,6 +10,28 @@ const mongoJournalMocks = vi.hoisted(() => ({
   upsertMongoJournalState: vi.fn(),
   listMongoJournalEvents: vi.fn(),
   recordMongoJournalEvent: vi.fn(),
+  purgeMongoJournalForOwner: vi.fn(),
+}));
+
+const mongoRecordMocks = vi.hoisted(() => ({
+  countRecords: vi.fn(),
+  currentCursor: vi.fn(),
+  pullRecords: vi.fn(),
+  purgeOwner: vi.fn(),
+  pushRecords: vi.fn(),
+}));
+
+const mongoDeviceMocks = vi.hoisted(() => ({
+  isDeviceActive: vi.fn(),
+  listDevices: vi.fn(),
+  purgeDevices: vi.fn(),
+  renameDevice: vi.fn(),
+  revokeDevice: vi.fn(),
+  touchDevice: vi.fn(),
+}));
+
+const mongoUserMocks = vi.hoisted(() => ({
+  deleteUser: vi.fn(),
 }));
 
 vi.mock("./mongo", () => ({
@@ -19,6 +41,10 @@ vi.mock("./mongo", () => ({
 vi.mock("./mongoJournal", () => ({
   ...mongoJournalMocks,
 }));
+
+vi.mock("./mongoRecords", () => ({ ...mongoRecordMocks }));
+vi.mock("./mongoDevices", () => ({ ...mongoDeviceMocks }));
+vi.mock("./mongoUsers", () => ({ ...mongoUserMocks }));
 
 import { appRouter } from "./routers";
 
@@ -42,6 +68,25 @@ function authenticatedContext(): TrpcContext {
 
 describe("journal router", () => {
   beforeEach(() => vi.clearAllMocks());
+
+  it("account deletion purges page workspaces and events, not only records", async () => {
+    mongoRecordMocks.purgeOwner.mockResolvedValue(12);
+    mongoDeviceMocks.purgeDevices.mockResolvedValue(undefined);
+    mongoJournalMocks.purgeMongoJournalForOwner.mockResolvedValue({
+      states: 9,
+      events: 30,
+    });
+    mongoUserMocks.deleteUser.mockResolvedValue(undefined);
+    const context = authenticatedContext();
+    const caller = appRouter.createCaller(context);
+    const result = await caller.auth.deleteAccount({
+      confirm: "delete everything",
+    });
+    expect(result).toEqual({ deleted: 12, workspaces: 9, events: 30 });
+    expect(mongoJournalMocks.purgeMongoJournalForOwner).toHaveBeenCalledWith(42);
+    expect(mongoUserMocks.deleteUser).toHaveBeenCalledWith(42);
+    expect(context.res.clearCookie).toHaveBeenCalled();
+  });
 
   it("reveals only non-sensitive MongoDB readiness", async () => {
     mongoMocks.mongoReadiness.mockResolvedValue({

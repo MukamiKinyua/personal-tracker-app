@@ -194,6 +194,41 @@ export async function openStore(): Promise<JournalStore> {
  * pressure. The prompt is granted silently in some browsers and only after
  * engagement in others, so the answer is reported rather than assumed.
  */
+/**
+ * Removes everything this journal keeps on the device: the IndexedDB
+ * database, every localStorage key under the app prefix (record-store
+ * fallback, page workspaces, the journal shell), and any legacy key that
+ * used the bare name. Returns what was removed so the caller can say so.
+ * Nothing on the server is touched.
+ */
+export async function eraseLocalJournalData(): Promise<{
+  database: boolean;
+  keys: number;
+}> {
+  let keys = 0;
+  try {
+    const doomed: string[] = [];
+    for (let index = 0; index < window.localStorage.length; index += 1) {
+      const key = window.localStorage.key(index);
+      if (key && key.startsWith("glory-personal-tracker")) doomed.push(key);
+    }
+    for (const key of doomed) window.localStorage.removeItem(key);
+    keys = doomed.length;
+  } catch {
+    // Storage blocked — nothing to remove there.
+  }
+  let database = false;
+  if (typeof indexedDB !== "undefined") {
+    database = await new Promise<boolean>(resolve => {
+      const request = indexedDB.deleteDatabase(DB_NAME);
+      request.onsuccess = () => resolve(true);
+      request.onerror = () => resolve(false);
+      request.onblocked = () => resolve(false);
+    });
+  }
+  return { database, keys };
+}
+
 export async function requestPersistence(): Promise<boolean> {
   try {
     if (!navigator.storage?.persist) return false;

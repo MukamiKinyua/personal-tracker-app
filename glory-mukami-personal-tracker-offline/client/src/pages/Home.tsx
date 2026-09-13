@@ -47,6 +47,7 @@ import { DayPlanner } from "@/components/DayPlanner";
 import { WorkoutStudio } from "@/components/WorkoutStudio";
 import { useRecordStore } from "@/contexts/RecordStoreContext";
 import { toCSV } from "@/lib/core/exportData";
+import { eraseLocalJournalData } from "@/lib/core/storage";
 import {
   computeStreak,
   isDueOn,
@@ -8698,6 +8699,53 @@ function PrivacyPage({
         setModules(payload.modules as typeof modules);
     },
   });
+  const auth = useAuth();
+  const journal = useRecordStore();
+  const deleteAccount = trpc.auth.deleteAccount.useMutation();
+  const [deleteTarget, setDeleteTarget] = useState<
+    "device" | "account" | null
+  >(null);
+  const [confirmText, setConfirmText] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const confirmed = confirmText.trim().toLowerCase() === "delete everything";
+  const recordCount = journal.exportAll().records.length;
+  function cancelDelete() {
+    setDeleteTarget(null);
+    setConfirmText("");
+  }
+  async function eraseDevice() {
+    if (!confirmed) return;
+    setDeleting(true);
+    try {
+      const result = await eraseLocalJournalData();
+      toast(
+        `Erased this device's copy: ${result.keys} stored item${result.keys === 1 ? "" : "s"}${result.database ? " and the local database" : ""}. Reloading.`
+      );
+      window.setTimeout(() => window.location.reload(), 900);
+    } catch {
+      setDeleting(false);
+      toast("Couldn't erase everything — try clearing site data in your browser settings");
+    }
+  }
+  async function eraseAccount() {
+    if (!confirmed || !auth.isAuthenticated) return;
+    setDeleting(true);
+    try {
+      const result = await deleteAccount.mutateAsync({
+        confirm: "delete everything",
+      });
+      await eraseLocalJournalData();
+      toast(
+        `Account deleted: ${result.deleted} record${result.deleted === 1 ? "" : "s"}, ${result.workspaces} page workspace${result.workspaces === 1 ? "" : "s"}, ${result.events} event${result.events === 1 ? "" : "s"} removed from the server, and this device's copy erased. Reloading.`
+      );
+      window.setTimeout(() => window.location.reload(), 1400);
+    } catch (error) {
+      setDeleting(false);
+      toast(
+        `The server refused the deletion${error instanceof Error && error.message ? `: ${error.message}` : ""}. Nothing was removed; your account still exists, so you can try again.`
+      );
+    }
+  }
   return (
     <section
       className="journal-spread privacy-spread glass-scope"
@@ -8712,9 +8760,8 @@ function PrivacyPage({
           <em>things in your hands.</em>
         </h2>
         <p className="page-intro">
-          These are prototype display preferences for your private journal. They
-          control what this interface shows; no production persistence or
-          notifications are active yet.
+          What this journal shows of your sensitive pages, and — further down —
+          how to remove what it holds, on this device or from your account.
         </p>
         <div className="privacy-signal">
           <HeartPulse size={15} />
@@ -8805,10 +8852,98 @@ function PrivacyPage({
                 : "Sensitive summaries hidden"}
           </b>
           <small>
-            Preview setting: {previewMode}. This is an interface preference only
-            until a storage and notification design is approved.
+            Preview setting: {previewMode}. These are display preferences; they
+            change what is shown, not what is stored.
           </small>
         </div>
+        <section className="privacy-delete" aria-labelledby="privacy-delete-title">
+          <div>
+            <span id="privacy-delete-title">Delete your data</span>
+            <b>
+              {recordCount} record{recordCount === 1 ? "" : "s"} on this device
+            </b>
+          </div>
+          <p>
+            Two separate things can be removed. Each asks you to type{" "}
+            <code>delete everything</code> first, and neither can be undone.
+          </p>
+          <div className="privacy-delete-options">
+            <article>
+              <b>Erase this device’s copy</b>
+              <small>
+                Removes every record, page workspace, setting and year grid
+                stored in this browser, then reloads.{" "}
+                {auth.isAuthenticated
+                  ? "Your account copy on the server is untouched and will sync back down if you sign in again."
+                  : "You are not signed in, so this is the only copy — it will be gone."}
+              </small>
+              <button
+                type="button"
+                onClick={() => {
+                  setDeleteTarget("device");
+                  setConfirmText("");
+                }}
+                disabled={deleting}
+              >
+                Erase this device…
+              </button>
+            </article>
+            <article>
+              <b>Delete account and everything on the server</b>
+              <small>
+                {auth.isAuthenticated
+                  ? `Removes ${auth.user?.email ?? "your account"} and all its records, page workspaces and events from the server, erases this device's copy, and signs you out. Other devices keep their local copy until they are erased too.`
+                  : "Sign in first — there is no account to delete while signed out."}
+              </small>
+              <button
+                type="button"
+                onClick={() => {
+                  setDeleteTarget("account");
+                  setConfirmText("");
+                }}
+                disabled={deleting || !auth.isAuthenticated}
+              >
+                Delete account…
+              </button>
+            </article>
+          </div>
+          {deleteTarget && (
+            <div className="privacy-delete-confirm" role="alertdialog" aria-labelledby="privacy-confirm-title">
+              <b id="privacy-confirm-title">
+                {deleteTarget === "device"
+                  ? "Erase everything stored on this device?"
+                  : "Delete your account and everything on the server?"}
+              </b>
+              <label>
+                Type <code>delete everything</code> to confirm
+                <input
+                  value={confirmText}
+                  onChange={event => setConfirmText(event.target.value)}
+                  autoComplete="off"
+                  spellCheck={false}
+                  disabled={deleting}
+                />
+              </label>
+              <div>
+                <button
+                  type="button"
+                  className="is-danger"
+                  disabled={!confirmed || deleting}
+                  onClick={deleteTarget === "device" ? eraseDevice : eraseAccount}
+                >
+                  {deleting
+                    ? "Deleting…"
+                    : deleteTarget === "device"
+                      ? "Erase this device now"
+                      : "Delete my account now"}
+                </button>
+                <button type="button" onClick={cancelDelete} disabled={deleting}>
+                  Keep everything
+                </button>
+              </div>
+            </div>
+          )}
+        </section>
       </div>
     </section>
   );
