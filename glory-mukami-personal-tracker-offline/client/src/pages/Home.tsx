@@ -10546,42 +10546,93 @@ function CareerPage({
   onCover: () => void;
 }) {
   type CareerEntry = {
+    id?: string;
     direction: string;
     milestone: string;
     evidence: string;
     application: string;
     reflection: string;
+    createdAt?: string;
+    updatedAt?: string;
   };
-  const [entries, setEntries] = useState<CareerEntry[]>([]);
-  const [draft, setDraft] = useState<CareerEntry>({
+  type CareerDraft = Pick<
+    CareerEntry,
+    "direction" | "milestone" | "evidence" | "application" | "reflection"
+  >;
+  const emptyCareerDraft: CareerDraft = {
     direction: "",
     milestone: "",
     evidence: "",
     application: "",
     reflection: "",
-  });
+  };
+  const [entries, setEntries] = useState<CareerEntry[]>([]);
+  const [lastEntries, setLastEntries] = useState<CareerEntry[] | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draft, setDraft] = useState<CareerDraft>(emptyCareerDraft);
+  const today = sleepDateInputValue(new Date());
+  const formatDay = (value?: string) =>
+    value && /^\d{4}-\d{2}-\d{2}$/.test(value)
+      ? new Date(`${value}T12:00:00`).toLocaleDateString(undefined, {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        })
+      : null;
   useMongoJournalScope({
     scope: "career",
     payload: { entries },
     hydrate: payload => {
       if (Array.isArray(payload.entries))
-        setEntries(payload.entries as CareerEntry[]);
+        setEntries(
+          (payload.entries as CareerEntry[]).map((entry, index) => ({
+            ...entry,
+            id: entry.id ?? `career-${index}-${entry.direction}`,
+          }))
+        );
     },
   });
   function addEntry(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!draft.direction.trim()) return;
-    setEntries(current => [
-      ...current,
-      { ...draft, direction: draft.direction.trim() },
-    ]);
+    const fields = { ...draft, direction: draft.direction.trim() };
+    if (editingId) {
+      setEntries(current =>
+        current.map(entry =>
+          entry.id === editingId
+            ? { ...entry, ...fields, updatedAt: today }
+            : entry
+        )
+      );
+      toast("Direction updated");
+    } else {
+      setEntries(current => [
+        ...current,
+        { ...fields, id: `career-${Date.now()}`, createdAt: today },
+      ]);
+      toast(`“${fields.direction}” saved`);
+    }
+    setDraft(emptyCareerDraft);
+    setEditingId(null);
+  }
+  function editEntry(entry: CareerEntry) {
+    setEditingId(entry.id ?? null);
     setDraft({
-      direction: "",
-      milestone: "",
-      evidence: "",
-      application: "",
-      reflection: "",
+      direction: entry.direction,
+      milestone: entry.milestone,
+      evidence: entry.evidence,
+      application: entry.application,
+      reflection: entry.reflection,
     });
+  }
+  function removeEntry(entry: CareerEntry) {
+    setLastEntries(entries);
+    setEntries(current => current.filter(item => item.id !== entry.id));
+    if (editingId === entry.id) {
+      setEditingId(null);
+      setDraft(emptyCareerDraft);
+    }
+    toast(`Removed “${entry.direction}”`);
   }
   return (
     <section
@@ -10672,14 +10723,43 @@ function CareerPage({
               placeholder="What did you learn or move forward?"
             />
           </label>
-          <Button type="submit" className="ink-button">
-            <Plus size={15} /> Save career direction
-          </Button>
+          <div className="career-form-actions">
+            <Button type="submit" className="ink-button">
+              <Plus size={15} />{" "}
+              {editingId ? "Save changes" : "Save career direction"}
+            </Button>
+            {editingId ? (
+              <button
+                type="button"
+                className="local-undo"
+                onClick={() => {
+                  setEditingId(null);
+                  setDraft(emptyCareerDraft);
+                }}
+              >
+                Cancel edit
+              </button>
+            ) : null}
+          </div>
         </form>
         <div className="career-list">
           <div>
             <span>career notebook</span>
-            <b>{entries.length} directions</b>
+            <b>
+              {entries.length} directions
+              {lastEntries && (
+                <button
+                  type="button"
+                  className="local-undo"
+                  onClick={() => {
+                    setEntries(lastEntries);
+                    setLastEntries(null);
+                  }}
+                >
+                  Undo remove
+                </button>
+              )}
+            </b>
           </div>
           {entries.length === 0 ? (
             <small>
@@ -10687,9 +10767,12 @@ function CareerPage({
               week.
             </small>
           ) : (
-            entries.map((entry, index) => (
-              <article key={`${entry.direction}-${index}`}>
-                <i>{entry.direction.slice(0, 1)}</i>
+            entries.map(entry => (
+              <article
+                key={entry.id}
+                className={cn(editingId === entry.id && "is-editing")}
+              >
+                <i aria-hidden="true">{entry.direction.slice(0, 1)}</i>
                 <p>
                   <b>{entry.direction}</b>
                   <small>
@@ -10702,6 +10785,25 @@ function CareerPage({
                   <em>
                     Reflection: {entry.reflection || "Add a progress note"}
                   </em>
+                  <small className="career-stamp">
+                    {formatDay(entry.updatedAt)
+                      ? `Updated ${formatDay(entry.updatedAt)}`
+                      : formatDay(entry.createdAt)
+                        ? `Saved ${formatDay(entry.createdAt)}`
+                        : "Saved before dates were kept"}
+                  </small>
+                  <span className="career-actions">
+                    <button type="button" onClick={() => editEntry(entry)}>
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeEntry(entry)}
+                      aria-label={`Remove ${entry.direction}`}
+                    >
+                      Remove
+                    </button>
+                  </span>
                 </p>
               </article>
             ))

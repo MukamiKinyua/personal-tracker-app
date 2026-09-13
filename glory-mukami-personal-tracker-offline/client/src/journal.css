@@ -30982,3 +30982,53 @@ body {
 .care-list article:has(.care-remove) {
   grid-template-columns: 27px 1fr auto;
 }
+
+.career-form-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.career-form-actions .local-undo,
+.career-list > div b .local-undo {
+  border: 0;
+  padding: 0;
+  color: inherit;
+  background: none;
+  font: inherit;
+  font-size: 0.6rem;
+  text-decoration: underline;
+  text-transform: none;
+  letter-spacing: 0;
+  cursor: pointer;
+}
+.career-list > div b .local-undo {
+  margin-left: 0.5rem;
+}
+.career-list article.is-editing {
+  outline: 2px dashed currentColor;
+  outline-offset: 3px;
+  border-radius: 6px;
+  opacity: 0.85;
+}
+.career-stamp {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.52rem;
+  opacity: 0.7;
+}
+.career-actions {
+  display: flex;
+  gap: 0.7rem;
+  margin-top: 0.3rem;
+}
+.career-actions button {
+  border: 0;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  font-size: 0.55rem;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
