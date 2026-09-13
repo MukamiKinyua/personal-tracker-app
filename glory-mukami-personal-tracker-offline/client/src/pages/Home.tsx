@@ -15908,7 +15908,7 @@ function StudyWorkbenchPage({
   onExams: () => void;
   onRecord: (minutes: number, label: string) => void;
 }) {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = sleepDateInputValue(new Date());
   const [topic, setTopic] = useState("");
   const [contextType, setContextType] = useState("Course");
   const [contextName, setContextName] = useState("");
@@ -15916,11 +15916,25 @@ function StudyWorkbenchPage({
   const [nextStep, setNextStep] = useState("");
   const [interruption, setInterruption] = useState("");
   const [duration, setDuration] = useState(25);
-  const [remainingSeconds, setRemainingSeconds] = useState(25 * 60);
-  const [isRunning, setIsRunning] = useState(false);
-  const [isBreak, setIsBreak] = useState(false);
+  /**
+   * A running focus block or break is a wall-clock end time, so the clock is
+   * right whenever a throttled background tab wakes up, and it survives a
+   * reload. `pausedRemaining` holds the seconds left while paused.
+   */
+  type StudyRun = {
+    mode: "focus" | "break";
+    endsAt: number;
+    pausedRemaining: number | null;
+    plannedSeconds: number;
+    topic: string;
+  };
+  const [run, setRun] = useState<StudyRun | null>(null);
+  const [tick, setTick] = useState(() => Date.now());
   const [awaitingOutcome, setAwaitingOutcome] = useState(false);
   const [sessions, setSessions] = useState<StudySessionRecord[]>([]);
+  const [lastSessions, setLastSessions] = useState<StudySessionRecord[] | null>(
+    null
+  );
   const [editId, setEditId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState({
     outcome: "Finished",
@@ -15928,10 +15942,17 @@ function StudyWorkbenchPage({
   });
   useMongoJournalScope({
     scope: "study-sessions",
-    payload: { sessions },
+    payload: { sessions, run, awaitingOutcome },
     hydrate: payload => {
       if (Array.isArray(payload.sessions))
         setSessions(payload.sessions as StudySessionRecord[]);
+      if (payload.run && typeof payload.run === "object") {
+        const stored = payload.run as StudyRun;
+        setRun(stored);
+        if (stored.topic) setTopic(current => current || stored.topic);
+      }
+      if (typeof payload.awaitingOutcome === "boolean")
+        setAwaitingOutcome(payload.awaitingOutcome);
     },
   });
   const summary = studyTimeSummary(sessions, today);
@@ -15939,41 +15960,85 @@ function StudyWorkbenchPage({
     (total, session) => total + session.minutes,
     0
   );
+  const isPaused = run !== null && run.pausedRemaining !== null;
+  const isRunning = run !== null && !isPaused;
+  const isBreak = run?.mode === "break";
+  const remainingSeconds = run
+    ? isPaused
+      ? run.pausedRemaining!
+      : Math.max(0, Math.round((run.endsAt - tick) / 1000))
+    : duration * 60;
+  const elapsedSeconds = run ? run.plannedSeconds - remainingSeconds : 0;
+  const hasStarted = run !== null && run.mode === "focus";
+
   useEffect(() => {
-    if (!isRunning || remainingSeconds <= 0) return;
-    const timer = window.setInterval(
-      () => setRemainingSeconds(current => Math.max(0, current - 1)),
-      1000
-    );
-    return () => window.clearInterval(timer);
-  }, [isRunning, remainingSeconds]);
+    if (!isRunning) return;
+    const interval = window.setInterval(() => setTick(Date.now()), 1000);
+    const onVisible = () => setTick(Date.now());
+    document.addEventListener("visibilitychange", onVisible);
+    setTick(Date.now());
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [isRunning]);
   useEffect(() => {
     if (!isRunning || remainingSeconds !== 0) return;
-    setIsRunning(false);
-    if (isBreak) {
-      setIsBreak(false);
-      setRemainingSeconds(duration * 60);
+    if (run?.mode === "break") {
+      setRun(null);
+      toast("Break over — ready when you are");
     } else {
+      // Keep the finished run so the outcome step can read its length.
+      setRun(current => (current ? { ...current, pausedRemaining: 0 } : null));
       setAwaitingOutcome(true);
     }
-  }, [duration, isBreak, isRunning, remainingSeconds]);
+  }, [isRunning, remainingSeconds, run?.mode]);
+  useEffect(() => {
+    if (!run || awaitingOutcome) {
+      document.title = "Glory Mukami's Personal Tracker";
+      return;
+    }
+    document.title = `${isPaused ? "⏸" : run.mode === "break" ? "☕" : "●"} ${formatStudyTimer(remainingSeconds)} · study`;
+    return () => {
+      document.title = "Glory Mukami's Personal Tracker";
+    };
+  }, [run, isPaused, remainingSeconds, awaitingOutcome]);
+
   function selectDuration(value: number) {
     setDuration(value);
-    if (!isRunning && !awaitingOutcome && !isBreak)
-      setRemainingSeconds(value * 60);
   }
   function startSession() {
     if (!topic.trim()) return;
-    setIsBreak(false);
+    const now = Date.now();
     setAwaitingOutcome(false);
-    setRemainingSeconds(duration * 60);
-    setIsRunning(true);
+    setRun({
+      mode: "focus",
+      endsAt: now + duration * 60_000,
+      pausedRemaining: null,
+      plannedSeconds: duration * 60,
+      topic: topic.trim(),
+    });
+  }
+  function pauseRun() {
+    if (!run || isPaused) return;
+    setRun({ ...run, pausedRemaining: remainingSeconds });
+  }
+  function resumeRun() {
+    if (!run || !isPaused) return;
+    // Resume continues from where it paused — it never restarts the block.
+    setRun({
+      ...run,
+      endsAt: Date.now() + run.pausedRemaining! * 1000,
+      pausedRemaining: null,
+    });
+  }
+  function discardRun() {
+    setRun(null);
+    setAwaitingOutcome(false);
+    toast("Session discarded — nothing was saved");
   }
   function saveOutcome(outcome: string) {
-    const completedMinutes = Math.max(
-      1,
-      Math.round((duration * 60 - remainingSeconds) / 60) || duration
-    );
+    const completedMinutes = Math.max(1, Math.round(elapsedSeconds / 60));
     const record: StudySessionRecord = {
       id: `${Date.now()}-study`,
       date: today,
@@ -15988,19 +16053,28 @@ function StudyWorkbenchPage({
     };
     setSessions(current => [record, ...current]);
     onRecord(completedMinutes, record.topic);
-    setIsRunning(false);
+    setRun(null);
     setAwaitingOutcome(false);
-    setRemainingSeconds(duration * 60);
     setTopic("");
     setContextName("");
     setNextStep("");
     setInterruption("");
+    toast(`${completedMinutes} min on ${record.topic} saved · ${outcome}`);
   }
   function beginBreak() {
-    setIsBreak(true);
     setAwaitingOutcome(false);
-    setRemainingSeconds(5 * 60);
-    setIsRunning(true);
+    setRun({
+      mode: "break",
+      endsAt: Date.now() + 5 * 60_000,
+      pausedRemaining: null,
+      plannedSeconds: 5 * 60,
+      topic: "",
+    });
+  }
+  function removeSession(session: StudySessionRecord) {
+    setLastSessions(sessions);
+    setSessions(current => current.filter(item => item.id !== session.id));
+    toast(`Removed ${session.minutes} min on ${session.topic}`);
   }
   function saveEdit(id: string) {
     setSessions(current =>
@@ -16093,32 +16167,62 @@ function StudyWorkbenchPage({
             />
           </label>
         </section>
-        <section className={cn("study-timer", isBreak && "break-mode")}>
+        <section
+          className={cn(
+            "study-timer",
+            isBreak && "break-mode",
+            isPaused && !awaitingOutcome && "paused-mode"
+          )}
+          role="timer"
+          aria-label={
+            awaitingOutcome
+              ? "Session finished, choose an outcome"
+              : isBreak
+                ? `Break, ${formatStudyTimer(remainingSeconds)} left`
+                : isRunning
+                  ? `Focus running, ${formatStudyTimer(remainingSeconds)} left`
+                  : isPaused
+                    ? `Focus paused, ${formatStudyTimer(remainingSeconds)} left`
+                    : `Not started, ${duration} minutes chosen`
+          }
+        >
           <div className="study-timer-top">
             <div>
-              <span>
-                {isBreak
-                  ? "Gentle break"
-                  : awaitingOutcome
-                    ? "Session ready"
+              <span className={cn("study-state", isRunning && "running")}>
+                {awaitingOutcome
+                  ? "✓ Session finished"
+                  : isBreak
+                    ? isPaused
+                      ? "⏸ Break paused"
+                      : "☕ Break running"
                     : isRunning
-                      ? "Focus in progress"
-                      : "Ready when you are"}
+                      ? "● Focus running"
+                      : isPaused
+                        ? "⏸ Focus paused"
+                        : "○ Not started"}
               </span>
               <b>{formatStudyTimer(remainingSeconds)}</b>
               <small>
-                {isBreak
-                  ? "A short pause is part of the work."
-                  : `${duration} minute local session`}
+                {awaitingOutcome && run
+                  ? `${Math.max(1, Math.round(elapsedSeconds / 60))} min will be saved`
+                  : isBreak
+                    ? "A short pause is part of the work."
+                    : run && isRunning
+                      ? `ends ${new Date(run.endsAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} · ${run.topic}`
+                      : run && isPaused
+                        ? `paused · ${run.topic}`
+                        : `${duration} minute session`}
               </small>
             </div>
             <div className="study-lengths">
               {[15, 25, 45, 60].map(value => (
                 <button
                   type="button"
+                  key={value}
                   className={cn(duration === value && "active")}
                   onClick={() => selectDuration(value)}
-                  disabled={isRunning || isBreak}
+                  disabled={run !== null}
+                  aria-pressed={duration === value}
                 >
                   {value} min
                 </button>
@@ -16143,42 +16247,74 @@ function StudyWorkbenchPage({
               >
                 Choose next step
               </button>
+              <button
+                type="button"
+                className="study-discard"
+                onClick={discardRun}
+              >
+                Discard — don’t save
+              </button>
             </div>
           ) : (
             <div className="study-timer-actions">
               {isRunning ? (
-                <button type="button" onClick={() => setIsRunning(false)}>
+                <button type="button" onClick={pauseRun}>
                   Pause
                 </button>
-              ) : !isBreak ? (
+              ) : isPaused ? (
+                <button type="button" onClick={resumeRun}>
+                  {isBreak ? "Resume break" : "Resume focus"}
+                </button>
+              ) : (
                 <button
                   type="button"
                   onClick={startSession}
                   disabled={!topic.trim()}
                 >
-                  {remainingSeconds < duration * 60
-                    ? "Resume focus"
-                    : "Start focus"}
-                </button>
-              ) : (
-                <button type="button" onClick={() => setIsRunning(true)}>
-                  Resume break
+                  {topic.trim()
+                    ? `Start ${duration} min on “${topic.trim()}”`
+                    : "Name a topic to start"}
                 </button>
               )}
-              {!isBreak &&
-              !awaitingOutcome &&
-              (isRunning || remainingSeconds < duration * 60) ? (
-                <button type="button" onClick={() => setAwaitingOutcome(true)}>
-                  End session
-                </button>
+              {hasStarted ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRun(current =>
+                        current
+                          ? { ...current, pausedRemaining: remainingSeconds }
+                          : null
+                      );
+                      setAwaitingOutcome(true);
+                    }}
+                  >
+                    End session
+                  </button>
+                  <button
+                    type="button"
+                    className="study-discard"
+                    onClick={discardRun}
+                  >
+                    Discard
+                  </button>
+                </>
               ) : null}
-              {!isBreak && !awaitingOutcome && !isRunning ? (
+              {!run ? (
                 <button
                   type="button"
                   className="study-break"
                   onClick={beginBreak}
                 >
                   Take 5 min break
+                </button>
+              ) : isBreak ? (
+                <button
+                  type="button"
+                  className="study-discard"
+                  onClick={discardRun}
+                >
+                  End break
                 </button>
               ) : null}
             </div>
@@ -16224,6 +16360,18 @@ function StudyWorkbenchPage({
           <div>
             <span>Recent study sessions</span>
             <b>· {sessions.length} saved</b>
+            {lastSessions && (
+              <button
+                type="button"
+                className="local-undo"
+                onClick={() => {
+                  setSessions(lastSessions);
+                  setLastSessions(null);
+                }}
+              >
+                Undo remove
+              </button>
+            )}
           </div>
           {sessions.length === 0 ? (
             <small>
@@ -16263,11 +16411,8 @@ function StudyWorkbenchPage({
                   </button>
                   <button
                     type="button"
-                    onClick={() =>
-                      setSessions(current =>
-                        current.filter(item => item.id !== session.id)
-                      )
-                    }
+                    onClick={() => removeSession(session)}
+                    aria-label={`Remove ${session.minutes} minute session on ${session.topic}`}
                   >
                     Remove
                   </button>

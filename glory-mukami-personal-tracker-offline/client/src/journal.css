@@ -15884,25 +15884,55 @@ button:focus-visible {
   --scene-art: #071b1f;
 }
 
-.journal-stage[data-journal-view="certifications"],
-.journal-stage[data-journal-view="internships"],
 .journal-stage[data-journal-view="analytics"],
 .journal-stage[data-journal-view="insights"],
 .journal-stage[data-journal-view="recommendations"],
 .journal-stage[data-journal-view="privacy"],
 .journal-stage[data-journal-view="notifications"],
-.journal-stage[data-journal-view="exportData"],
-.journal-stage[data-journal-view="history"],
 .journal-stage[data-journal-view="social"],
 .journal-stage[data-journal-view="family"],
 .journal-stage[data-journal-view="hobbies"],
-.journal-stage[data-journal-view="experiences"],
-.journal-stage[data-journal-view="achievements"],
-.journal-stage[data-journal-view="personalGrowth"],
 .journal-stage[data-journal-view="goals"],
 .journal-stage[data-journal-view="utilities"] {
   --scene-image: url("/media/runtime/glory-art-learning-cosmic-library_d8ec8d02.png");
   --scene-position: center;
+  --scene-art: #0d0820;
+}
+/* Split out from the group above: each gets its own painting rather than the
+   shared placeholder every other page in that list still uses. */
+.journal-stage[data-journal-view="certifications"] {
+  --scene-image: url("/media/runtime/glory-art-certifications-knowledge-bloom_aa4fc761.jpg");
+  --scene-position: 50% 30%;
+  --scene-art: #0d0820;
+}
+.journal-stage[data-journal-view="internships"] {
+  --scene-image: url("/media/runtime/glory-art-internships-pocket-watch_f6055022.jpg");
+  --scene-position: center;
+  --scene-art: #0d0820;
+}
+.journal-stage[data-journal-view="exportData"] {
+  --scene-image: url("/media/runtime/glory-art-exportdata-memory-path_936ec488.jpg");
+  --scene-position: 45% center;
+  --scene-art: #0d0820;
+}
+.journal-stage[data-journal-view="history"] {
+  --scene-image: url("/media/runtime/glory-art-history-book-maze_781bacc7.jpg");
+  --scene-position: 40% center;
+  --scene-art: #0d0820;
+}
+.journal-stage[data-journal-view="experiences"] {
+  --scene-image: url("/media/runtime/glory-art-experiences-narrative-of-time_34e77024.jpg");
+  --scene-position: 50% 30%;
+  --scene-art: #0d0820;
+}
+.journal-stage[data-journal-view="achievements"] {
+  --scene-image: url("/media/runtime/glory-art-achievements-narrative-of-time_34e77024.jpg");
+  --scene-position: 50% 30%;
+  --scene-art: #0d0820;
+}
+.journal-stage[data-journal-view="personalGrowth"] {
+  --scene-image: url("/media/runtime/glory-art-personalgrowth-glass-box_fa19151b.jpg");
+  --scene-position: 45% center;
   --scene-art: #0d0820;
 }
 /* Split out from the group above: Projects gets its own painting rather than
@@ -16956,7 +16986,14 @@ button:focus-visible {
     [data-journal-view="career"],
     [data-journal-view="portfolio"],
     [data-journal-view="cv"],
-    [data-journal-view="projects"]
+    [data-journal-view="projects"],
+    [data-journal-view="certifications"],
+    [data-journal-view="internships"],
+    [data-journal-view="exportData"],
+    [data-journal-view="history"],
+    [data-journal-view="experiences"],
+    [data-journal-view="achievements"],
+    [data-journal-view="personalGrowth"]
   ):not([data-journal-view="cover"]):not([data-journal-view="contents"]):not(
     [data-journal-view="dashboard"]
   ) {
@@ -24376,6 +24413,32 @@ body {
   color: #fffaf2;
   border: 1px solid rgba(255, 250, 242, 0.35);
   background: transparent;
+}
+.study-timer-actions .study-discard,
+.study-outcomes .study-discard {
+  color: rgba(255, 250, 242, 0.85);
+  border: 1px dashed rgba(255, 250, 242, 0.45);
+  background: transparent;
+}
+.study-timer.paused-mode {
+  outline: 2px dashed rgba(255, 250, 242, 0.45);
+  outline-offset: -6px;
+}
+.study-state.running {
+  color: #ffd9b8 !important;
+}
+.study-history-workbench > div:first-child .local-undo {
+  margin-left: 0.5rem;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  background: none;
+  font-size: 0.56rem;
+  font-weight: 800;
+  text-decoration: underline;
+  text-transform: none;
+  letter-spacing: 0;
+  cursor: pointer;
 }
 .study-outcomes {
   align-items: center;
