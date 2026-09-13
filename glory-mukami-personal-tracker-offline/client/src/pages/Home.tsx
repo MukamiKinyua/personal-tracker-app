@@ -17949,7 +17949,12 @@ function DigitalLifePage({
   const [goal, setGoal] = useState(120);
   const [boundary, setBoundary] = useState(true);
   const [boundaryTime, setBoundaryTime] = useState("21:30");
+  const [boundaryEnd, setBoundaryEnd] = useState("06:30");
+  const [boundarySkippedOn, setBoundarySkippedOn] = useState<string | null>(
+    null
+  );
   const [entries, setEntries] = useState<DigitalEntry[]>([]);
+  const [lastEntries, setLastEntries] = useState<DigitalEntry[] | null>(null);
   const [draft, setDraft] = useState({
     minutes: "30",
     category: "Study",
@@ -17958,24 +17963,76 @@ function DigitalLifePage({
   });
   const [editingId, setEditingId] = useState<string | null>(null);
   const minutesRef = useRef<HTMLInputElement>(null);
+  const [clock, setClock] = useState(() => Date.now());
+  useEffect(() => {
+    const interval = window.setInterval(() => setClock(Date.now()), 30_000);
+    return () => window.clearInterval(interval);
+  }, []);
   useMongoJournalScope({
     scope: "digital-life",
-    payload: { goal, boundary, boundaryTime, entries },
+    payload: {
+      goal,
+      boundary,
+      boundaryTime,
+      boundaryEnd,
+      boundarySkippedOn,
+      entries,
+    },
     hydrate: payload => {
       if (typeof payload.goal === "number") setGoal(payload.goal);
       if (typeof payload.boundary === "boolean") setBoundary(payload.boundary);
       if (typeof payload.boundaryTime === "string")
         setBoundaryTime(payload.boundaryTime);
+      if (typeof payload.boundaryEnd === "string")
+        setBoundaryEnd(payload.boundaryEnd);
+      if (
+        typeof payload.boundarySkippedOn === "string" ||
+        payload.boundarySkippedOn === null
+      )
+        setBoundarySkippedOn(payload.boundarySkippedOn as string | null);
       if (Array.isArray(payload.entries))
         setEntries(payload.entries as DigitalEntry[]);
     },
   });
-  const today = new Date().toISOString().slice(0, 10);
+  const today = sleepDateInputValue(new Date());
   const summary = digitalSummary(entries, today);
   const progress = Math.min(
     100,
     Math.round((summary.todayMinutes / goal) * 100)
   );
+
+  // The boundary is a window in local device time that may cross midnight
+  // (21:30 → 06:30). "Tonight" is keyed by the date the window starts.
+  const boundaryStatus = (() => {
+    const now = new Date(clock);
+    const toMinutes = (value: string) => {
+      const [h, m] = value.split(":").map(Number);
+      return (h || 0) * 60 + (m || 0);
+    };
+    const start = toMinutes(boundaryTime);
+    const end = toMinutes(boundaryEnd);
+    const current = now.getHours() * 60 + now.getMinutes();
+    const crossesMidnight = end <= start;
+    const inside = crossesMidnight
+      ? current >= start || current < end
+      : current >= start && current < end;
+    const windowDate = new Date(now);
+    if (inside && crossesMidnight && current < end)
+      windowDate.setDate(windowDate.getDate() - 1);
+    const windowKey = sleepDateInputValue(windowDate);
+    const skippedTonight = boundarySkippedOn === windowKey;
+    const minutesUntil = inside
+      ? 0
+      : ((start - current + 24 * 60) % (24 * 60));
+    const minutesIn = inside ? (current - start + 24 * 60) % (24 * 60) : 0;
+    return { inside, skippedTonight, windowKey, minutesUntil, minutesIn };
+  })();
+  function formatHm(total: number) {
+    const h = Math.floor(total / 60);
+    const m = total % 60;
+    return h > 0 ? `${h} h ${m} min` : `${m} min`;
+  }
+
   function resetDraft() {
     setDraft({
       minutes: "30",
@@ -17989,9 +18046,13 @@ function DigitalLifePage({
     event.preventDefault();
     const minutes = Number(draft.minutes);
     if (!Number.isFinite(minutes) || minutes <= 0) return;
+    const existing = editingId
+      ? entries.find(item => item.id === editingId)
+      : undefined;
     const entry: DigitalEntry = {
       id: editingId || `${Date.now()}-digital`,
-      date: today,
+      // An edit keeps the entry on its own day; it doesn't move it to today.
+      date: existing?.date ?? today,
       minutes,
       category: draft.category,
       purpose: draft.purpose,
@@ -18002,7 +18063,17 @@ function DigitalLifePage({
         ? current.map(item => (item.id === editingId ? entry : item))
         : [entry, ...current]
     );
+    toast(
+      editingId
+        ? "Entry updated"
+        : `${minutes} min of ${draft.category.toLowerCase()} saved`
+    );
     resetDraft();
+  }
+  function removeEntry(entry: DigitalEntry) {
+    setLastEntries(entries);
+    setEntries(current => current.filter(item => item.id !== entry.id));
+    toast(`Removed ${entry.minutes} min of ${entry.category.toLowerCase()}`);
   }
   function beginEdit(entry: DigitalEntry) {
     setDraft({
@@ -18029,6 +18100,11 @@ function DigitalLifePage({
         <p className="page-intro">
           A private screen-time check-in that makes space for boundaries, focus,
           and the parts of life that do not live behind a screen.
+        </p>
+        <p className="digital-source-note">
+          Everything here is typed in by you. Nothing is read from your phone,
+          browser, or any app — there is no sync, no permission to grant, and
+          nothing that can silently fail.
         </p>
         <button
           type="button"
@@ -18077,9 +18153,12 @@ function DigitalLifePage({
           <div className="digital-section-heading">
             <div>
               <span>Log time with context</span>
-              <b>Private and local</b>
+              <b>Entered by hand</b>
             </div>
-            <small>Record what the time was for, not just the number.</small>
+            <small>
+              Record what the time was for, not just the number. Today’s total
+              is the sum of what you log here.
+            </small>
           </div>
           <form onSubmit={saveEntry}>
             <div className="digital-quick-times">
@@ -18180,7 +18259,16 @@ function DigitalLifePage({
             ) : null}
           </form>
         </section>
-        <section className="digital-boundary">
+        <section
+          className={cn(
+            "digital-boundary",
+            boundary &&
+              boundaryStatus.inside &&
+              !boundaryStatus.skippedTonight &&
+              "is-inside"
+          )}
+          aria-labelledby="digital-boundary-title"
+        >
           <label>
             <input
               type="checkbox"
@@ -18188,23 +18276,76 @@ function DigitalLifePage({
               onChange={event => setBoundary(event.target.checked)}
             />
             <span>
-              <b>Evening boundary</b>
+              <b id="digital-boundary-title">Evening boundary</b>
               <small>
-                {boundary
-                  ? `Local preference on · from ${boundaryTime}`
-                  : "Local preference off"}
+                A line you draw for yourself. This page only tells you where you
+                stand against it — it never blocks or locks anything.
               </small>
             </span>
           </label>
-          <label>
-            Boundary time
-            <input
-              type="time"
-              value={boundaryTime}
-              onChange={event => setBoundaryTime(event.target.value)}
-              disabled={!boundary}
-            />
-          </label>
+          <div className="digital-boundary-times">
+            <label>
+              From
+              <input
+                type="time"
+                value={boundaryTime}
+                onChange={event => setBoundaryTime(event.target.value)}
+                disabled={!boundary}
+              />
+            </label>
+            <label>
+              Until
+              <input
+                type="time"
+                value={boundaryEnd}
+                onChange={event => setBoundaryEnd(event.target.value)}
+                disabled={!boundary}
+              />
+            </label>
+          </div>
+          <p className="digital-boundary-status" aria-live="polite">
+            {!boundary
+              ? "Off. Nothing is watched or shown."
+              : boundaryStatus.skippedTonight
+                ? `Skipped tonight — back on tomorrow at ${boundaryTime}.`
+                : boundaryStatus.inside
+                  ? `Inside your boundary · ${formatHm(boundaryStatus.minutesIn)} past ${boundaryTime}.`
+                  : `${formatHm(boundaryStatus.minutesUntil)} until your ${boundaryTime} boundary.`}
+          </p>
+          {boundary && (
+            <small className="digital-boundary-fine">
+              Times are your device’s local clock; a window that ends before it
+              starts runs overnight.
+              {boundaryStatus.inside && !boundaryStatus.skippedTonight ? (
+                <>
+                  {" "}
+                  <button
+                    type="button"
+                    className="digital-inline-link"
+                    onClick={() => {
+                      setBoundarySkippedOn(boundaryStatus.windowKey);
+                      toast("Boundary skipped for tonight only");
+                    }}
+                  >
+                    Skip tonight
+                  </button>{" "}
+                  if this evening is an exception — it comes back tomorrow on
+                  its own.
+                </>
+              ) : boundaryStatus.skippedTonight ? (
+                <>
+                  {" "}
+                  <button
+                    type="button"
+                    className="digital-inline-link"
+                    onClick={() => setBoundarySkippedOn(null)}
+                  >
+                    Un-skip
+                  </button>
+                </>
+              ) : null}
+            </small>
+          )}
         </section>
         <section className="digital-week">
           <div>
@@ -18226,18 +18367,33 @@ function DigitalLifePage({
           <div>
             <span>Recent digital activity</span>
             <b>{entries.length} saved</b>
+            {lastEntries && (
+              <button
+                type="button"
+                className="local-undo"
+                onClick={() => {
+                  setEntries(lastEntries);
+                  setLastEntries(null);
+                }}
+              >
+                Undo remove
+              </button>
+            )}
           </div>
           {entries.length === 0 ? (
-            <small>Your local activity entries will appear here.</small>
+            <small>Your entries will appear here.</small>
           ) : (
             entries.slice(0, 5).map(entry => (
-              <article key={entry.id}>
+              <article
+                key={entry.id}
+                className={cn(editingId === entry.id && "is-editing")}
+              >
                 <div>
                   <b>
                     {entry.minutes} min · {entry.category} · {entry.purpose}
                   </b>
                   <small>
-                    {entry.date}
+                    {entry.date === today ? "Today" : entry.date}
                     {entry.note ? ` · ${entry.note}` : ""}
                   </small>
                 </div>
@@ -18247,11 +18403,8 @@ function DigitalLifePage({
                   </button>
                   <button
                     type="button"
-                    onClick={() =>
-                      setEntries(current =>
-                        current.filter(item => item.id !== entry.id)
-                      )
-                    }
+                    onClick={() => removeEntry(entry)}
+                    aria-label={`Remove ${entry.minutes} minutes of ${entry.category} on ${entry.date}`}
                   >
                     Remove
                   </button>
