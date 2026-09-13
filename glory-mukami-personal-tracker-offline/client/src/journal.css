@@ -31299,3 +31299,53 @@ body {
   background-image: none !important;
   background-blend-mode: normal !important;
 }
+
+/* Security already had its own right-page background rule, keyed to its
+   specific .security-workspace-page class rather than the generic
+   :last-child structure - one class-tier step more specific than the rule
+   above, so it kept winning despite matching #root id-tier too. Matching
+   its exact selector here, later in the file, settles it. */
+#root .journal-stage[data-journal-view="security"] .journal-spread.security-spread > .spread-page.security-workspace-page {
+  background: #1D1B17 !important;
+  background-image: none !important;
+  background-blend-mode: normal !important;
+}
+
+/* Shared by the notebook-style pages: achievements, experiences, hobbies,
+   family, social. */
+.notebook-date {
+  font-weight: 700;
+}
+.notebook-date.is-overdue {
+  opacity: 0.85;
+}
+.notebook-date.is-today,
+.notebook-date.is-tomorrow {
+  color: #a8481f;
+}
+.achievements-list article.is-editing,
+.experiences-list article.is-editing,
+.hobbies-list article.is-editing,
+.family-list article.is-editing,
+.social-list article.is-editing {
+  outline: 2px dashed currentColor;
+  outline-offset: 3px;
+  border-radius: 6px;
+  opacity: 0.85;
+}
+.achievements-list > div b .local-undo,
+.experiences-list > div b .local-undo,
+.hobbies-list > div b .local-undo,
+.family-list > div b .local-undo,
+.social-list > div b .local-undo {
+  margin-left: 0.5rem;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  background: none;
+  font: inherit;
+  text-decoration: underline;
+  text-transform: none;
+  letter-spacing: 0;
+  cursor: pointer;
+}

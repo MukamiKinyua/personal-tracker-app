@@ -5922,16 +5922,61 @@ function AchievementsPage({
   onCover: () => void;
 }) {
   type Achievement = {
+    id?: string;
     title: string;
     date: string;
     evidence: string;
     gratitude: string;
     meaning: string;
+    createdAt?: string;
+    updatedAt?: string;
   };
   const [achievements, setAchievements] = useState<Achievement[]>([]);
+  const [lastAchievements, setLastAchievements] = useState<Achievement[] | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const today = sleepDateInputValue(new Date());
+  const formatDay = (value?: string) =>
+    value && /^\d{4}-\d{2}-\d{2}$/.test(value)
+      ? new Date(`${value}T12:00:00`).toLocaleDateString(undefined, {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        })
+      : null;
+  function dateLabel(value: string) {
+    if (!value) return null;
+    const detail = assignmentDueDetail(value, today);
+    const days = detail.daysAway ?? 0;
+    const abs = Math.abs(days);
+    const rel =
+      detail.kind === "today"
+        ? "today"
+        : detail.kind === "tomorrow"
+          ? "tomorrow"
+          : days < 0
+            ? `${abs} day${abs === 1 ? "" : "s"} ago`
+            : `in ${days} days`;
+    return { text: `${detail.exact} · ${rel}`, kind: detail.kind };
+  }
+  function editAchievement(achievement: Achievement) {
+    setEditingId(achievement.id ?? null);
+    setDraft({
+      title: achievement.title,
+      date: achievement.date,
+      evidence: achievement.evidence,
+      gratitude: achievement.gratitude,
+      meaning: achievement.meaning,
+    });
+  }
+  function removeAchievement(achievement: Achievement) {
+    setLastAchievements(achievements);
+    setAchievements(current => current.filter(entry => entry.id !== achievement.id));
+    if (editingId === achievement.id) setEditingId(null);
+    toast(`Removed “${achievement.title}”`);
+  }
   const [draft, setDraft] = useState<Achievement>({
     title: "",
-    date: new Date().toISOString().slice(0, 10),
+    date: sleepDateInputValue(new Date()),
     evidence: "",
     gratitude: "",
     meaning: "",
@@ -5941,19 +5986,36 @@ function AchievementsPage({
     payload: { achievements },
     hydrate: payload => {
       if (Array.isArray(payload.achievements))
-        setAchievements(payload.achievements as Achievement[]);
+        setAchievements(
+          (payload.achievements as Achievement[]).map((entry, index) => ({
+            ...entry,
+            id: entry.id ?? `achievement-${index}-${entry.title}`,
+          }))
+        );
     },
   });
   function addAchievement(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!draft.title.trim()) return;
-    setAchievements(current => [
-      { ...draft, title: draft.title.trim() },
-      ...current,
-    ]);
+    const fields = { ...draft, title: draft.title.trim() };
+    if (editingId) {
+      setAchievements(current =>
+        current.map(entry =>
+          entry.id === editingId ? { ...entry, ...fields, updatedAt: today } : entry
+        )
+      );
+      toast("Updated");
+    } else {
+      setAchievements(current => [
+        { ...fields, id: `achievement-${Date.now()}`, createdAt: today },
+        ...current,
+      ]);
+      toast(`“${fields.title}” saved`);
+    }
+    setEditingId(null);
     setDraft({
       title: "",
-      date: new Date().toISOString().slice(0, 10),
+      date: sleepDateInputValue(new Date()),
       evidence: "",
       gratitude: "",
       meaning: "",
@@ -6042,14 +6104,48 @@ function AchievementsPage({
               placeholder="What does this teach you about yourself?"
             />
           </label>
-          <Button className="ink-button" type="submit">
-            <Plus size={15} /> Celebrate this moment
-          </Button>
+          <div className="career-form-actions">
+            <Button type="submit" className="ink-button">
+              <Plus size={15} /> {editingId ? "Save changes" : "Celebrate this moment"}
+            </Button>
+            {editingId ? (
+              <button
+                type="button"
+                className="local-undo"
+                onClick={() => {
+                  setEditingId(null);
+                  setDraft({
+      title: "",
+      date: sleepDateInputValue(new Date()),
+      evidence: "",
+      gratitude: "",
+      meaning: "",
+                  });
+                }}
+              >
+                Cancel edit
+              </button>
+            ) : null}
+          </div>
         </form>
         <div className="achievement-list">
           <div>
             <span>celebration history</span>
-            <b>{achievements.length} wins</b>
+            <b>
+              {achievements.length} wins
+              {lastAchievements && (
+                <button
+                  type="button"
+                  className="local-undo"
+                  onClick={() => {
+                    setAchievements(lastAchievements);
+                    setLastAchievements(null);
+                  }}
+                >
+                  Undo remove
+                </button>
+              )}
+            </b>
           </div>
           {achievements.length === 0 ? (
             <small>
@@ -6057,12 +6153,12 @@ function AchievementsPage({
               the next thing.
             </small>
           ) : (
-            achievements.map((achievement, index) => (
-              <article key={`${achievement.title}-${index}`}>
+            achievements.map(achievement => (
+              <article key={achievement.id} className={cn(editingId === achievement.id && "is-editing")}>
                 <i>✦</i>
                 <p>
                   <b>{achievement.title}</b>
-                  <small>{achievement.date}</small>
+                  <small>{achievement.date ? (<span className={cn("notebook-date", `is-${dateLabel(achievement.date)!.kind}`)}>{dateLabel(achievement.date)!.text}</span>) : "no date"}</small>
                   <em>
                     Evidence:{" "}
                     {achievement.evidence || "Add detail when you want"}
@@ -6073,6 +6169,25 @@ function AchievementsPage({
                   <em>
                     Meaning: {achievement.meaning || "Add what this means"}
                   </em>
+                  <small className="career-stamp">
+                    {formatDay(achievement.updatedAt)
+                      ? `Updated ${formatDay(achievement.updatedAt)}`
+                      : formatDay(achievement.createdAt)
+                        ? `Saved ${formatDay(achievement.createdAt)}`
+                        : "Saved before dates were kept"}
+                  </small>
+                  <span className="career-actions">
+                    <button type="button" onClick={() => editAchievement(achievement)}>
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeAchievement(achievement)}
+                      aria-label={`Remove ${achievement.title}`}
+                    >
+                      Remove
+                    </button>
+                  </span>
                 </p>
               </article>
             ))
