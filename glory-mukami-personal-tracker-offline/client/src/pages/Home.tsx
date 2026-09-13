@@ -5186,9 +5186,11 @@ function PersonalGrowthPage({
     updatedAt?: string;
   };
   const [entries, setEntries] = useState<GrowthEntry[]>([]);
-  const [lastGrowthEntrys, setLastGrowthEntrys] = useState<GrowthEntry[] | null>(null);
+  const [lastEntries, setLastEntries] = useState<GrowthEntry[] | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const today = sleepDateInputValue(new Date());
+  const growthEntryName = (entry: GrowthEntry) =>
+    entry.value || entry.area || "growth note";
   const formatDay = (value?: string) =>
     value && /^\d{4}-\d{2}-\d{2}$/.test(value)
       ? new Date(`${value}T12:00:00`).toLocaleDateString(undefined, {
@@ -5208,10 +5210,10 @@ function PersonalGrowthPage({
     });
   }
   function removeGrowthEntry(entry: GrowthEntry) {
-    setLastGrowthEntrys(entries);
-    setEntries(current => current.filter(entry => entry.id !== entry.id));
+    setLastEntries(entries);
+    setEntries(current => current.filter(item => item.id !== entry.id));
     if (editingId === entry.id) setEditingId(null);
-    toast(`Removed “${entry.value}”`);
+    toast(`Removed “${growthEntryName(entry)}” — Undo remove brings it back`);
   }
   const [draft, setDraft] = useState<GrowthEntry>({
     value: "",
@@ -5354,11 +5356,11 @@ function PersonalGrowthPage({
                 onClick={() => {
                   setEditingId(null);
                   setDraft({
-      value: "",
-      area: "",
-      practice: "",
-      reflection: "",
-      nextStep: "",
+                    value: "",
+                    area: "",
+                    practice: "",
+                    reflection: "",
+                    nextStep: "",
                   });
                 }}
               >
@@ -5372,13 +5374,14 @@ function PersonalGrowthPage({
             <span>becoming notebook</span>
             <b>
               {entries.length} notes
-              {lastGrowthEntrys && (
+              {lastEntries && (
                 <button
                   type="button"
                   className="local-undo"
                   onClick={() => {
-                    setEntries(lastGrowthEntrys);
-                    setLastGrowthEntrys(null);
+                    setEntries(lastEntries);
+                    setLastEntries(null);
+                    toast("Growth notes restored");
                   }}
                 >
                   Undo remove
@@ -5419,7 +5422,7 @@ function PersonalGrowthPage({
                     <button
                       type="button"
                       onClick={() => removeGrowthEntry(entry)}
-                      aria-label={`Remove ${entry.value}`}
+                      aria-label={`Remove ${growthEntryName(entry)}`}
                     >
                       Remove
                     </button>
@@ -5635,11 +5638,11 @@ function AchievementsPage({
                 onClick={() => {
                   setEditingId(null);
                   setDraft({
-      title: "",
-      date: sleepDateInputValue(new Date()),
-      evidence: "",
-      gratitude: "",
-      meaning: "",
+                    title: "",
+                    date: sleepDateInputValue(new Date()),
+                    evidence: "",
+                    gratitude: "",
+                    meaning: "",
                   });
                 }}
               >
@@ -5941,12 +5944,12 @@ function ExperiencesPage({
                 onClick={() => {
                   setEditingId(null);
                   setDraft({
-      title: "",
-      date: "",
-      detail: "",
-      anticipation: "",
-      memory: "",
-      reflection: "",
+                    title: "",
+                    date: "",
+                    detail: "",
+                    anticipation: "",
+                    memory: "",
+                    reflection: "",
                   });
                 }}
               >
@@ -6238,12 +6241,12 @@ function HobbiesPage({
                 onClick={() => {
                   setEditingId(null);
                   setDraft({
-      title: "",
-      project: "",
-      rhythm: "When I have time",
-      supplies: "",
-      inspiration: "",
-      reflection: "",
+                    title: "",
+                    project: "",
+                    rhythm: "When I have time",
+                    supplies: "",
+                    inspiration: "",
+                    reflection: "",
                   });
                 }}
               >
@@ -6539,12 +6542,12 @@ function FamilyPage({
                 onClick={() => {
                   setEditingId(null);
                   setDraft({
-      label: "",
-      plan: "",
-      date: "",
-      care: "",
-      followThrough: "",
-      reminder: "No reminder",
+                    label: "",
+                    plan: "",
+                    date: "",
+                    care: "",
+                    followThrough: "",
+                    reminder: "No reminder",
                   });
                 }}
               >
@@ -10860,12 +10863,12 @@ function SocialLifePage({
                 onClick={() => {
                   setEditingId(null);
                   setDraft({
-      person: "",
-      plan: "",
-      date: "",
-      followThrough: "",
-      note: "",
-      reminder: "No reminder",
+                    person: "",
+                    plan: "",
+                    date: "",
+                    followThrough: "",
+                    note: "",
+                    reminder: "No reminder",
                   });
                 }}
               >
