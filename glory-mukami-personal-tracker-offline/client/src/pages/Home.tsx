@@ -2063,6 +2063,7 @@ export default function Home() {
           <IntegrationsPage
             onContents={() => turnTo("contents", "backward")}
             onCover={() => turnTo("cover", "backward")}
+            onNavigate={destination => turnTo(destination)}
           />
         );
       case "exportData":
@@ -22990,13 +22991,29 @@ function ReflectionPage({
 function IntegrationsPage({
   onContents,
   onCover,
+  onNavigate,
 }: {
   onContents: () => void;
   onCover: () => void;
+  onNavigate: (destination: View) => void;
 }) {
+  const auth = useAuth();
+  const journal = useRecordStore();
   const [consents, setConsents] = useState<
     Record<IntegrationKey, IntegrationConsent>
   >(() => emptyIntegrationConsent());
+  const [lastChangeAt, setLastChangeAt] = useState<string | null>(null);
+  const [signingOut, setSigningOut] = useState(false);
+  const formatWhen = (value?: string | null) =>
+    value
+      ? new Date(value).toLocaleString([], {
+          weekday: "short",
+          day: "numeric",
+          month: "short",
+          hour: "numeric",
+          minute: "2-digit",
+        })
+      : null;
   useMongoJournalScope({
     scope: "integrations",
     payload: { consents },
@@ -23015,10 +23032,32 @@ function IntegrationsPage({
     [consents]
   );
   function toggleConsent(key: IntegrationKey) {
-    setConsents(current =>
-      toggleIntegrationConsent(current, key, new Date().toISOString())
+    const now = new Date().toISOString();
+    const wasRecorded = consents[key]?.state === "consent-recorded";
+    setConsents(current => toggleIntegrationConsent(current, key, now));
+    setLastChangeAt(now);
+    const title = integrationOptions.find(option => option.key === key)?.title;
+    toast(
+      wasRecorded
+        ? `${title}: note cleared — nothing was connected, so nothing was disconnected`
+        : `${title}: noted as worth a conversation — still nothing connected`
     );
   }
+  async function signOut() {
+    setSigningOut(true);
+    try {
+      await auth.logout();
+      toast("Signed out. This device keeps its local copy; your account copy stays where it is.");
+    } finally {
+      setSigningOut(false);
+    }
+  }
+  const signedIn = auth.isAuthenticated && auth.user;
+  const provider =
+    auth.user?.loginMethod?.toLowerCase().includes("google")
+      ? "Google"
+      : auth.user?.loginMethod || "Sign-in provider";
+  const connectedCount = signedIn ? 2 : 0;
   return (
     <section
       className="journal-spread integrations-spread glass-scope"
@@ -23033,29 +23072,188 @@ function IntegrationsPage({
           <em>stays yours.</em>
         </h2>
         <p className="page-intro">
-          A local consent ledger for possible future connections. Record what
-          you may want to explore without linking an account or handing over
-          credentials.
+          What this journal is connected to right now, in plain terms — and a
+          private ledger for connections you may want to consider later.
         </p>
         <div className="integration-safety">
           <HeartPulse size={15} />
           <span>
-            Nothing connected · {summary.recorded} local consent
-            {summary.recorded === 1 ? "" : "s"} recorded
+            {connectedCount === 0
+              ? "Nothing connected · nothing leaves this device"
+              : `${connectedCount} connections · ${summary.recorded} future option${summary.recorded === 1 ? "" : "s"} noted`}
           </span>
         </div>
       </div>
       <div className="spread-page integrations-page">
+        <section
+          className="integration-connected"
+          aria-labelledby="integration-connected-title"
+        >
+          <div>
+            <span id="integration-connected-title">Connected now</span>
+            <b>{signedIn ? "2 connections" : "None"}</b>
+          </div>
+          {signedIn ? (
+            <>
+              <article className="integration-live-card">
+                <div className="integration-live-heading">
+                  <div>
+                    <span>Sign-in</span>
+                    <b>{provider}</b>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={signOut}
+                    disabled={signingOut}
+                  >
+                    {signingOut ? "Signing out…" : "Sign out"}
+                  </button>
+                </div>
+                <dl>
+                  <div>
+                    <dt>Account</dt>
+                    <dd>
+                      {auth.user?.name || "—"}
+                      {auth.user?.email ? ` · ${auth.user.email}` : ""}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Permissions requested</dt>
+                    <dd>
+                      Basic profile only: name, email address, and profile
+                      picture, used to identify your account.
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Scope</dt>
+                    <dd>
+                      Identity only. No access to your mail, calendar, files,
+                      contacts, or anything else in that account.
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Last verified</dt>
+                    <dd>At the start of this session.</dd>
+                  </div>
+                  <div>
+                    <dt>Disconnect</dt>
+                    <dd>
+                      Sign out. This device keeps its local copy; the account
+                      copy stays on the server; nothing in the {provider}{" "}
+                      account is touched.
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Delete data</dt>
+                    <dd>
+                      Deletion of what the account holds is handled in{" "}
+                      <button
+                        type="button"
+                        className="integration-inline-link"
+                        onClick={() => onNavigate("privacy")}
+                      >
+                        Privacy Controls
+                      </button>
+                      .
+                    </dd>
+                  </div>
+                </dl>
+              </article>
+              <article className="integration-live-card">
+                <div className="integration-live-heading">
+                  <div>
+                    <span>Account sync</span>
+                    <b>This journal’s own server</b>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => journal.syncNow()}
+                    disabled={!journal.online}
+                  >
+                    Sync now
+                  </button>
+                </div>
+                <dl>
+                  <div>
+                    <dt>What syncs</dt>
+                    <dd>
+                      The records and page state you save in this journal, to
+                      your own account so they survive reinstalling and reach
+                      your other devices.
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Last sync</dt>
+                    <dd>
+                      {formatWhen(journal.sync.lastSyncedAt) ?? "Not yet this session"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Status</dt>
+                    <dd>
+                      {journal.online ? "Online" : "Offline — changes are queued"}
+                      {journal.pendingWrites > 0
+                        ? ` · ${journal.pendingWrites} change${journal.pendingWrites === 1 ? "" : "s"} waiting to send`
+                        : " · nothing waiting"}
+                      {journal.sync.lastError
+                        ? ` · last attempt failed: ${journal.sync.lastError}`
+                        : ""}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Who can read it</dt>
+                    <dd>Only your signed-in account. No third party.</dd>
+                  </div>
+                  <div>
+                    <dt>Disconnect</dt>
+                    <dd>
+                      Sign out (above). Syncing stops; what is already on the
+                      server stays until you delete it.
+                    </dd>
+                  </div>
+                </dl>
+              </article>
+            </>
+          ) : (
+            <article className="integration-live-card">
+              <div className="integration-live-heading">
+                <div>
+                  <span>Not signed in</span>
+                  <b>Everything stays on this device</b>
+                </div>
+              </div>
+              <dl>
+                <div>
+                  <dt>If you sign in</dt>
+                  <dd>
+                    Google is asked for your basic profile (name, email,
+                    picture) to identify you — nothing else — and this
+                    journal’s own server keeps a copy of what you save so it
+                    survives reinstalling.
+                  </dd>
+                </div>
+                <div>
+                  <dt>Right now</dt>
+                  <dd>
+                    No provider, no permissions granted, no sync, nothing to
+                    disconnect. Deleting the app’s data on this device deletes
+                    the only copy.
+                  </dd>
+                </div>
+              </dl>
+            </article>
+          )}
+        </section>
         <section className="integration-boundary">
           <div>
-            <span>Connection boundary</span>
-            <b>Setup only</b>
+            <span>Future connections</span>
+            <b>Notes only — nothing below is connected</b>
           </div>
           <p>
-            This workspace does not start OAuth, request passwords or tokens,
-            read another service, or import records. A future connection would
-            require a separate provider, clear permissions, and your
-            confirmation.
+            Recording a note here starts no OAuth, requests no password or
+            token, reads no other service, and imports nothing. It is a
+            reminder to yourself that an option deserves a deliberate
+            conversation before anything is ever linked.
           </p>
         </section>
         <section
@@ -23073,7 +23271,7 @@ function IntegrationsPage({
                 <div className="integration-card-heading">
                   <div>
                     <span>
-                      {isRecorded ? "Local consent recorded" : "Not considered"}
+                      {isRecorded ? "✓ Worth a conversation" : "Not considered"}
                     </span>
                     <b>{option.title}</b>
                   </div>
@@ -23082,29 +23280,76 @@ function IntegrationsPage({
                     aria-pressed={isRecorded}
                     onClick={() => toggleConsent(option.key)}
                   >
-                    {isRecorded
-                      ? "Clear local consent"
-                      : "Record local consent"}
+                    {isRecorded ? "Clear note" : "Note as worth considering"}
                   </button>
                 </div>
                 <p>{option.note}</p>
+                <dl className="integration-facts">
+                  <div>
+                    <dt>Provider</dt>
+                    <dd>None</dd>
+                  </div>
+                  <div>
+                    <dt>Permissions</dt>
+                    <dd>None requested</dd>
+                  </div>
+                  <div>
+                    <dt>Last sync</dt>
+                    <dd>Never — nothing to sync</dd>
+                  </div>
+                  <div>
+                    <dt>Disconnect</dt>
+                    <dd>Nothing to disconnect</dd>
+                  </div>
+                  <div>
+                    <dt>Clearing this note</dt>
+                    <dd>Removes only the note; no external data exists</dd>
+                  </div>
+                </dl>
                 <small>{option.boundary}</small>
                 {isRecorded ? (
                   <em>
-                    Recorded locally on{" "}
-                    {new Date(consent.consentAt).toLocaleString()} · no
-                    connection exists.
+                    Noted {formatWhen(consent.consentAt)} · still no
+                    connection.
                   </em>
                 ) : null}
               </article>
             );
           })}
         </section>
-        <p className="integration-footer-note">
-          You can use every journal module without connecting anything. These
-          states only help you remember which future options deserve a
-          deliberate conversation.
-        </p>
+        <section className="integration-summary" aria-live="polite">
+          <div>
+            <span>Where this leaves you</span>
+            <b>
+              {summary.recorded} of {integrationOptions.length} noted as worth
+              a conversation
+            </b>
+          </div>
+          <p>
+            {signedIn
+              ? `Connected: ${provider} sign-in and account sync. `
+              : "Connected: nothing. "}
+            Future options noted: {summary.recorded}
+            {summary.recorded > 0
+              ? ` (${integrationOptions
+                  .filter(option => consents[option.key]?.state === "consent-recorded")
+                  .map(option => option.title)
+                  .join(", ")})`
+              : ""}
+            .{" "}
+            {lastChangeAt
+              ? `Last change ${formatWhen(lastChangeAt)}, saved.`
+              : "No changes this visit."}{" "}
+            Every journal page works without connecting anything.
+          </p>
+          <button
+            type="button"
+            className="ink-button"
+            onClick={onContents}
+          >
+            Done here — back to contents
+          </button>
+        </section>
       </div>
     </section>
   );
