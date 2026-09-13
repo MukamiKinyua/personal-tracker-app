@@ -31323,9 +31323,9 @@ body {
 .notebook-date.is-tomorrow {
   color: #a8481f;
 }
-.achievements-list article.is-editing,
-.experiences-list article.is-editing,
-.hobbies-list article.is-editing,
+.achievement-list article.is-editing,
+.experience-list article.is-editing,
+.hobby-list article.is-editing,
 .family-list article.is-editing,
 .social-list article.is-editing {
   outline: 2px dashed currentColor;
@@ -31333,9 +31333,9 @@ body {
   border-radius: 6px;
   opacity: 0.85;
 }
-.achievements-list > div b .local-undo,
-.experiences-list > div b .local-undo,
-.hobbies-list > div b .local-undo,
+.achievement-list > div b .local-undo,
+.experience-list > div b .local-undo,
+.hobby-list > div b .local-undo,
 .family-list > div b .local-undo,
 .social-list > div b .local-undo {
   margin-left: 0.5rem;

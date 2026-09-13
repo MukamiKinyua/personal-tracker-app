@@ -6206,14 +6206,60 @@ function ExperiencesPage({
   onCover: () => void;
 }) {
   type Experience = {
+    id?: string;
     title: string;
     date: string;
     detail: string;
     anticipation: string;
     memory: string;
     reflection: string;
+    createdAt?: string;
+    updatedAt?: string;
   };
   const [experiences, setExperiences] = useState<Experience[]>([]);
+  const [lastExperiences, setLastExperiences] = useState<Experience[] | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const today = sleepDateInputValue(new Date());
+  const formatDay = (value?: string) =>
+    value && /^\d{4}-\d{2}-\d{2}$/.test(value)
+      ? new Date(`${value}T12:00:00`).toLocaleDateString(undefined, {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        })
+      : null;
+  function dateLabel(value: string) {
+    if (!value) return null;
+    const detail = assignmentDueDetail(value, today);
+    const days = detail.daysAway ?? 0;
+    const abs = Math.abs(days);
+    const rel =
+      detail.kind === "today"
+        ? "today"
+        : detail.kind === "tomorrow"
+          ? "tomorrow"
+          : days < 0
+            ? `${abs} day${abs === 1 ? "" : "s"} ago`
+            : `in ${days} days`;
+    return { text: `${detail.exact} · ${rel}`, kind: detail.kind };
+  }
+  function editExperience(experience: Experience) {
+    setEditingId(experience.id ?? null);
+    setDraft({
+      title: experience.title,
+      date: experience.date,
+      detail: experience.detail,
+      anticipation: experience.anticipation,
+      memory: experience.memory,
+      reflection: experience.reflection,
+    });
+  }
+  function removeExperience(experience: Experience) {
+    setLastExperiences(experiences);
+    setExperiences(current => current.filter(entry => entry.id !== experience.id));
+    if (editingId === experience.id) setEditingId(null);
+    toast(`Removed “${experience.title}”`);
+  }
   const [draft, setDraft] = useState<Experience>({
     title: "",
     date: "",
@@ -6227,16 +6273,33 @@ function ExperiencesPage({
     payload: { experiences },
     hydrate: payload => {
       if (Array.isArray(payload.experiences))
-        setExperiences(payload.experiences as Experience[]);
+        setExperiences(
+          (payload.experiences as Experience[]).map((entry, index) => ({
+            ...entry,
+            id: entry.id ?? `experience-${index}-${entry.title}`,
+          }))
+        );
     },
   });
   function addExperience(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!draft.title.trim()) return;
-    setExperiences(current => [
-      ...current,
-      { ...draft, title: draft.title.trim() },
-    ]);
+    const fields = { ...draft, title: draft.title.trim() };
+    if (editingId) {
+      setExperiences(current =>
+        current.map(entry =>
+          entry.id === editingId ? { ...entry, ...fields, updatedAt: today } : entry
+        )
+      );
+      toast("Updated");
+    } else {
+      setExperiences(current => [
+        ...current,
+        { ...fields, id: `experience-${Date.now()}`, createdAt: today },
+      ]);
+      toast(`“${fields.title}” saved`);
+    }
+    setEditingId(null);
     setDraft({
       title: "",
       date: "",
@@ -6347,14 +6410,49 @@ function ExperiencesPage({
               placeholder="What did this give you?"
             />
           </label>
-          <Button className="ink-button" type="submit">
-            <Plus size={15} /> Save experience
-          </Button>
+          <div className="career-form-actions">
+            <Button type="submit" className="ink-button">
+              <Plus size={15} /> {editingId ? "Save changes" : "Save experience"}
+            </Button>
+            {editingId ? (
+              <button
+                type="button"
+                className="local-undo"
+                onClick={() => {
+                  setEditingId(null);
+                  setDraft({
+      title: "",
+      date: "",
+      detail: "",
+      anticipation: "",
+      memory: "",
+      reflection: "",
+                  });
+                }}
+              >
+                Cancel edit
+              </button>
+            ) : null}
+          </div>
         </form>
         <div className="experience-list">
           <div>
             <span>memory map</span>
-            <b>{experiences.length} moments</b>
+            <b>
+              {experiences.length} moments
+              {lastExperiences && (
+                <button
+                  type="button"
+                  className="local-undo"
+                  onClick={() => {
+                    setExperiences(lastExperiences);
+                    setLastExperiences(null);
+                  }}
+                >
+                  Undo remove
+                </button>
+              )}
+            </b>
           </div>
           {experiences.length === 0 ? (
             <small>
@@ -6362,13 +6460,13 @@ function ExperiencesPage({
               with a little more care.
             </small>
           ) : (
-            experiences.map((experience, index) => (
-              <article key={`${experience.title}-${index}`}>
+            experiences.map(experience => (
+              <article key={experience.id} className={cn(editingId === experience.id && "is-editing")}>
                 <i>{experience.title.slice(0, 1)}</i>
                 <p>
                   <b>{experience.title}</b>
                   <small>
-                    {experience.date || "Date open"} ·{" "}
+                    {experience.date ? (<span className={cn("notebook-date", `is-${dateLabel(experience.date)!.kind}`)}>{dateLabel(experience.date)!.text}</span>) : "Date open"} ·{" "}
                     {experience.detail || "Detail to be added"}
                   </small>
                   <em>
@@ -6379,6 +6477,25 @@ function ExperiencesPage({
                   <em>
                     Reflection: {experience.reflection || "Add a reflection"}
                   </em>
+                  <small className="career-stamp">
+                    {formatDay(experience.updatedAt)
+                      ? `Updated ${formatDay(experience.updatedAt)}`
+                      : formatDay(experience.createdAt)
+                        ? `Saved ${formatDay(experience.createdAt)}`
+                        : "Saved before dates were kept"}
+                  </small>
+                  <span className="career-actions">
+                    <button type="button" onClick={() => editExperience(experience)}>
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeExperience(experience)}
+                      aria-label={`Remove ${experience.title}`}
+                    >
+                      Remove
+                    </button>
+                  </span>
                 </p>
               </article>
             ))
