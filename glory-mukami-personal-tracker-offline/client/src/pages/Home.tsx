@@ -6050,6 +6050,7 @@ function ExperiencesPage({
                   onClick={() => {
                     setExperiences(lastExperiences);
                     setLastExperiences(null);
+                    toast("Experience restored");
                   }}
                 >
                   Undo remove
