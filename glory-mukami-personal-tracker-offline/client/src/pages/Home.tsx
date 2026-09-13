@@ -46,7 +46,12 @@ import { SettingsPanel } from "@/components/SettingsPanel";
 import { DayPlanner } from "@/components/DayPlanner";
 import { WorkoutStudio } from "@/components/WorkoutStudio";
 import { useRecordStore } from "@/contexts/RecordStoreContext";
-import { computeStreak, type HabitDayState } from "@/lib/core/streaks";
+import {
+  computeStreak,
+  isDueOn,
+  type HabitDayState,
+  type Schedule as HabitSchedule,
+} from "@/lib/core/streaks";
 import { suggestMeals } from "@/lib/core/mealMemory";
 import { fromMeal, fromMealMessage } from "@/lib/core/grocery";
 import { toast } from "sonner";
@@ -18594,17 +18599,48 @@ function HabitsPage({
   onRecordHabit: (label: string) => void;
 }) {
   const pixelStore = useContext(PixelsTrackerContext);
-  const today = new Date().toISOString().slice(0, 10);
-  const [habits, setHabits] = useState<
-    {
-      id: string;
-      name: string;
-      schedule: string;
-      minimum: string;
-      cue: string;
-      archived: boolean;
-    }[]
-  >([]);
+  const today = sleepDateInputValue(new Date());
+  type Habit = {
+    id: string;
+    name: string;
+    schedule: string;
+    /** Weekdays (0 = Sunday) for day-based schedules. */
+    days?: number[];
+    minimum: string;
+    cue: string;
+    archived: boolean;
+  };
+  const [habits, setHabits] = useState<Habit[]>([]);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const weekdayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const dayBasedSchedules = new Set(["Selected days", "3 times a week"]);
+  function habitSchedule(habit: Habit): HabitSchedule {
+    switch (habit.schedule) {
+      case "Weekdays":
+        return { kind: "days", days: [1, 2, 3, 4, 5] };
+      case "Weekends":
+        return { kind: "days", days: [0, 6] };
+      case "Selected days":
+      case "3 times a week":
+        return habit.days && habit.days.length > 0
+          ? { kind: "days", days: habit.days }
+          : { kind: "daily" };
+      default:
+        return { kind: "daily" };
+    }
+  }
+  function describeSchedule(habit: Habit) {
+    if (dayBasedSchedules.has(habit.schedule) && habit.days?.length) {
+      return [...habit.days]
+        .sort()
+        .map(day => weekdayNames[day])
+        .join(", ");
+    }
+    if (dayBasedSchedules.has(habit.schedule)) {
+      return `${habit.schedule} · no days chosen yet, so every day counts`;
+    }
+    return habit.schedule;
+  }
   const [states, setStates] = useState<Record<string, HabitDailyState>>({});
   const [records, setRecords] = useState<HabitRecord[]>([]);
   const [avoidanceHabits, setAvoidanceHabits] = useState<AvoidanceHabit[]>([]);
@@ -18619,9 +18655,16 @@ function HabitsPage({
     return () => window.clearInterval(interval);
   }, []);
   const [editingId, setEditingId] = useState<string | "new" | null>(null);
-  const [draft, setDraft] = useState({
+  const [draft, setDraft] = useState<{
+    name: string;
+    schedule: string;
+    days: number[];
+    minimum: string;
+    cue: string;
+  }>({
     name: "",
     schedule: "Every day",
+    days: [],
     minimum: "",
     cue: "",
   });
@@ -18640,6 +18683,7 @@ function HabitsPage({
     },
   });
   const activeHabits = habits.filter(habit => !habit.archived);
+  const pausedHabits = habits.filter(habit => habit.archived);
   const activeAvoidanceHabits = avoidanceHabits.filter(
     habit => !habit.archived
   );
@@ -18648,12 +18692,46 @@ function HabitsPage({
     value: HabitDailyState;
     label: string;
     color: string;
+    glyph: string;
+    meaning: string;
   }> = [
-    { value: "complete", label: "Complete", color: "#e75e93" },
-    { value: "partial", label: "Partial", color: "#e3a83a" },
-    { value: "rest", label: "Planned rest", color: "#3c9aa1" },
-    { value: "skipped", label: "Skipped", color: "#8b7b82" },
+    {
+      value: "complete",
+      label: "Complete",
+      color: "#e75e93",
+      glyph: "●",
+      meaning: "Did it — the full version or the smallest one. Counts toward the streak.",
+    },
+    {
+      value: "partial",
+      label: "Partial",
+      color: "#e3a83a",
+      glyph: "◐",
+      meaning: "Did some of it. Also counts toward the streak.",
+    },
+    {
+      value: "rest",
+      label: "Planned rest",
+      color: "#3c9aa1",
+      glyph: "○",
+      meaning: "Chose in advance not to today. Neither adds to nor breaks the streak.",
+    },
+    {
+      value: "skipped",
+      label: "Skipped",
+      color: "#8b7b82",
+      glyph: "—",
+      meaning: "Didn't happen, no plan. Neither adds to nor breaks the streak either — the only thing that breaks a streak is a scheduled day left blank.",
+    },
   ];
+  const [showStateKey, setShowStateKey] = useState(false);
+  // Today's state comes from the dated records, never from a per-habit map
+  // that would carry yesterday's "Complete today" into tomorrow.
+  function stateToday(habitId: string): HabitDailyState | undefined {
+    return records.find(
+      record => record.habitId === habitId && record.date === today
+    )?.state;
+  }
   /**
    * The streak for one habit.
    *
@@ -18663,29 +18741,47 @@ function HabitsPage({
    * version broke on anything that was not `complete`, which punished the user
    * for using the rest option the page itself offers.
    */
-  function calculateStreak(habitId: string) {
+  function calculateStreak(habit: Habit) {
     const dayStates: Record<string, HabitDayState> = {};
     for (const record of records) {
-      if (record.habitId === habitId) {
+      if (record.habitId === habit.id) {
         dayStates[record.date] = record.state as HabitDayState;
       }
     }
 
-    const result = computeStreak({ states: dayStates, today });
-    const loggedToday = records.some(
-      record => record.habitId === habitId && record.date === today
-    );
+    const schedule = habitSchedule(habit);
+    const result = computeStreak({ states: dayStates, today, schedule });
+    const loggedToday = Boolean(stateToday(habit.id));
+    const dueToday = isDueOn(schedule, today);
 
     return {
       streak: result.current,
+      dueToday,
       // Only a nudge, never a failure: today is still the user's to log.
-      inDanger: result.current > 0 && !loggedToday,
+      inDanger: result.current > 0 && dueToday && !loggedToday,
     };
   }
 
   function selectState(habitId: string, state: HabitDailyState) {
-    setStates(current => ({ ...current, [habitId]: state }));
-    setRecords(current => setHabitDayState(current, habitId, today, state));
+    const current = stateToday(habitId);
+    // Tapping the chosen state again clears today, so a mis-tap is one tap
+    // to undo rather than a choice between four wrong answers.
+    if (current === state) {
+      setRecords(records =>
+        records.filter(
+          record => !(record.habitId === habitId && record.date === today)
+        )
+      );
+      setStates(map => {
+        const next = { ...map };
+        delete next[habitId];
+        return next;
+      });
+      toast("Today cleared for this habit");
+      return;
+    }
+    setStates(map => ({ ...map, [habitId]: state }));
+    setRecords(records => setHabitDayState(records, habitId, today, state));
     const monthIndex = new Date().getMonth();
     const day = new Date().getDate();
     const status = statusOptions.find(option => option.value === state)!;
@@ -18694,6 +18790,32 @@ function HabitsPage({
       onRecordHabit(
         habits.find(habit => habit.id === habitId)?.name || "Habit"
       );
+  }
+  function moveHabit(habitId: string, delta: -1 | 1) {
+    setHabits(current => {
+      const order = current.filter(habit => !habit.archived);
+      const index = order.findIndex(habit => habit.id === habitId);
+      const target = index + delta;
+      if (index < 0 || target < 0 || target >= order.length) return current;
+      const reordered = [...order];
+      [reordered[index], reordered[target]] = [
+        reordered[target]!,
+        reordered[index]!,
+      ];
+      return [...reordered, ...current.filter(habit => habit.archived)];
+    });
+  }
+  function setArchived(habitId: string, archived: boolean) {
+    setHabits(current =>
+      current.map(item => (item.id === habitId ? { ...item, archived } : item))
+    );
+    toast(archived ? "Habit paused — find it under Paused habits" : "Habit resumed");
+  }
+  function deleteHabit(habitId: string) {
+    setHabits(current => current.filter(item => item.id !== habitId));
+    setRecords(current => current.filter(record => record.habitId !== habitId));
+    setConfirmDeleteId(null);
+    toast("Habit and its history deleted");
   }
   function addAvoidanceHabit(event: React.FormEvent) {
     event.preventDefault();
@@ -18731,49 +18853,45 @@ function HabitsPage({
       return next;
     });
   }
-  function beginEdit(habit?: (typeof habits)[number]) {
+  function beginEdit(habit?: Habit) {
     setDraft(
       habit
         ? {
             name: habit.name,
             schedule: habit.schedule,
+            days: habit.days ?? [],
             minimum: habit.minimum,
             cue: habit.cue,
           }
-        : { name: "", schedule: "Every day", minimum: "", cue: "" }
+        : { name: "", schedule: "Every day", days: [], minimum: "", cue: "" }
     );
     setEditingId(habit?.id || "new");
   }
   function saveHabit(event: React.FormEvent) {
     event.preventDefault();
     if (!draft.name.trim()) return;
+    const fields = {
+      name: draft.name.trim(),
+      schedule: draft.schedule,
+      days: dayBasedSchedules.has(draft.schedule)
+        ? [...draft.days].sort()
+        : undefined,
+      minimum: draft.minimum.trim() || "One small version",
+      cue: draft.cue.trim(),
+    };
     if (editingId === "new")
       setHabits(current => [
         ...current,
-        {
-          id: `${Date.now()}-habit`,
-          name: draft.name.trim(),
-          schedule: draft.schedule,
-          minimum: draft.minimum.trim() || "One small version",
-          cue: draft.cue.trim(),
-          archived: false,
-        },
+        { id: `${Date.now()}-habit`, ...fields, archived: false },
       ]);
     else if (editingId)
       setHabits(current =>
         current.map(habit =>
-          habit.id === editingId
-            ? {
-                ...habit,
-                name: draft.name.trim(),
-                schedule: draft.schedule,
-                minimum: draft.minimum.trim() || "One small version",
-                cue: draft.cue.trim(),
-              }
-            : habit
+          habit.id === editingId ? { ...habit, ...fields } : habit
         )
       );
     setEditingId(null);
+    toast(editingId === "new" ? "Habit added" : "Habit updated");
   }
   return (
     <section
@@ -18908,6 +19026,34 @@ function HabitsPage({
             </b>
           </div>
           <small>Choose the most honest version of each habit today.</small>
+          <button
+            type="button"
+            className="habit-key-toggle"
+            onClick={() => setShowStateKey(value => !value)}
+            aria-expanded={showStateKey}
+          >
+            {showStateKey ? "Hide" : "What do the four states mean?"}
+          </button>
+          {showStateKey && (
+            <dl className="habit-state-key">
+              {statusOptions.map(option => (
+                <div key={option.value}>
+                  <dt>
+                    <i style={{ background: option.color }} aria-hidden="true" />
+                    <span aria-hidden="true">{option.glyph}</span> {option.label}
+                  </dt>
+                  <dd>{option.meaning}</dd>
+                </div>
+              ))}
+              <div>
+                <dt>Not scheduled</dt>
+                <dd>
+                  A day your schedule doesn’t include. Leaving it blank never
+                  breaks a streak. You can still log it if you did it anyway.
+                </dd>
+              </div>
+            </dl>
+          )}
         </section>
         <section className="habit-list">
           {activeHabits.length === 0 ? (
@@ -18916,10 +19062,17 @@ function HabitsPage({
               than five.
             </p>
           ) : null}
-          {activeHabits.map(habit => {
-            const { streak, inDanger } = calculateStreak(habit.id);
+          {activeHabits.map((habit, index) => {
+            const { streak, inDanger, dueToday } = calculateStreak(habit);
+            const current = stateToday(habit.id);
+            const currentOption = statusOptions.find(
+              option => option.value === current
+            );
             return (
-              <article className="habit-card" key={habit.id}>
+              <article
+                className={cn("habit-card", !dueToday && "is-off-day")}
+                key={habit.id}
+              >
                 <div className="habit-card-heading">
                   <div>
                     <b>
@@ -18930,64 +19083,140 @@ function HabitsPage({
                             "streak-badge",
                             inDanger && "in-danger"
                           )}
+                          title={
+                            inDanger
+                              ? "Scheduled today and not logged yet"
+                              : undefined
+                          }
                         >
                           🔥 {streak}-day streak
+                          {inDanger ? " · today still open" : ""}
                         </span>
                       )}
                     </b>
                     <small>
-                      {habit.schedule} · smallest version: {habit.minimum}
+                      {describeSchedule(habit)} · smallest version:{" "}
+                      {habit.minimum}
                     </small>
                     {habit.cue ? <em>Best cue: {habit.cue}</em> : null}
                   </div>
-                  <button type="button" onClick={() => beginEdit(habit)}>
-                    Edit
-                  </button>
+                  <div className="habit-card-tools">
+                    <button
+                      type="button"
+                      onClick={() => moveHabit(habit.id, -1)}
+                      disabled={index === 0}
+                      aria-label={`Move ${habit.name} up`}
+                      title="Move up"
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => moveHabit(habit.id, 1)}
+                      disabled={index === activeHabits.length - 1}
+                      aria-label={`Move ${habit.name} down`}
+                      title="Move down"
+                    >
+                      ↓
+                    </button>
+                    <button type="button" onClick={() => beginEdit(habit)}>
+                      Edit
+                    </button>
+                  </div>
                 </div>
                 <div
                   className="habit-states"
-                  aria-label={`Set today's state for ${habit.name}`}
+                  role="group"
+                  aria-label={`Today's state for ${habit.name}`}
                 >
                   {statusOptions.map(option => (
                     <button
                       type="button"
                       key={option.value}
                       className={cn(
-                        states[habit.id] === option.value && "active",
+                        current === option.value && "active",
                         option.value
                       )}
                       onClick={() => selectState(habit.id, option.value)}
-                      aria-pressed={states[habit.id] === option.value}
+                      aria-pressed={current === option.value}
+                      title={option.meaning}
                     >
-                      <i style={{ background: option.color }} />
+                      <i style={{ background: option.color }} aria-hidden="true">
+                        {option.glyph}
+                      </i>
+                      {current === option.value ? "✓ " : ""}
                       {option.label}
                     </button>
                   ))}
                 </div>
                 <div className="habit-card-foot">
                   <span>
-                    {states[habit.id]
-                      ? `${statusOptions.find(option => option.value === states[habit.id])!.label} today`
-                      : "Not logged today"}
+                    {currentOption
+                      ? `${currentOption.label} today · tap again to clear`
+                      : dueToday
+                        ? "Not logged today"
+                        : "Not scheduled today — log it only if you did it"}
                   </span>
                   <button
                     type="button"
-                    onClick={() =>
-                      setHabits(current =>
-                        current.map(item =>
-                          item.id === habit.id
-                            ? { ...item, archived: true }
-                            : item
-                        )
-                      )
-                    }
+                    onClick={() => setArchived(habit.id, true)}
                   >
-                    Pause
+                    Pause habit
                   </button>
                 </div>
               </article>
             );
           })}
+          {pausedHabits.length > 0 && (
+            <section className="habit-paused" aria-labelledby="habit-paused-title">
+              <div>
+                <span id="habit-paused-title">Paused habits</span>
+                <b>{pausedHabits.length}</b>
+              </div>
+              <small>
+                Paused habits keep their history and stay out of today’s
+                rhythm. Resume whenever you like, or delete for good.
+              </small>
+              {pausedHabits.map(habit => (
+                <article key={habit.id}>
+                  <b>{habit.name}</b>
+                  <small>{describeSchedule(habit)}</small>
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => setArchived(habit.id, false)}
+                    >
+                      Resume
+                    </button>
+                    {confirmDeleteId === habit.id ? (
+                      <>
+                        <button
+                          type="button"
+                          className="is-danger"
+                          onClick={() => deleteHabit(habit.id)}
+                        >
+                          Delete for good
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setConfirmDeleteId(null)}
+                        >
+                          Keep
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDeleteId(habit.id)}
+                      >
+                        Delete…
+                      </button>
+                    )}
+                  </div>
+                </article>
+              ))}
+            </section>
+          )}
         </section>
         {editingId ? (
           <form className="habit-editor" onSubmit={saveHabit}>
@@ -19020,6 +19249,41 @@ function HabitsPage({
               <option>3 times a week</option>
               <option>Selected days</option>
             </select>
+            {dayBasedSchedules.has(draft.schedule) && (
+              <div
+                className="habit-day-picker"
+                role="group"
+                aria-label="Which days"
+              >
+                {weekdayNames.map((name, day) => (
+                  <button
+                    type="button"
+                    key={name}
+                    className={cn(draft.days.includes(day) && "active")}
+                    aria-pressed={draft.days.includes(day)}
+                    onClick={() =>
+                      setDraft(current => ({
+                        ...current,
+                        days: current.days.includes(day)
+                          ? current.days.filter(value => value !== day)
+                          : [...current.days, day],
+                      }))
+                    }
+                  >
+                    {draft.days.includes(day) ? "✓ " : ""}
+                    {name}
+                  </button>
+                ))}
+                <small>
+                  {draft.days.length === 0
+                    ? "Pick the days this habit is due. Until you do, every day counts."
+                    : `Due ${[...draft.days]
+                        .sort()
+                        .map(day => weekdayNames[day])
+                        .join(", ")} — other days never break the streak.`}
+                </small>
+              </div>
+            )}
             <input
               value={draft.minimum}
               onChange={event =>
@@ -19058,7 +19322,8 @@ function HabitsPage({
             {weekly.rest} planned rest · {weekly.skipped} skipped
           </p>
           <small>
-            Planned rest is part of the rhythm, not a broken streak.
+            Planned rest and skipped days are part of the rhythm, not a broken
+            streak. Only a scheduled day left blank breaks one.
           </small>
         </section>
         <section className="habit-year">

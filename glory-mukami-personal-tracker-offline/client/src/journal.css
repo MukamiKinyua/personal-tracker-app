@@ -925,26 +925,18 @@ button:focus-visible {
 
 /* Was a plain light-mode bar pinned to the top of the right column only
    (opaque-ish white, dark ink text - the same un-dark-moded pattern as the
-   quick-chips below it). Lifted out of that column entirely with
-   position:absolute - but its containing block is .contents-list, not the
-   full-width .journal-spread, because .spread-page (which .contents-list
-   also is) sets position:relative of its own, and .contents-list only spans
-   the right half of the spread.
-
-   The CSS spec's containing block for an absolutely positioned box is
-   formed by the nearest positioned ancestor's PADDING box - which is the
-   box that INCLUDES the padding, so its edge sits at border-left +
-   border-width, not border-left + padding-left. .contents-list has no
-   border, so that edge is just its own left edge (x=720 at 1440px), full
-   stop - the padding is content of that box, not an extra offset outside
-   it. left:0 + translateX(-50%) (the standard "edge becomes centre" pair)
-   therefore already lands the pill's centre at .contents-list's left edge,
-   the true midpoint of the two-page spread, with no padding correction
-   needed. (An earlier version of this rule subtracted the padding's clamp
-   expression, on the assumption the padding sat outside that edge - it
-   doesn't, and the subtraction only measured as correct at the time because
-   a separate specificity bug, fixed below, meant position:absolute wasn't
-   actually winning yet either. Two wrongs.)
+   quick-chips below it). Lifted out of flow with position:absolute and
+   centred at the top of .contents-list, its own containing block (left:50%
+   + translateX(-50%), the standard "edge becomes centre" pair - centring
+   WITHIN this column, not across the full two-page spread: .contents-list
+   sets overflow-x:hidden, and a pill wide enough to look right stretches
+   past its left edge into the left-hand page at true spread-centre, which
+   that overflow silently clips - the icon and most of the input disappear
+   while the pill's own background paints on regardless, since a box's
+   background isn't confined by the same box's own overflow the way a
+   sibling would be. Signs of exactly that: the icon undetectable by
+   elementsFromPoint at its own coordinates, while the frosted fill still
+   showed in a screenshot).
 
    Needs #root: a plain `.contents-search` loses outright to several
    scattered, unconditional !important rules elsewhere in this file that
@@ -973,7 +965,7 @@ button:focus-visible {
      matching or exceeding five selector steps. */
   position: absolute;
   top: 1.5rem;
-  left: 0;
+  left: 50%;
   transform: translateX(-50%);
   z-index: 6;
   width: min(30rem, calc(100vw - 3rem));
@@ -21845,14 +21837,177 @@ body {
   font-weight: 840;
 }
 .habit-states button i {
-  width: 0.5rem;
-  height: 0.5rem;
+  display: grid;
+  place-items: center;
+  width: 0.9rem;
+  height: 0.9rem;
   border-radius: 50%;
+  color: #fffaf2;
+  font-size: 0.5rem;
+  font-style: normal;
+  line-height: 1;
 }
 .habit-states button.active {
+  border-width: 2px;
   border-color: #160a16;
-  box-shadow: inset 0 -2px 0 #160a16;
+  box-shadow: inset 0 -3px 0 #160a16;
   background: #fffaf2;
+  font-weight: 900;
+}
+.habit-states button:focus-visible,
+.habit-card-tools button:focus-visible,
+.habit-day-picker button:focus-visible {
+  outline: 2px solid #160a16;
+  outline-offset: 2px;
+}
+.habit-card.is-off-day {
+  opacity: 0.86;
+}
+.habit-card.is-off-day .habit-states button:not(.active) {
+  border-style: dashed;
+}
+.habit-card-tools {
+  display: flex;
+  gap: 0.28rem;
+  align-items: flex-start;
+}
+.habit-card-tools button {
+  border: 1px solid rgba(22, 10, 22, 0.44);
+  border-radius: 7px;
+  padding: 0.32rem 0.42rem;
+  color: #160a16;
+  background: transparent;
+  font-size: 0.57rem;
+  font-weight: 850;
+}
+.habit-card-tools button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.habit-key-toggle {
+  margin-top: 0.4rem;
+  padding: 0;
+  border: 0;
+  color: #160a16;
+  background: none;
+  font-size: 0.56rem;
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.habit-state-key {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0.5rem 0 0;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid rgba(22, 10, 22, 0.3);
+  border-radius: 8px;
+  background: rgba(255, 250, 242, 0.7);
+}
+.habit-state-key dt {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: #160a16;
+  font-size: 0.57rem;
+  font-weight: 850;
+}
+.habit-state-key dt i {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+}
+.habit-state-key dd {
+  margin: 0.1rem 0 0;
+  color: #3a2338;
+  font-size: 0.56rem;
+  line-height: 1.45;
+}
+.habit-day-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.28rem;
+}
+.habit-day-picker button {
+  border: 1px solid rgba(22, 10, 22, 0.35);
+  border-radius: 999px;
+  padding: 0.28rem 0.5rem;
+  color: #160a16;
+  background: rgba(255, 250, 242, 0.6);
+  font-size: 0.55rem;
+  font-weight: 800;
+}
+.habit-day-picker button.active {
+  border-width: 2px;
+  border-color: #160a16;
+  background: #fffaf2;
+}
+.habit-day-picker small {
+  flex: 1 1 100%;
+  color: #3a2338;
+  font-size: 0.55rem;
+  line-height: 1.4;
+}
+.habit-paused {
+  display: grid;
+  gap: 0.4rem;
+  margin-top: 0.9rem;
+  padding: 0.65rem;
+  border: 1px dashed rgba(22, 10, 22, 0.4);
+  border-radius: 10px;
+}
+.habit-paused > div {
+  display: flex;
+  justify-content: space-between;
+  color: #160a16;
+  font-size: 0.57rem;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.habit-paused > small {
+  color: #3a2338;
+  font-size: 0.55rem;
+  line-height: 1.45;
+}
+.habit-paused article {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.15rem 0.5rem;
+  align-items: center;
+  padding: 0.4rem 0;
+  border-top: 1px dashed rgba(22, 10, 22, 0.2);
+}
+.habit-paused article b {
+  color: #160a16;
+  font-size: 0.62rem;
+}
+.habit-paused article small {
+  grid-column: 1;
+  color: #3a2338;
+  font-size: 0.54rem;
+}
+.habit-paused article > div {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  display: flex;
+  gap: 0.28rem;
+}
+.habit-paused article button {
+  border: 1px solid rgba(22, 10, 22, 0.44);
+  border-radius: 7px;
+  padding: 0.3rem 0.45rem;
+  color: #160a16;
+  background: transparent;
+  font-size: 0.55rem;
+  font-weight: 850;
+  white-space: nowrap;
+}
+.habit-paused article button.is-danger {
+  color: #fffaf2;
+  background: #8b2942;
+  border-color: #8b2942;
 }
 .habit-card-foot {
   display: flex;
