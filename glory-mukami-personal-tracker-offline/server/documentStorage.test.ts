@@ -24,3 +24,13 @@ describe("document storage policy", () => {
     expect(DOCUMENT_UPLOAD_MAX_BYTES).toBe(15 * 1024 * 1024);
   });
 });
+
+describe("private document ownership from the storage key", () => {
+  it("names the owner for journal documents and nobody for public artwork", async () => {
+    const { privateDocumentOwnerId } = await import("./_core/storageProxy");
+    expect(privateDocumentOwnerId("journal-documents/42/1726-passport_ab12cd34.pdf")).toBe(42);
+    expect(privateDocumentOwnerId("glory-art-cv-night-desk_c8bff2ca.jpg")).toBeNull();
+    // A malformed owner segment must not fall through to "public".
+    expect(Number.isNaN(privateDocumentOwnerId("journal-documents/not-a-user/x.pdf"))).toBe(true);
+  });
+});

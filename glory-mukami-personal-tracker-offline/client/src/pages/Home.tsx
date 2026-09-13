@@ -13069,11 +13069,17 @@ function DocumentRenewalPage({
   onContents: () => void;
   onCover: () => void;
 }) {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = sleepDateInputValue(new Date());
   const [records, setRecords] = useState<RenewalRecord[]>([]);
+  const [lastRecords, setLastRecords] = useState<RenewalRecord[] | null>(null);
   const [customTypes, setCustomTypes] = useState<string[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [archiveOpen, setArchiveOpen] = useState(false);
+  const auth = useAuth();
+  function reviewWhen(record: RenewalRecord) {
+    if (!record.reviewDate) return null;
+    return assignmentDueDetail(record.reviewDate, today);
+  }
   const [uploadingId, setUploadingId] = useState<string | null>(null);
   const [uploadMessage, setUploadMessage] = useState<string | null>(null);
   const [draft, setDraft] = useState({
@@ -13161,6 +13167,7 @@ function DocumentRenewalPage({
         ? current.map(record => (record.id === editingId ? next : record))
         : [next, ...current]
     );
+    toast(editingId ? "Document updated" : `${next.title} added`);
     resetDraft();
   }
   function editRecord(record: RenewalRecord) {
@@ -13297,8 +13304,20 @@ function DocumentRenewalPage({
             <span>{status}</span>
           </div>
           <small>
-            {record.type} · {record.reviewDate || "No review date"} ·{" "}
-            {record.reviewWindow}
+            {record.type} ·{" "}
+            {record.reviewDate ? (
+              <>
+                <time dateTime={record.reviewDate}>
+                  {reviewWhen(record)?.exact}
+                </time>
+                {status === "Past due" || status === "Approaching" || status === "Upcoming"
+                  ? ` (${reviewWhen(record)?.label.toLowerCase()})`
+                  : ""}
+              </>
+            ) : (
+              "no review date"
+            )}{" "}
+            · {record.reviewWindow}
           </small>
           {record.nextAction ? (
             <em>Next: {record.nextAction}</em>
@@ -13323,14 +13342,16 @@ function DocumentRenewalPage({
               </small>
               <button
                 type="button"
-                onClick={() =>
+                title="The stored file itself stays in storage until your account is deleted"
+                onClick={() => {
                   updateRecord(record.id, current => ({
                     ...current,
                     attachment: undefined,
-                  }))
-                }
+                  }));
+                  toast("Reference removed. The stored file remains in storage until the account is deleted.");
+                }}
               >
-                Remove file reference
+                Forget this file
               </button>
             </div>
           ) : (
@@ -13419,11 +13440,19 @@ function DocumentRenewalPage({
           )}
           <button
             type="button"
-            onClick={() =>
+            onClick={() => {
+              setLastRecords(records);
               setRecords(current =>
                 current.filter(item => item.id !== record.id)
-              )
-            }
+              );
+              if (editingId === record.id) resetDraft();
+              toast(
+                record.attachment
+                  ? `Removed ${record.title}. Its stored file remains until the account is deleted.`
+                  : `Removed ${record.title}`
+              );
+            }}
+            aria-label={`Remove ${record.title}`}
           >
             Remove
           </button>
@@ -13445,20 +13474,63 @@ function DocumentRenewalPage({
           <em>not the files.</em>
         </h2>
         <p className="page-intro">
-          Track the metadata that helps you review or renew an important record,
-          then optionally attach a file to managed private storage. The journal
-          keeps only a storage reference—not document bytes in the database.
+          Track the dates that help you review or renew an important record,
+          and optionally attach the file itself.
         </p>
         <div className="document-safety">
           <HeartPulse size={15} />
-          <span>Owner-scoped metadata + managed file reference</span>
+          <span>
+            {auth.isAuthenticated
+              ? "Files open only for your signed-in account"
+              : "Sign in to attach files"}
+          </span>
         </div>
+        <section className="document-handling" aria-labelledby="document-handling-title">
+          <span id="document-handling-title">How documents are handled</span>
+          <ul>
+            <li>
+              <b>Dates and notes:</b>{" "}
+              {auth.isAuthenticated
+                ? "on this device and in your own account’s database."
+                : "on this device only until you sign in."}
+            </li>
+            <li>
+              <b>Attached files:</b> stored under your account in managed file
+              storage, not in the database. A file opens only while you are
+              signed in to the account that uploaded it — a link on its own is
+              not enough.
+            </li>
+            <li>
+              <b>Removing:</b> “Forget this file” and Remove drop this journal’s
+              reference. The stored file itself is not deleted individually;
+              it goes when the account is deleted in Privacy Controls. If a
+              file must not exist anywhere, don’t attach it.
+            </li>
+            <li>
+              <b>Limits:</b> PDF, images, text, or Office documents up to 15 MB.
+            </li>
+          </ul>
+        </section>
       </div>
       <div className="spread-page documents-workbench">
         <section className="document-review-summary">
           <div>
             <span>Review, factually</span>
-            <b>{summary.pastDue + summary.approaching} to review now</b>
+            <b>
+              {summary.pastDue + summary.approaching} to review now
+              {lastRecords && (
+                <button
+                  type="button"
+                  className="local-undo"
+                  onClick={() => {
+                    setRecords(lastRecords);
+                    setLastRecords(null);
+                  }}
+                >
+                  Undo remove
+                </button>
+              )}
+            </b>
           </div>
           <p>
             {summary.pastDue
