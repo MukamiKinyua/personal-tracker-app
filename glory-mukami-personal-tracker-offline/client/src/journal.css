@@ -14927,6 +14927,12 @@ button:focus-visible {
   animation: cover-return-bed var(--page-flip-duration) cubic-bezier(0.25, 0.68, 0.18, 1) forwards !important;
 }
 
+/* When the turn carries the real cover on the flap and reveals it under
+   the lifting page, this bed would only sit on top of that reveal. */
+.page-flip.carries-content.to-cover .flip-p2 {
+  display: none;
+}
+
 .page-flip.to-cover .flip-p2 > div {
   background:
     linear-gradient(108deg, rgba(13, 5, 35, 0.16), rgba(13, 5, 35, 0.64)),

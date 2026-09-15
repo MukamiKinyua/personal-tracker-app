@@ -967,6 +967,13 @@ function syncLiveState(source: Element, copy: Element) {
       twin.getContext("2d")?.drawImage(original, 0, 0);
     }
   });
+  // Looping CSS animations (the cover art's slow drift) restart from zero on
+  // a fresh clone; put the copy's clocks where the originals' are.
+  const sourceAnimations = source.getAnimations({ subtree: true });
+  copy.getAnimations({ subtree: true }).forEach((animation, index) => {
+    const twin = sourceAnimations[index];
+    if (twin) animation.currentTime = twin.currentTime;
+  });
 }
 
 function reminderNotificationBody(
@@ -1742,6 +1749,7 @@ export default function Home() {
     const pairs: Array<[Element, Element]> = [];
     for (const selector of [
       ":scope > .journal-spread",
+      ":scope > .journal-cover",
       ":scope > .pixels-floating",
     ]) {
       const original = stage.querySelector(selector);
@@ -1789,13 +1797,10 @@ export default function Home() {
       }, 140);
       return;
     }
-    // The cover has no two-column spread to clone and keeps its hand-built
-    // art skin; below 821px the spread collapses to one column and "the
-    // half the leaf sits in" no longer means anything.
+    // Below 821px the spread collapses to one column and "the half the
+    // leaf sits in" no longer means anything.
     setTurnCarriesContent(
-      view !== "cover" &&
-        nextView !== "cover" &&
-        Boolean(window.matchMedia?.("(min-width: 821px)").matches)
+      Boolean(window.matchMedia?.("(min-width: 821px)").matches)
     );
     setTurnDirection(direction);
     setTurnDestination(nextView);
@@ -1942,9 +1947,6 @@ export default function Home() {
                 Open a chapter, then choose where you would like to spend time.
                 Each page keeps the journal in view while making the day easier
                 to manage.
-              </p>
-              <p className="contents-note">
-                Tip: every chapter has a path back to here.
               </p>
             </div>
             <div className="spread-page contents-list">
@@ -2784,7 +2786,10 @@ export default function Home() {
                         <div className="flip-face-content">
                           <div
                             ref={flipBackStandInRef}
-                            className="journal-stage journal-open"
+                            className={cn(
+                              "journal-stage",
+                              turnDestination !== "cover" && "journal-open"
+                            )}
                             data-journal-view={turnDestination}
                             aria-hidden="true"
                             inert
@@ -9004,40 +9009,6 @@ function ExportPage({
               : "No export yet this visit"}
           </span>
         </div>
-        <section
-          className="export-ownership"
-          aria-labelledby="export-ownership-title"
-        >
-          <span id="export-ownership-title">Your data, in plain terms</span>
-          <ul>
-            <li>
-              <b>Format:</b> one JSON file with a readme and a field dictionary
-              inside it, so it can be read without this app. Any single area
-              can also go out as CSV below.
-            </li>
-            <li>
-              <b>What’s included:</b> exactly what the manifest lists. Records
-              include ones you deleted, marked with a deletion time, so nothing
-              is a silent gap.
-            </li>
-            <li>
-              <b>Where it goes:</b> your downloads folder. Only you decide
-              where it goes after that.
-            </li>
-            <li>
-              <b>Deleting afterwards:</b> exporting changes nothing here.
-              Removal of what the app holds is in{" "}
-              <button
-                type="button"
-                className="export-inline-link"
-                onClick={() => onNavigate("privacy")}
-              >
-                Privacy Controls
-              </button>
-              .
-            </li>
-          </ul>
-        </section>
       </div>
       <div className="spread-page export-page">
         <div className="export-scope">
@@ -13732,32 +13703,6 @@ function DocumentRenewalPage({
               : "Sign in to attach files"}
           </span>
         </div>
-        <section className="document-handling" aria-labelledby="document-handling-title">
-          <span id="document-handling-title">How documents are handled</span>
-          <ul>
-            <li>
-              <b>Dates and notes:</b>{" "}
-              {auth.isAuthenticated
-                ? "on this device and in your own account’s database."
-                : "on this device only until you sign in."}
-            </li>
-            <li>
-              <b>Attached files:</b> stored under your account in managed file
-              storage, not in the database. A file opens only while you are
-              signed in to the account that uploaded it — a link on its own is
-              not enough.
-            </li>
-            <li>
-              <b>Removing:</b> “Forget this file” and Remove drop this journal’s
-              reference. The stored file itself is not deleted individually;
-              it goes when the account is deleted in Privacy Controls. If a
-              file must not exist anywhere, don’t attach it.
-            </li>
-            <li>
-              <b>Limits:</b> PDF, images, text, or Office documents up to 15 MB.
-            </li>
-          </ul>
-        </section>
       </div>
       <div className="spread-page documents-workbench">
         <section className="document-review-summary">
@@ -14214,36 +14159,6 @@ function FinanceCashflowPage({
           <HeartPulse size={15} />
           <span>Private entries · no bank connection · no advice</span>
         </div>
-        <section className="finance-handling" aria-labelledby="finance-handling-title">
-          <span id="finance-handling-title">How this money data is handled</span>
-          <ul>
-            <li>
-              <b>Where:</b>{" "}
-              {auth.isAuthenticated
-                ? "on this device and in your own account’s database. "
-                : "on this device only until you sign in. "}
-              Never sent to a bank, a third party, or anyone else.
-            </li>
-            <li>
-              <b>Amounts:</b> stored to the cent and shown with two decimals,
-              in whichever currency label you set below. No conversion is ever
-              applied.
-            </li>
-            <li>
-              <b>Recurring:</b> a label so you notice it — nothing is re-added
-              on your behalf.
-            </li>
-            <li>
-              <b>Transfers:</b> there is one pot here, not accounts. Record a
-              transfer as money out only if it left the amount you’re tracking;
-              otherwise leave it out.
-            </li>
-            <li>
-              <b>Correct or delete:</b> any record, from the history below.
-              Export everything as CSV there too.
-            </li>
-          </ul>
-        </section>
       </div>
       <div className="spread-page finances-workbench">
         <section className="finance-period-setup">
@@ -18356,14 +18271,6 @@ function TasksPage({
           </span>
           <b>{planningSummary.timeBoundToday} time-bound today</b>
         </div>
-        <p className="tasks-persistence-note">
-          Saved as you go on this device
-          {auth.isAuthenticated
-            ? ", and synced to your account"
-            : " (sign in to sync across devices)"}
-          . Every add, edit, complete, move and delete can be undone from the
-          message that appears right after.
-        </p>
       </div>
       <div className="spread-page tasks-page">
         <form
@@ -18889,11 +18796,6 @@ function DigitalLifePage({
         <p className="page-intro">
           A private screen-time check-in that makes space for boundaries, focus,
           and the parts of life that do not live behind a screen.
-        </p>
-        <p className="digital-source-note">
-          Everything here is typed in by you. Nothing is read from your phone,
-          browser, or any app — there is no sync, no permission to grant, and
-          nothing that can silently fail.
         </p>
         <button
           type="button"
@@ -20959,12 +20861,6 @@ function WellbeingPage({
             A calm daily check-in for noticing your emotional weather, energy,
             and what could care for you next.
           </p>
-          <p className="wellbeing-scope-note">
-            This is a notebook, not a measurement. It doesn’t diagnose, score,
-            or watch for anything — it only keeps the words you choose. If
-            things feel heavy for a while, talking with someone you trust, or a
-            local support line, is a real next step; this page can’t be that.
-          </p>
           <button
             type="button"
             className="ink-button"
@@ -21303,37 +21199,6 @@ function CyclePage({
         >
           <Plus size={15} /> Log cycle entry
         </button>
-        <section className="cycle-privacy" aria-labelledby="cycle-privacy-title">
-          <span id="cycle-privacy-title">How this data is handled</span>
-          <ul>
-            <li>
-              <b>Where it lives:</b>{" "}
-              {auth.isAuthenticated
-                ? "on this device, and in your own account's database so it survives reinstalling. "
-                : "on this device only, until you sign in. "}
-              It is never shared with anyone else and nothing here is sent to a
-              third party.
-            </li>
-            <li>
-              <b>How long:</b> until you delete it. Nothing expires on its own.
-            </li>
-            <li>
-              <b>Delete:</b> any single entry below, or everything at once.
-            </li>
-            <li>
-              <b>Export:</b>{" "}
-              <button
-                type="button"
-                className="cycle-inline-link"
-                onClick={downloadCycleData}
-                disabled={entries.length === 0 && contextEntries.length === 0}
-              >
-                download everything on this page as a file
-              </button>{" "}
-              you keep.
-            </li>
-          </ul>
-        </section>
       </div>
       <div className="spread-page cycle-ring-page">
         <div className="cycle-ring">
