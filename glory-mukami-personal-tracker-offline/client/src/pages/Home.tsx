@@ -10,6 +10,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { COOKIE_NAME } from "@shared/const";
 import {
+  ArrowLeft,
   ArrowRight,
   BookOpen,
   CalendarDays,
@@ -917,6 +918,57 @@ type JournalShellPayload = {
 };
 const ReminderPreviewContext = createContext("Hide sensitive names");
 
+// Annotated as View[] (not Exclude<View, "cover" | "contents">[]) so it can
+// still be searched with a plain View, e.g. `chapterViews.indexOf(nav.view)`
+// when nav.view happens to be "cover" or "contents" — TS would otherwise
+// auto-narrow the filtered array's element type and reject that lookup.
+const chapterViews: View[] = journalViews.filter(
+  candidate => candidate !== "cover" && candidate !== "contents"
+);
+
+const JournalNavContext = createContext<{
+  view: View;
+  turnTo: (nextView: View, direction?: TurnDirection) => void;
+} | null>(null);
+
+/**
+ * Carry across the live state cloneNode leaves behind, so a copy of a page
+ * looks like the page did at that instant and not like a fresh render of
+ * it: scroll offsets, what has been typed into fields, and canvas bitmaps.
+ * The copy must already be in the document - scroll offsets need layout.
+ */
+function syncLiveState(source: Element, copy: Element) {
+  const originals = [source, ...Array.from(source.querySelectorAll("*"))];
+  const twins = [copy, ...Array.from(copy.querySelectorAll("*"))];
+  if (originals.length !== twins.length) return;
+  originals.forEach((original, index) => {
+    const twin = twins[index];
+    if (original.scrollTop || original.scrollLeft) {
+      twin.scrollTop = original.scrollTop;
+      twin.scrollLeft = original.scrollLeft;
+    }
+    if (
+      original instanceof HTMLInputElement &&
+      twin instanceof HTMLInputElement
+    ) {
+      twin.value = original.value;
+      twin.checked = original.checked;
+    } else if (
+      (original instanceof HTMLTextAreaElement &&
+        twin instanceof HTMLTextAreaElement) ||
+      (original instanceof HTMLSelectElement &&
+        twin instanceof HTMLSelectElement)
+    ) {
+      twin.value = original.value;
+    } else if (
+      original instanceof HTMLCanvasElement &&
+      twin instanceof HTMLCanvasElement
+    ) {
+      twin.getContext("2d")?.drawImage(original, 0, 0);
+    }
+  });
+}
+
 function reminderNotificationBody(
   mode: string,
   reminder: LocalReminder
@@ -935,6 +987,14 @@ function JournalActions({
   onContents: () => void;
   onCover: () => void;
 }) {
+  const nav = useContext(JournalNavContext);
+  const chapterIndex = nav ? chapterViews.indexOf(nav.view) : -1;
+  const previousView = chapterIndex > 0 ? chapterViews[chapterIndex - 1] : null;
+  const nextView =
+    chapterIndex >= 0 && chapterIndex < chapterViews.length - 1
+      ? chapterViews[chapterIndex + 1]
+      : null;
+
   return (
     <div className="journal-actions" aria-label="Journal navigation">
       <button className="journal-action" onClick={onCover} type="button">
@@ -945,6 +1005,31 @@ function JournalActions({
         <BookOpen size={15} />
         <span>Contents</span>
       </button>
+      {chapterIndex >= 0 && (
+        <>
+          <button
+            className="journal-action journal-action-prev"
+            type="button"
+            disabled={!previousView}
+            onClick={() => previousView && nav?.turnTo(previousView, "backward")}
+            aria-label="Previous chapter"
+          >
+            <ArrowLeft size={14} />
+          </button>
+          <span className="journal-action-chapter">
+            {chapterIndex + 1} / {chapterViews.length}
+          </span>
+          <button
+            className="journal-action journal-action-next"
+            type="button"
+            disabled={!nextView}
+            onClick={() => nextView && nav?.turnTo(nextView)}
+            aria-label="Next chapter"
+          >
+            <ArrowRight size={14} />
+          </button>
+        </>
+      )}
     </div>
   );
 }
@@ -1278,6 +1363,11 @@ export default function Home() {
   const [isTurning, setIsTurning] = useState(false);
   const [turnDirection, setTurnDirection] = useState<TurnDirection>("forward");
   const [turnDestination, setTurnDestination] = useState<View>("contents");
+  const [turnCarriesContent, setTurnCarriesContent] = useState(false);
+  const journalStageRef = useRef<HTMLDivElement>(null);
+  const flipFrontHostRef = useRef<HTMLDivElement>(null);
+  const flipBackStandInRef = useRef<HTMLDivElement>(null);
+  const flipRevealHostRef = useRef<HTMLDivElement>(null);
   const [expandedGroup, setExpandedGroup] = useState("Body");
   const [mobileContentsOpen, setMobileContentsOpen] = useState(false);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
@@ -1628,6 +1718,50 @@ export default function Home() {
       heading.focus({ preventScroll: true });
     });
   }
+  /**
+   * The turning leaf's front face carries the page it is lifting off, so the
+   * first frame of a turn is the resting page itself rather than a blank
+   * sheet dropped over it. The whole spread is cloned inside a stand-in
+   * .journal-stage that repeats the real stage's classes and
+   * data-journal-view, so every ancestor-dependent rule (scene art,
+   * per-view colours, glass buttons) resolves exactly as it does on the
+   * real page; the stand-in is then slid so the spine lands on the leaf's
+   * hinge. This runs as a layout effect because the overlay - and with it
+   * the host element - only exists once isTurning has rendered, and it has
+   * to be populated before that first frame paints.
+   */
+  useLayoutEffect(() => {
+    if (!isTurning || !turnCarriesContent) return;
+    const host = flipFrontHostRef.current;
+    const stage = journalStageRef.current;
+    if (!host || !stage) return;
+    const standIn = document.createElement("div");
+    standIn.className = stage.className;
+    standIn.dataset.journalView = stage.dataset.journalView ?? "";
+    standIn.setAttribute("aria-hidden", "true");
+    const pairs: Array<[Element, Element]> = [];
+    for (const selector of [
+      ":scope > .journal-spread",
+      ":scope > .pixels-floating",
+    ]) {
+      const original = stage.querySelector(selector);
+      if (!original) continue;
+      const copy = original.cloneNode(true) as Element;
+      standIn.append(copy);
+      pairs.push([original, copy]);
+    }
+    host.replaceChildren(standIn);
+    // cloneNode copies markup, not the live state a reader would notice
+    // missing: scroll offsets need layout, so they are copied only now
+    // that the copy is in the document.
+    pairs.forEach(([original, copy]) => syncLiveState(original, copy));
+    // The slot the sheet lifts from uncovers the destination page: a static
+    // copy of the flap's stand-in, so the page is rendered only once.
+    const reveal = flipRevealHostRef.current;
+    const back = flipBackStandInRef.current;
+    if (reveal && back) reveal.replaceChildren(back.cloneNode(true));
+  }, [isTurning, turnCarriesContent]);
+
   function turnTo(nextView: View, direction: TurnDirection = "forward") {
     if (isTurning || isFading || nextView === view) return;
     setMobileContentsOpen(false);
@@ -1655,6 +1789,14 @@ export default function Home() {
       }, 140);
       return;
     }
+    // The cover has no two-column spread to clone and keeps its hand-built
+    // art skin; below 821px the spread collapses to one column and "the
+    // half the leaf sits in" no longer means anything.
+    setTurnCarriesContent(
+      view !== "cover" &&
+        nextView !== "cover" &&
+        Boolean(window.matchMedia?.("(min-width: 821px)").matches)
+    );
     setTurnDirection(direction);
     setTurnDestination(nextView);
     setIsTurning(true);
@@ -1693,8 +1835,8 @@ export default function Home() {
     });
   }
 
-  function renderPage() {
-    switch (view) {
+  function renderPage(pageView: View = view) {
+    switch (pageView) {
       case "cover":
         const lastVisitedPage = contentsPreferences?.lastVisitedPage;
         const canResumeSession = lastVisitedPage && lastVisitedPage !== "cover";
@@ -2530,6 +2672,7 @@ export default function Home() {
   }
 
   return (
+    <JournalNavContext.Provider value={{ view, turnTo }}>
     <PixelsTrackerContext.Provider
       value={{ records: pixelRecords, update: updatePixels, set: setPixels }}
     >
@@ -2581,6 +2724,7 @@ export default function Home() {
           </svg>
 
           <div
+            ref={journalStageRef}
             className={cn(
               "journal-stage",
               view !== "cover" && "journal-open",
@@ -2594,20 +2738,32 @@ export default function Home() {
                 <PixelsGrid tracker={activePixelsTracker} />
               </div>
             )}
-            {isTurning && (
+          </div>
+          {/* The turn overlay sits beside the stage, not inside it: its
+              stand-in stages carry the destination's data-journal-view, and
+              nested inside the real stage they would also match every rule
+              keyed on the *outgoing* view (descendant selectors), with the
+              later rule in the file winning. */}
+          {isTurning && (
               <div
                 className={cn(
                   "page-turn",
                   "whole-page-turn",
                   "page-flip",
                   turnDirection,
+                  turnCarriesContent && "carries-content",
                   pageTurnDestinationClass(turnDestination)
                 )}
                 aria-label={`Turning ${turnDirection} through the journal`}
               >
+                {/* Under the leaves, in the slot the sheet lifts from: the
+                    page being uncovered. A copy of the flap's stand-in,
+                    filled in by the layout effect below. */}
+                <div className="flip-reveal" ref={flipRevealHostRef} />
                 <div className="flip-r1">
                   <div className="flip-p1">
                     <div>
+                      <div className="flip-face-content" ref={flipFrontHostRef} />
                       <div />
                     </div>
                   </div>
@@ -2618,6 +2774,25 @@ export default function Home() {
                 <div className="flip-r3">
                   <div className="flip-p3">
                     <div>
+                      {turnCarriesContent && (
+                        // The flap's underside is the page it lands on. That
+                        // page is not in the document yet (the real view
+                        // swaps when the turn ends), so it is rendered here,
+                        // inside a stand-in stage that repeats the real
+                        // stage's classes and data-journal-view so every
+                        // ancestor-keyed rule resolves as it will on arrival.
+                        <div className="flip-face-content">
+                          <div
+                            ref={flipBackStandInRef}
+                            className="journal-stage journal-open"
+                            data-journal-view={turnDestination}
+                            aria-hidden="true"
+                            inert
+                          >
+                            {renderPage(turnDestination)}
+                          </div>
+                        </div>
+                      )}
                       <div />
                     </div>
                   </div>
@@ -2633,8 +2808,7 @@ export default function Home() {
                   </div>
                 </div>
               </div>
-            )}
-          </div>
+          )}
           {reminderNotice && (
             <div className="local-reminder-alert" role="status">
               <span>{reminderNotice}</span>
@@ -2729,6 +2903,7 @@ export default function Home() {
         </main>
       </ReminderPreviewContext.Provider>
     </PixelsTrackerContext.Provider>
+    </JournalNavContext.Provider>
   );
 }
 
