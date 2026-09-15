@@ -37,6 +37,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { greetingFor } from "@/lib/core/today";
 import { AccountPanel } from "@/components/AccountPanel";
 import { TodayPanel } from "@/components/TodayPanel";
 import { InsightsPanel } from "@/components/InsightsPanel";
@@ -2200,11 +2201,26 @@ export default function Home() {
                 onCover={() => turnTo("cover", "backward")}
               />
               <p className="page-kicker glass-panel-fit glass-panel-fit-kicker">your day · dashboard</p>
-              <h2 id="dashboard-title">
-                Good morning,
-                <br />
-                <em>Glory.</em>
-              </h2>
+              {(() => {
+                // Computed from the real clock and the signed-in name, not
+                // hardcoded — a fixed "Good morning, Glory." would eventually
+                // say good morning at 4pm, and would name someone who never
+                // signed in.
+                const timeGreeting = greetingFor(new Date().getHours());
+                const displayName = auth.user?.name?.trim();
+                return (
+                  <h2 id="dashboard-title">
+                    {timeGreeting}
+                    {displayName ? "," : "."}
+                    {displayName ? (
+                      <>
+                        <br />
+                        <em>{displayName}.</em>
+                      </>
+                    ) : null}
+                  </h2>
+                );
+              })()}
               <p className="page-intro">
                 Today's focus and what needs your attention. Open any chapter to
                 dive deeper.

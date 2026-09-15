@@ -131,6 +131,23 @@ export type Briefing = {
 };
 
 /**
+ * "Good morning, Glory." — or afternoon, or evening.
+ *
+ * Its own function, not inlined into the briefing, because the dashboard's
+ * page header needs the same greeting without building a full `TodayView` —
+ * one implementation used from both places is what keeps them from silently
+ * disagreeing about what time of day it is.
+ */
+export function greetingFor(hourOfDay: number, name?: string): string {
+  const who = name ? `, ${name}` : "";
+  return hourOfDay < 12
+    ? `Good morning${who}`
+    : hourOfDay < 18
+      ? `Good afternoon${who}`
+      : `Good evening${who}`;
+}
+
+/**
  * The daily briefing.
  *
  * Deliberately factual. It counts what is there and says so; it does not
@@ -148,13 +165,7 @@ export function buildBriefing({
   /** Local hour, 0–23, used only to choose the greeting. */
   hourOfDay: number;
 }): Briefing {
-  const who = name ? `, ${name}` : "";
-  const greeting =
-    hourOfDay < 12
-      ? `Good morning${who}`
-      : hourOfDay < 18
-        ? `Good afternoon${who}`
-        : `Good evening${who}`;
+  const greeting = greetingFor(hourOfDay, name);
 
   const lines: string[] = [];
 

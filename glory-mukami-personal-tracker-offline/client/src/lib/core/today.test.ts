@@ -5,6 +5,7 @@ import {
   buildBriefing,
   buildToday,
   clearDayMessage,
+  greetingFor,
   overflowLabel,
   todayItemLabel,
   type TodayHabit,
@@ -156,6 +157,23 @@ describe("the daily briefing", () => {
     expect(buildBriefing({ view, hourOfDay: 21 }).greeting).toBe(
       "Good evening"
     );
+  });
+
+  it("greetingFor is exposed on its own, not only via buildBriefing", () => {
+    // The dashboard's page header greets without a full TodayView, so it
+    // needs this directly. A fixed "Good morning, Glory." on that header —
+    // once true — would eventually say good morning at 4pm, and would name
+    // someone who never signed in, which is what this covers against.
+    expect(greetingFor(8, "Glory")).toBe("Good morning, Glory");
+    expect(greetingFor(14)).toBe("Good afternoon");
+    expect(greetingFor(21)).toBe("Good evening");
+    // Midnight is still "morning" by this clock's own boundary (hour < 12).
+    expect(greetingFor(0)).toBe("Good morning");
+    expect(greetingFor(11)).toBe("Good morning");
+    expect(greetingFor(12)).toBe("Good afternoon");
+    expect(greetingFor(17)).toBe("Good afternoon");
+    expect(greetingFor(18)).toBe("Good evening");
+    expect(greetingFor(23)).toBe("Good evening");
   });
 
   it("leads with the overdue item, since that is what has slipped", () => {
