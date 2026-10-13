@@ -10,6 +10,49 @@ import { TimerBar } from "./components/TimerBar";
 import { NativeBridges } from "./components/NativeBridges";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
+import { Login } from "./pages/Login";
+import { useAuth } from "./_core/hooks/useAuth";
+import { useGoogleSignIn } from "./hooks/useGoogleSignIn";
+import { useState, type ReactNode } from "react";
+
+const GUEST_KEY = "glory-personal-tracker:continue-without-account";
+
+function readGuestChoice(): boolean {
+  try {
+    return localStorage.getItem(GUEST_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Shows the sign-in page until someone signs in or chooses to continue
+ * without an account. It steps aside whenever sign-in cannot work (no server
+ * support, or offline) so nobody is ever locked out of their own journal.
+ */
+function AuthGate({ children }: { children: ReactNode }) {
+  const auth = useAuth();
+  const signIn = useGoogleSignIn();
+  const [guest, setGuest] = useState(readGuestChoice);
+
+  if (guest || auth.user) return <>{children}</>;
+  // Wait for both checks so nobody sees the wrong screen flash first.
+  if (auth.loading || signIn.checking) return null;
+  if (!signIn.available) return <>{children}</>;
+
+  return (
+    <Login
+      onContinueWithoutAccount={() => {
+        try {
+          localStorage.setItem(GUEST_KEY, "1");
+        } catch {
+          // Private mode: the choice just lasts until the next launch.
+        }
+        setGuest(true);
+      }}
+    />
+  );
+}
 
 function Router() {
   // make sure to consider if you need authentication for certain routes
@@ -47,7 +90,9 @@ function App() {
               {/* Reminder schedule and home-screen widget, kept in step with
                   the journal. Renders nothing. */}
               <NativeBridges />
-              <Router />
+              <AuthGate>
+                <Router />
+              </AuthGate>
             </TooltipProvider>
           </TimersProvider>
         </RecordStoreProvider>

@@ -93,6 +93,8 @@ function loadGsi(): Promise<GoogleAccounts> {
 export type SignInState = {
   /** True once the server says Google sign-in is configured. */
   available: boolean;
+  /** True while the server is still being asked whether sign-in is offered. */
+  checking: boolean;
   busy: boolean;
   error?: string;
   /** Signs in with a token obtained elsewhere — the Android path. */
@@ -206,6 +208,7 @@ export function useGoogleSignIn(clientId?: string): SignInState {
 
   return {
     available: Boolean(methods.data?.google && resolvedClientId),
+    checking: methods.isLoading,
     busy,
     error,
     signInWithToken: exchange,

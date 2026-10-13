@@ -273,19 +273,19 @@ const groups: ContentsGroup[] = [
     eyebrow: "care & energy",
     icon: HeartPulse,
     items: [
-      {
-        label: "Fitness & Portraits",
-        view: "portraits",
-        note: "movement, recovery & color",
-      },
+      { label: "Water Intake", view: "water", note: "hydrate with intention" },
+      { label: "Nutrition", view: "nutrition", note: "nourish & plan meals" },
+      { label: "Sleep", view: "sleep", note: "rest, routine & recovery" },
       {
         label: "Workout Studio",
         view: "workouts",
         note: "guided motion & routines",
       },
-      { label: "Nutrition", view: "nutrition", note: "nourish & plan meals" },
-      { label: "Water Intake", view: "water", note: "hydrate with intention" },
-      { label: "Sleep", view: "sleep", note: "rest, routine & recovery" },
+      {
+        label: "Fitness & Portraits",
+        view: "portraits",
+        note: "movement, recovery & color",
+      },
       {
         label: "Period & Cycle Tracker",
         view: "cycle",
@@ -298,11 +298,6 @@ const groups: ContentsGroup[] = [
     eyebrow: "focus & reflection",
     icon: Moon,
     items: [
-      {
-        label: "Weekly & Monthly Reflections",
-        view: "reflections",
-        note: "notice, learn & reset",
-      },
       { label: "Wellbeing", view: "wellbeing", note: "mood & restful rituals" },
       { label: "Habits", view: "habits", note: "gentle consistency" },
       { label: "Productivity", view: "productivity", note: "focus & flow" },
@@ -311,6 +306,11 @@ const groups: ContentsGroup[] = [
         view: "digitalLife",
         note: "screen time & boundaries",
       },
+      {
+        label: "Weekly & Monthly Reflections",
+        view: "reflections",
+        note: "notice, learn & reset",
+      },
     ],
   },
   {
@@ -318,68 +318,33 @@ const groups: ContentsGroup[] = [
     eyebrow: "plan & move",
     icon: CalendarDays,
     items: [
+      { label: "Tasks", view: "tasks", note: "capture & complete" },
+      { label: "Time", view: "time", note: "shape your day" },
       {
         label: "Assignments",
         view: "assignments",
         note: "deadlines & next steps",
       },
-      { label: "Courses", view: "courses", note: "subjects & materials" },
-      { label: "Exams", view: "exams", note: "prepare with perspective" },
       {
         label: "Study Sessions",
         view: "studySessions",
         note: "focus & review",
       },
-      { label: "Tasks", view: "tasks", note: "capture & complete" },
-      { label: "Time", view: "time", note: "shape your day" },
       { label: "Finances", view: "finances", note: "private money notes" },
-      { label: "Documents", view: "documents", note: "metadata & renewals" },
-      { label: "Security", view: "security", note: "hygiene & privacy" },
-      {
-        label: "Environment",
-        view: "environment",
-        note: "care for your space",
-      },
+      { label: "Exams", view: "exams", note: "prepare with perspective" },
+      { label: "Courses", view: "courses", note: "subjects & materials" },
       { label: "Purchases", view: "purchases", note: "plan & reflect" },
       {
         label: "Responsibilities",
         view: "responsibilities",
         note: "repeat & follow through",
       },
-      { label: "Career Goals", view: "career", note: "direction & evidence" },
       {
-        label: "Portfolio",
-        view: "portfolio",
-        note: "projects & presentation",
+        label: "Environment",
+        view: "environment",
+        note: "care for your space",
       },
       { label: "Projects", view: "projects", note: "plan & make progress" },
-      {
-        label: "Certifications",
-        view: "certifications",
-        note: "prepare & renew",
-      },
-      { label: "CV", view: "cv", note: "shape your story" },
-      {
-        label: "Internship Applications",
-        view: "internships",
-        note: "apply & follow through",
-      },
-      {
-        label: "Privacy Controls",
-        view: "privacy",
-        note: "sensitive data choices",
-      },
-      {
-        label: "Reminder Preview",
-        view: "notifications",
-        note: "what a reminder reveals",
-      },
-      {
-        label: "Export",
-        view: "exportData",
-        note: "download your local session",
-      },
-      { label: "History", view: "history", note: "session records & review" },
       { label: "Social Life", view: "social", note: "people & connection" },
       { label: "Family", view: "family", note: "shared care & dates" },
       { label: "Hobbies", view: "hobbies", note: "play & practice" },
@@ -395,10 +360,23 @@ const groups: ContentsGroup[] = [
         note: "values & becoming",
       },
       {
-        label: "Daily Dashboard",
-        view: "dashboard",
-        note: "your day in focus",
+        label: "Internship Applications",
+        view: "internships",
+        note: "apply & follow through",
       },
+      { label: "Career Goals", view: "career", note: "direction & evidence" },
+      {
+        label: "Portfolio",
+        view: "portfolio",
+        note: "projects & presentation",
+      },
+      {
+        label: "Certifications",
+        view: "certifications",
+        note: "prepare & renew",
+      },
+      { label: "CV", view: "cv", note: "shape your story" },
+      { label: "Documents", view: "documents", note: "metadata & renewals" },
     ],
   },
   {
@@ -406,12 +384,12 @@ const groups: ContentsGroup[] = [
     eyebrow: "learn & become",
     icon: Compass,
     items: [
+      { label: "Goals", view: "goals", note: "progress with intention" },
       {
         label: "Learning Something New",
         view: "learning",
         note: "skills, practice & milestones",
       },
-      { label: "Goals", view: "goals", note: "progress with intention" },
     ],
   },
   {
@@ -419,6 +397,22 @@ const groups: ContentsGroup[] = [
     eyebrow: "review & guidance",
     icon: Sparkles,
     items: [
+      { label: "Security", view: "security", note: "hygiene & privacy" },
+      {
+        label: "Privacy Controls",
+        view: "privacy",
+        note: "sensitive data choices",
+      },
+      {
+        label: "Integrations",
+        view: "integrations",
+        note: "consent before connection",
+      },
+      {
+        label: "Reminder Preview",
+        view: "notifications",
+        note: "what a reminder reveals",
+      },
       { label: "Analytics", view: "analytics", note: "local facts & review" },
       { label: "Insights", view: "insights", note: "evidence with context" },
       {
@@ -426,10 +420,16 @@ const groups: ContentsGroup[] = [
         view: "recommendations",
         note: "optional next steps",
       },
+      { label: "History", view: "history", note: "session records & review" },
       {
-        label: "Integrations",
-        view: "integrations",
-        note: "consent before connection",
+        label: "Export",
+        view: "exportData",
+        note: "download your local session",
+      },
+      {
+        label: "Daily Dashboard",
+        view: "dashboard",
+        note: "your day in focus",
       },
     ],
   },
@@ -923,9 +923,17 @@ const ReminderPreviewContext = createContext("Hide sensitive names");
 // still be searched with a plain View, e.g. `chapterViews.indexOf(nav.view)`
 // when nav.view happens to be "cover" or "contents" — TS would otherwise
 // auto-narrow the filtered array's element type and reject that lookup.
-const chapterViews: View[] = journalViews.filter(
-  candidate => candidate !== "cover" && candidate !== "contents"
-);
+// Previous/Next follow the contents order (most-used pages first), then any
+// view the contents does not list.
+const chapterViews: View[] = [
+  ...allContentsItems.map(item => item.view),
+  ...journalViews.filter(
+    candidate =>
+      candidate !== "cover" &&
+      candidate !== "contents" &&
+      !allContentsItems.some(item => item.view === candidate)
+  ),
+];
 
 const JournalNavContext = createContext<{
   view: View;
@@ -1372,6 +1380,7 @@ export default function Home() {
   const [turnDirection, setTurnDirection] = useState<TurnDirection>("forward");
   const [turnDestination, setTurnDestination] = useState<View>("contents");
   const [turnCarriesContent, setTurnCarriesContent] = useState(false);
+  const [turnVertical, setTurnVertical] = useState(false);
   const journalStageRef = useRef<HTMLDivElement>(null);
   const flipFrontHostRef = useRef<HTMLDivElement>(null);
   const flipBackStandInRef = useRef<HTMLDivElement>(null);
@@ -1800,8 +1809,15 @@ export default function Home() {
     }
     // Below 821px the spread collapses to one column and "the half the
     // leaf sits in" no longer means anything.
+    // In portrait the leaf hinges at the top edge and sweeps up
+    // (flip-vertical). Its face is the whole page, so it always carries the
+    // live page - there is no spread to be too narrow for.
+    const portrait = Boolean(
+      window.matchMedia?.("(orientation: portrait)").matches
+    );
+    setTurnVertical(portrait);
     setTurnCarriesContent(
-      Boolean(window.matchMedia?.("(min-width: 821px)").matches)
+      portrait || Boolean(window.matchMedia?.("(min-width: 821px)").matches)
     );
     setTurnDirection(direction);
     setTurnDestination(nextView);
@@ -2769,6 +2785,7 @@ export default function Home() {
                   "whole-page-turn",
                   "page-flip",
                   turnDirection,
+                  turnVertical && "flip-vertical",
                   turnCarriesContent && "carries-content",
                   pageTurnDestinationClass(turnDestination)
                 )}
@@ -6722,10 +6739,6 @@ function FamilyPage({
           shared plans. Use names, initials, or only the detail you feel
           comfortable holding here.
         </p>
-        <div className="family-signal">
-          <HeartPulse size={15} />
-          <span>{plans.length} shared moments noted</span>
-        </div>
       </div>
       <div className="spread-page family-page">
         <form className="family-form" onSubmit={addPlan}>
@@ -7060,10 +7073,6 @@ function InternshipsPage({
           follow-up you want to make—without turning your search into a verdict
           on yourself.
         </p>
-        <div className="internships-signal">
-          <Sparkles size={15} />
-          <span>{applications.length} applications held with care</span>
-        </div>
       </div>
       <div className="spread-page internships-page">
         <form className="internships-form" onSubmit={saveApplication}>
@@ -7390,14 +7399,6 @@ function CvPage({
           education. It is never published or submitted anywhere; copy or
           download it when you want to use it.
         </p>
-        <div className="cv-signal" aria-live="polite">
-          <Sparkles size={15} />
-          <span>
-            {changedAt
-              ? `Saved as you type · ${wordCount} word${wordCount === 1 ? "" : "s"} · last change ${formatWhen(changedAt)}${auth.isAuthenticated ? " · synced to your account" : " · on this device"}`
-              : "Saved as you type — nothing to press"}
-          </span>
-        </div>
       </div>
       <div className="spread-page cv-page">
         <form className="cv-form" onSubmit={saveProfile}>
@@ -7606,10 +7607,6 @@ function CertificationsPage({
           or lesson that helps you continue growing without storing the
           credential itself.
         </p>
-        <div className="certifications-signal">
-          <Sparkles size={15} />
-          <span>{certifications.length} credentials in view</span>
-        </div>
       </div>
       <div className="spread-page certifications-page">
         <form className="certifications-form" onSubmit={saveCertification}>
@@ -7912,10 +7909,6 @@ function ProjectsPage({
           Keep project direction, the next milestone, evidence of progress, and
           what you want to remember when a chapter closes.
         </p>
-        <div className="projects-signal">
-          <Sparkles size={15} />
-          <span>{projects.length} projects in motion</span>
-        </div>
       </div>
       <div className="spread-page projects-page">
         <form className="projects-form" onSubmit={saveProject}>
@@ -8280,10 +8273,6 @@ function HistoryPage({
           own detailed history below. Your activity is saved to your private
           journal and restores across reloads.
         </p>
-        <div className="history-signal">
-          <Clock3 size={15} />
-          <span>{visibleEntries.length} durable records to review</span>
-        </div>
       </div>
       <div className="spread-page history-page">
         <div className="history-filters" aria-label="History filters">
@@ -8569,14 +8558,6 @@ function RecommendationsPage({
           sources you choose. You can adjust, pause, dismiss, show less from a
           source, or turn them off at any time.
         </p>
-        <div className="recommendations-signal">
-          <Sparkles size={15} />
-          <span>
-            {enabled
-              ? `${eligibleSources.length} local source${eligibleSources.length === 1 ? "" : "s"} available`
-              : "Optional prompts are off"}
-          </span>
-        </div>
       </div>
       <div className="spread-page recommendations-page">
         <div className="recommendation-header">
@@ -9012,14 +8993,6 @@ function ExportPage({
           built in your browser and saved to your device; nothing is uploaded
           anywhere to make it.
         </p>
-        <div className="export-signal">
-          <Sparkles size={15} />
-          <span>
-            {lastExport
-              ? `Last export ${formatTime(lastExport.at)} · ${lastExport.fileName} · ${formatBytes(lastExport.bytes)}`
-              : "No export yet this visit"}
-          </span>
-        </div>
       </div>
       <div className="spread-page export-page">
         <div className="export-scope">
@@ -9265,10 +9238,6 @@ function NotificationPreviewPage({
           this site can run; guaranteed operating-system delivery remains
           outside the web scope.
         </p>
-        <div className="notification-signal">
-          <HeartPulse size={15} />
-          <span>{previewMode}</span>
-        </div>
       </div>
       <div className="spread-page notifications-page">
         <div className="notification-preview-title">
@@ -9640,12 +9609,6 @@ function PrivacyPage({
           What this journal shows of your sensitive pages, and — further down —
           how to remove what it holds, on this device or from your account.
         </p>
-        <div className="privacy-signal">
-          <HeartPulse size={15} />
-          <span>
-            {privateMode ? "Private mode is on" : "Private mode is off"}
-          </span>
-        </div>
       </div>
       <div className="spread-page privacy-page">
         <AccountPanel />
@@ -9988,13 +9951,6 @@ function InsightsPage({
           An insight begins with the records you chose to save. Each card names
           its source, its evidence level, and what it cannot conclude.
         </p>
-        <div className="insights-signal">
-          <Sparkles size={15} />
-          <span>
-            {Object.values(saved).filter(Boolean).length} insights kept ·{" "}
-            {evidenceLabel}
-          </span>
-        </div>
       </div>
       <div className="spread-page insights-page">
         <header className="insights-evidence-ledger">
@@ -10291,10 +10247,6 @@ function AnalyticsPage({
           Review windows, sources, and low-data limits stay visible so a count
           never pretends to be more than it is.
         </p>
-        <div className="analytics-signal">
-          <Compass size={15} />
-          <span>Local records only · no score or prediction</span>
-        </div>
       </div>
       <div className="spread-page analytics-page">
         <InsightsPanel />
@@ -10738,10 +10690,6 @@ function PortfolioPage({
           that would help you share your work—without publishing anything from
           this journal.
         </p>
-        <div className="portfolio-signal">
-          <Sparkles size={15} />
-          <span>{projects.length} projects in your portfolio</span>
-        </div>
       </div>
       <div className="spread-page portfolio-page">
         <form className="portfolio-form" onSubmit={addProject}>
@@ -11026,10 +10974,6 @@ function SocialLifePage({
           Keep plans, follow-through, and a small note about how connection
           felt—without turning relationships into a scorecard.
         </p>
-        <div className="social-signal">
-          <HeartPulse size={15} />
-          <span>{plans.length} connection plans held</span>
-        </div>
       </div>
       <div className="spread-page social-page">
         <form className="social-form" onSubmit={addPlan}>
@@ -11325,10 +11269,6 @@ function CareerPage({
           Collect the work you want to move toward, small evidence of your
           skills, and applications or conversations worth following through on.
         </p>
-        <div className="career-signal">
-          <Sparkles size={15} />
-          <span>{entries.length} career directions held</span>
-        </div>
       </div>
       <div className="spread-page career-page">
         <form className="career-form" onSubmit={addEntry}>
