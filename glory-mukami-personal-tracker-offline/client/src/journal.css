@@ -13207,13 +13207,26 @@ button:focus-visible {
   backdrop-filter: blur(12px) saturate(1.06);
 }
 
+/*
+ * A bare list/shelf/grid/history block with no card wrapper gets its first
+ * child (or a stray `small`) auto-styled as a glass chip, so a page doesn't
+ * need to hand-style that one leading element itself.
+ *
+ * `.utility-grid` is excluded: it is a uniform list of identically-styled
+ * `.utility-tile` buttons, each already laid out by its own `display: grid`
+ * rule. This selector's wildcard `[class*="-grid"]` matched it by name alone,
+ * which silently forced `display: flex` onto only the first tile — every
+ * other tile kept the two-row grid layout its sibling rule intends, so just
+ * the opening "Tasks" row rendered with its title and arrow in the wrong
+ * place.
+ */
 .journal-stage[data-journal-view]:not([data-journal-view="cover"])
   .journal-spread
   > .spread-page:last-child
   > :is(
     [class*="-list"],
     [class*="-shelf"],
-    [class*="-grid"],
+    [class*="-grid"]:not(.utility-grid),
     [class*="-history"]
   )
   > :first-child:not(article),
@@ -13223,7 +13236,7 @@ button:focus-visible {
   > :is(
     [class*="-list"],
     [class*="-shelf"],
-    [class*="-grid"],
+    [class*="-grid"]:not(.utility-grid),
     [class*="-history"]
   )
   > small {
@@ -31056,31 +31069,6 @@ body {
     padding: 0.35rem 0.45rem;
   }
 
-  .journal-spread {
-    display: flex !important;
-    flex-direction: column !important;
-    height: 100vh !important;
-  }
-
-  .spread-page {
-    width: 100% !important;
-    max-width: 100% !important;
-    min-height: auto !important;
-  }
-
-  .spread-page:first-child {
-    flex-shrink: 0;
-    max-height: 35vh;
-    overflow-y: auto;
-    border-bottom: 1px solid var(--ui-border);
-  }
-
-  .spread-page:last-child {
-    flex: 1;
-    overflow-y: auto;
-    padding: var(--sp-lg);
-  }
-
   /* Hide artwork on mobile, show compact header */
   .contents-intro,
   .dashboard-intro,
@@ -31137,10 +31125,6 @@ body {
 
 /* Small phones: 480px and below */
 @media (max-width: 480px) {
-  .spread-page:first-child {
-    max-height: 30vh;
-  }
-
   .spread-page:last-child {
     padding: var(--sp-md);
   }
@@ -31787,7 +31771,12 @@ body {
   background-blend-mode: normal !important;
 }
 #root .journal-stage[data-journal-view="notifications"] .journal-spread > .spread-page:last-child {
-  background: #6E7273 !important;
+  /* Was #6E7273 - a mid-grey. Every workbench here uses light text tinted
+     for a dark backdrop (see var(--scene-ink) and .notification-preview's
+     dark translucent pill), so a mid-grey page background left it near
+     unreadable. Darkened to the same family as the sibling flat pages
+     (e.g. security's #1D1B17) while keeping the steel-bell undertone. */
+  background: #24282a !important;
   background-image: none !important;
   background-blend-mode: normal !important;
 }

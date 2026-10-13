@@ -76,7 +76,7 @@ export function RussianTwistsMotionDemo({
       </div>
       <figcaption>
         <span className="workout-video-label">
-          Detailed demo · fourth exercise under review
+          Detailed demo
         </span>
         <p id="russian-twists-form-cue">
           Feet slightly elevated · rotate from the torso · 15 repetitions

@@ -76,7 +76,7 @@ export function LegRaisesMotionDemo({
       </div>
       <figcaption>
         <span className="workout-video-label">
-          Detailed demo · sixth exercise under review
+          Detailed demo
         </span>
         <p id="leg-raises-form-cue">
           Forearms grounded · legs straight and together · controlled lift and

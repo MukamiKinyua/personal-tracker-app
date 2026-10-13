@@ -39,6 +39,7 @@ import {
   isNative,
   notificationsPermitted,
   requestNotificationPermission,
+  saveBackupFile,
 } from "@/lib/native";
 import { useEffect, useRef, useState } from "react";
 
@@ -109,16 +110,22 @@ export function SettingsPanel() {
     setPriorityError(undefined);
   }
 
-  function download() {
+  async function download() {
     const bundle = journal.exportAll();
-    const blob = new Blob([JSON.stringify(bundle, null, 2)], {
-      type: "application/json",
-    });
+    const contents = JSON.stringify(bundle, null, 2);
+    const filename = backupFilename();
+
+    // On Android there is no Downloads folder an in-app link can reach, so
+    // the file goes to the system share sheet instead; the browser's own
+    // download link only ever existed for the web build.
+    if (await saveBackupFile(filename, contents)) return;
+
+    const blob = new Blob([contents], { type: "application/json" });
     const url = URL.createObjectURL(blob);
 
     const link = document.createElement("a");
     link.href = url;
-    link.download = backupFilename();
+    link.download = filename;
     link.click();
     URL.revokeObjectURL(url);
   }

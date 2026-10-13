@@ -9,8 +9,10 @@
  */
 
 import { Capacitor, registerPlugin } from "@capacitor/core";
+import { Directory, Encoding, Filesystem } from "@capacitor/filesystem";
 import { LocalNotifications } from "@capacitor/local-notifications";
 import { Preferences } from "@capacitor/preferences";
+import { Share } from "@capacitor/share";
 import { SocialLogin } from "@capgo/capacitor-social-login";
 
 export function isNative(): boolean {
@@ -166,4 +168,39 @@ export async function publishWidget(summary: WidgetSummary): Promise<void> {
     // No widget placed, or an older APK without the bridge: the data is
     // still written and the next periodic redraw will pick it up.
   }
+}
+
+/* ------------------------------------------------------------------------ */
+/* Backup                                                                    */
+/* ------------------------------------------------------------------------ */
+
+/**
+ * Hands a backup file to the user on Android.
+ *
+ * There is no Downloads folder an in-app `<a download>` click can reach from
+ * inside the WebView, so the file is written to the app's private cache and
+ * then handed to the system share sheet — the user picks Drive, a Downloads
+ * app, email, whatever they trust to survive a reinstall. Returns false when
+ * there is no native layer, so the caller falls back to the browser's own
+ * download link.
+ */
+export async function saveBackupFile(
+  filename: string,
+  contents: string
+): Promise<boolean> {
+  if (!isNative()) return false;
+
+  const written = await Filesystem.writeFile({
+    path: filename,
+    data: contents,
+    directory: Directory.Cache,
+    encoding: Encoding.UTF8,
+  });
+
+  await Share.share({
+    title: "Save your backup",
+    url: written.uri,
+  });
+
+  return true;
 }

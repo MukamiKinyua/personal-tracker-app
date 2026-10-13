@@ -3032,9 +3032,7 @@ function BasicCrunchesMotionDemo({
         />
       </div>
       <figcaption>
-        <span className="basic-crunches-label">
-          Detailed demo · first exercise under review
-        </span>
+        <span className="basic-crunches-label">Detailed demo</span>
         <p id="basic-crunches-form-cue">
           Tabletop legs at 90° · controlled curl · full return
         </p>
@@ -3307,11 +3305,8 @@ function WorkoutPage({
             {motionPaused ? "Play motion" : "Pause motion"}
           </button>
           <small>
-            Detailed references now include the supplied Core demonstrations,
-            Donkey Kicks, Donkey Kick Pulses, Garland Pose, both Seated Figure 4
-            variations, Bow Pose, Lizard Pose Variation, Pigeon Pose, Head to
-            Knee, and Quad Stretch. Later cards remain simplified previews and
-            will be replaced one at a time after review.
+            A few exercises have a short looping demo with a form cue; the
+            rest use a simplified illustration.
           </small>
         </div>
         <div className="workout-exercise-grid">
@@ -9730,7 +9725,7 @@ function PrivacyPage({
             {privateMode
               ? "Sensitive summaries hidden"
               : sensitiveSummaries
-                ? "Sensitive summaries visible in this prototype"
+                ? "Sensitive summaries visible"
                 : "Sensitive summaries hidden"}
           </b>
           <small>
@@ -10741,7 +10736,7 @@ function PortfolioPage({
         <p className="page-intro">
           Keep project evidence, the role you played, and the presentation note
           that would help you share your work—without publishing anything from
-          this prototype.
+          this journal.
         </p>
         <div className="portfolio-signal">
           <Sparkles size={15} />
@@ -15666,7 +15661,16 @@ function GoalsWorkspacePage({
               </button>
               <button
                 type="button"
-                onClick={() => setGoalState(goal, "archived", "archived — find it under review")}
+                onClick={() =>
+                  // "find it under review" used to read as if someone else
+                  // were reviewing the goal — there is no such process here.
+                  // The section it actually moves to is named below.
+                  setGoalState(
+                    goal,
+                    "archived",
+                    "archived — find it under Review and archive"
+                  )
+                }
               >
                 Archive
               </button>
@@ -18402,7 +18406,11 @@ function TasksPage({
                   subtasks: event.target.value,
                 }))
               }
-              placeholder="Gather materials\nMake the first pass"
+              // A plain JSX attribute string never interprets `\n` as an
+              // escape sequence — it rendered as the literal characters
+              // backslash-n. Wrapping it in an expression makes it a real
+              // JS string, where `\n` becomes an actual line break.
+              placeholder={"Gather materials\nMake the first pass"}
               rows={2}
             />
           </label>
@@ -19137,12 +19145,12 @@ function ProductivityPage({
   const taskInputRef = useRef<HTMLInputElement>(null);
   const pixelStore = useContext(PixelsTrackerContext);
   const [minutes, setMinutes] = useState(25);
-  const [taskDraft, setTaskDraft] = useState(
-    "Finish the next small assignment step"
-  );
-  const [stepDraft, setStepDraft] = useState(
-    "Open the brief and outline three points"
-  );
+  // Empty, not an example sentence: these used to hold real text as their
+  // starting *value* rather than as a placeholder, so the field was never
+  // actually empty and one click of "Add" with no typing created a task the
+  // user never wrote.
+  const [taskDraft, setTaskDraft] = useState("");
+  const [stepDraft, setStepDraft] = useState("");
   const [tasks, setTasks] = useState<
     { id: string; label: string; nextStep: string; done: boolean }[]
   >([]);
@@ -20466,7 +20474,10 @@ function SleepPage({
   const durationCheck = sleepDurationCheck(bedtime, wakeTime, computedHours);
   const canSave = durationCheck.kind !== "missing" && hours > 0;
   const todayValue = sleepDateInputValue(new Date());
-  const lastNight = logs[0] || { hours, quality };
+  // No fallback to the current draft form: that used to make an unsaved,
+  // untouched bedtime/wake-time selection read as a confident "Last night"
+  // summary before anything was ever logged.
+  const lastNight = logs[0] ?? null;
 
   function resetForm() {
     setEditingId(null);
@@ -20563,11 +20574,20 @@ function SleepPage({
       <div className="spread-page sleep-page">
         <section className="sleep-summary">
           <span>Last night</span>
-          <b>{formatSleepDuration(lastNight.hours)}</b>
-          <small>
-            {lastNight.quality} rest ·{" "}
-            {sleepDurationBand(lastNight.hours).label}
-          </small>
+          {lastNight ? (
+            <>
+              <b>{formatSleepDuration(lastNight.hours)}</b>
+              <small>
+                {lastNight.quality} rest ·{" "}
+                {sleepDurationBand(lastNight.hours).label}
+              </small>
+            </>
+          ) : (
+            <>
+              <b>—</b>
+              <small>Nothing logged yet.</small>
+            </>
+          )}
         </section>
         <section className="sleep-capture">
           <label className="sleep-date-field">

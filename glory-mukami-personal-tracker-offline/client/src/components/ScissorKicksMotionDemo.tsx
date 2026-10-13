@@ -101,7 +101,7 @@ export function ScissorKicksMotionDemo({
       </div>
       <figcaption>
         <span className="workout-video-label">
-          Detailed demo · eighth exercise under review
+          Detailed demo
         </span>
         <p id="scissor-kicks-form-cue">
           Straight legs low · alternate up and down · controlled criss-cross

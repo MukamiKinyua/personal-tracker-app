@@ -79,7 +79,7 @@ export function JackKnivesMotionDemo({
       </div>
       <figcaption>
         <span className="workout-video-label">
-          Detailed demo · third exercise under review
+          Detailed demo
         </span>
         <p id="jack-knives-form-cue">
           Controlled tuck and extension · steady floor contact · 15 per side

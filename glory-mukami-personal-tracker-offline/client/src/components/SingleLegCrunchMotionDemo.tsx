@@ -102,7 +102,7 @@ export function SingleLegCrunchMotionDemo({
       </div>
       <figcaption>
         <span className="workout-video-label">
-          Detailed demo · seventh exercise under review
+          Detailed demo
         </span>
         <p id="single-leg-crunch-form-cue">
           One knee draws in · reach toward the raised foot · controlled return

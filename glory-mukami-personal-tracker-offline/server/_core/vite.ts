@@ -3,10 +3,30 @@ import fs from "fs";
 import { type Server } from "http";
 import { nanoid } from "nanoid";
 import path from "path";
-import { createServer as createViteServer } from "vite";
-import viteConfig from "../../vite.config";
+
+/**
+ * `import()` with a specifier esbuild cannot see, so it neither bundles the
+ * module nor resolves it at build time — it stays a genuine runtime import.
+ *
+ * `vite.config.ts` and everything it pulls in (`vite`, the React and
+ * Tailwind Vite plugins, ...) are devDependencies. A production install
+ * skips those, so a specifier esbuild *can* see — even behind a dynamic
+ * `import()` — gets bundled in and crashes the server before it ever reaches
+ * this dev-only branch.
+ */
+function uncapturedImport<T>(specifier: string): Promise<T> {
+  return new Function("s", "return import(s)")(specifier);
+}
 
 export async function setupVite(app: Express, server: Server) {
+  const [{ createServer: createViteServer }, { default: viteConfig }] =
+    await Promise.all([
+      uncapturedImport<typeof import("vite")>("vite"),
+      uncapturedImport<typeof import("../../vite.config")>(
+        "../../vite.config"
+      ),
+    ]);
+
   const serverOptions = {
     middlewareMode: true,
     hmr: { server },

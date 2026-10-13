@@ -79,7 +79,7 @@ export function BicycleKicksMotionDemo({
       </div>
       <figcaption>
         <span className="workout-video-label">
-          Detailed demo · second exercise under review
+          Detailed demo
         </span>
         <p id="bicycle-kicks-form-cue">
           Alternating long leg extensions · steady braced torso · full exchange

@@ -77,7 +77,7 @@ export function BicycleCrunchesMotionDemo({
       </div>
       <figcaption>
         <span className="workout-video-label">
-          Detailed demo · fifth exercise under review
+          Detailed demo
         </span>
         <p id="bicycle-crunches-form-cue">
           Opposite elbow and knee · controlled torso curl · 15 each side
