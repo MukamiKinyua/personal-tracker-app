@@ -8,6 +8,7 @@ import { registerOAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
 import { appRouter } from "../routers";
 import { storagePut } from "../storage";
+import { registerFileRoutes } from "../filesRoutes";
 import {
   DOCUMENT_UPLOAD_MAX_BYTES,
   isSupportedDocumentMimeType,
@@ -47,6 +48,7 @@ async function startServer() {
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   registerStorageProxy(app);
   registerOAuthRoutes(app);
+  registerFileRoutes(app);
   app.post(
     `/api/documents/upload`,
     express.raw({ type: "*/*", limit: `${DOCUMENT_UPLOAD_MAX_BYTES}b` }),

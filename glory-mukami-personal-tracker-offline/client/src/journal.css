@@ -33282,3 +33282,122 @@ button.attention-row:focus-visible {
   outline: 2px solid #ffd2e9;
   outline-offset: 2px;
 }
+
+/* Attached files and photos (components/FileAttachments.tsx). Inherits the
+   colour of the page that hosts it. */
+.file-attachments {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+  padding-top: 0.6rem;
+  border-top: 1px dashed rgba(127, 127, 127, 0.4);
+  color: inherit;
+}
+.file-attachments-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  font-size: 0.7rem;
+}
+.file-attachments-add {
+  display: flex;
+  gap: 0.4rem;
+}
+.file-add-button {
+  position: relative;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.file-add-button input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+.file-add-button:focus-within {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+.file-attachments ul {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.file-attachments li {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.6rem;
+}
+.file-thumb {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: rgba(127, 127, 127, 0.2);
+}
+.file-thumb-icon {
+  display: grid;
+  place-items: center;
+  font-size: 1.1rem;
+}
+.file-meta {
+  display: grid;
+  min-width: 0;
+}
+.file-name {
+  overflow: hidden;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-align: left;
+  text-decoration: underline;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.file-meta small,
+.file-empty {
+  font-size: 0.65rem;
+  opacity: 0.8;
+}
+.file-status-ok::before {
+  content: "✓ ";
+}
+.file-status-warn {
+  font-weight: 700;
+}
+.file-remove,
+.file-confirm button {
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  padding: 0.25rem 0.6rem;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  font-size: 0.62rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.file-confirm {
+  display: flex;
+  gap: 0.3rem;
+}
+.file-message {
+  margin: 0;
+  font-size: 0.7rem;
+  font-weight: 700;
+}

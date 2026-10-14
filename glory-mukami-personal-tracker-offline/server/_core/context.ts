@@ -64,6 +64,26 @@ async function userFromSession(
   return asUser(stored);
 }
 
+/**
+ * Who is calling a plain HTTP route (one that bypasses tRPC), by the same two
+ * routes createContext uses: this server's own session, then the Manus one.
+ */
+export async function authenticateUser(
+  req: CreateExpressContextOptions["req"]
+): Promise<User | null> {
+  try {
+    const own = await userFromSession(req);
+    if (own) return own;
+  } catch {
+    // Fall through to the Manus session.
+  }
+  try {
+    return await sdk.authenticateRequest(req);
+  } catch {
+    return null;
+  }
+}
+
 export type TrpcContext = {
   req: CreateExpressContextOptions["req"];
   res: CreateExpressContextOptions["res"];

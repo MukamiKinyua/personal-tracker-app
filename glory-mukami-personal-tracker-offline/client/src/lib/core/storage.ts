@@ -17,6 +17,8 @@
  * means the sync engine and a server, or a backup file the user has exported.
  */
 
+import { clearFileStore } from "../fileStore";
+
 export type StorageKind = "indexeddb" | "localstorage" | "memory";
 
 export type StorageStatus = {
@@ -217,6 +219,8 @@ export async function eraseLocalJournalData(): Promise<{
   } catch {
     // Storage blocked — nothing to remove there.
   }
+  // Attached files and photos live in their own database.
+  await clearFileStore();
   let database = false;
   if (typeof indexedDB !== "undefined") {
     database = await new Promise<boolean>(resolve => {

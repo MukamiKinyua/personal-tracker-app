@@ -34,6 +34,10 @@ const mongoUserMocks = vi.hoisted(() => ({
   deleteUser: vi.fn(),
 }));
 
+const mongoFileMocks = vi.hoisted(() => ({
+  purgeFilesForOwner: vi.fn(),
+}));
+
 vi.mock("./mongo", () => ({
   mongoReadiness: mongoMocks.mongoReadiness,
 }));
@@ -45,6 +49,7 @@ vi.mock("./mongoJournal", () => ({
 vi.mock("./mongoRecords", () => ({ ...mongoRecordMocks }));
 vi.mock("./mongoDevices", () => ({ ...mongoDeviceMocks }));
 vi.mock("./mongoUsers", () => ({ ...mongoUserMocks }));
+vi.mock("./mongoFiles", () => ({ ...mongoFileMocks }));
 
 import { appRouter } from "./routers";
 
@@ -77,6 +82,7 @@ describe("journal router", () => {
       events: 30,
     });
     mongoUserMocks.deleteUser.mockResolvedValue(undefined);
+    mongoFileMocks.purgeFilesForOwner.mockResolvedValue(3);
     const context = authenticatedContext();
     const caller = appRouter.createCaller(context);
     const result = await caller.auth.deleteAccount({
@@ -85,6 +91,8 @@ describe("journal router", () => {
     expect(result).toEqual({ deleted: 12, workspaces: 9, events: 30 });
     expect(mongoJournalMocks.purgeMongoJournalForOwner).toHaveBeenCalledWith(42);
     expect(mongoUserMocks.deleteUser).toHaveBeenCalledWith(42);
+    // Backed-up photos and documents go with the account.
+    expect(mongoFileMocks.purgeFilesForOwner).toHaveBeenCalledWith(42);
     expect(context.res.clearCookie).toHaveBeenCalled();
   });
 

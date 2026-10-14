@@ -3,6 +3,8 @@ export type RenewalState =
   | "In progress"
   | "Renewed"
   | "Archived";
+import type { FileRef } from "./fileRefs";
+
 export type DocumentAttachment = {
   key: string;
   url: string;
@@ -21,7 +23,10 @@ export type RenewalRecord = {
   note: string;
   state: RenewalState;
   renewals: string[];
+  /** Uploaded to the server before files were kept on the device. */
   attachment?: DocumentAttachment;
+  /** Documents and photos, stored on this device and backed up to the account. */
+  attachments?: FileRef[];
 };
 export type DocumentReviewStatus =
   | "No date"

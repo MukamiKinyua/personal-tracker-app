@@ -8,7 +8,6 @@ import {
   useState,
 } from "react";
 import type { LucideIcon } from "lucide-react";
-import { COOKIE_NAME } from "@shared/const";
 import {
   ArrowLeft,
   ArrowRight,
@@ -46,7 +45,7 @@ import { JournalCalendar } from "@/components/JournalCalendar";
 import { SettingsPanel } from "@/components/SettingsPanel";
 import { DayPlanner } from "@/components/DayPlanner";
 import { WorkoutStudio } from "@/components/WorkoutStudio";
-import { apiUrl, authHeaders } from "@/lib/api";
+import { FileAttachments } from "@/components/FileAttachments";
 import { useRecordStore } from "@/contexts/RecordStoreContext";
 import type { AnyRecord } from "@/lib/core/recordStore";
 import { toCSV } from "@/lib/core/exportData";
@@ -163,7 +162,6 @@ import {
   documentReviewStatus,
   documentReviewSummary,
   sortDocumentsForReview,
-  type DocumentAttachment,
   type RenewalRecord,
   type RenewalState,
 } from "../lib/documentTracker";
@@ -13288,8 +13286,6 @@ function DocumentRenewalPage({
     if (!record.reviewDate) return null;
     return assignmentDueDetail(record.reviewDate, today);
   }
-  const [uploadingId, setUploadingId] = useState<string | null>(null);
-  const [uploadMessage, setUploadMessage] = useState<string | null>(null);
   const [draft, setDraft] = useState({
     title: "",
     type: "Identity",
@@ -13369,6 +13365,7 @@ function DocumentRenewalPage({
       state: draft.state,
       renewals: existing?.renewals || [],
       attachment: existing?.attachment,
+      attachments: existing?.attachments,
     };
     setRecords(current =>
       editingId
@@ -13398,106 +13395,6 @@ function DocumentRenewalPage({
     setRecords(current =>
       current.map(record => (record.id === id ? updater(record) : record))
     );
-  }
-  function previewAuthHeader(): Record<string, string> {
-    // This server's own session first; the Manus preview mirror after.
-    const own = authHeaders();
-    if (own.Authorization) return own;
-    try {
-      const raw = sessionStorage.getItem("manus-cookie");
-      const prefix = `${COOKIE_NAME}=`;
-      const pair = raw
-        ?.split(";")
-        .find(value => value.trim().startsWith(prefix));
-      const token = pair?.trim().slice(prefix.length);
-      return token ? { Authorization: `Bearer ${token}` } : {};
-    } catch {
-      return {};
-    }
-  }
-  async function uploadAttachment(
-    record: RenewalRecord,
-    file: File | undefined
-  ) {
-    if (!file) return;
-    const allowedTypes = new Set([
-      "application/pdf",
-      "application/octet-stream",
-      "text/plain",
-      "text/markdown",
-      "image/jpeg",
-      "image/png",
-      "image/webp",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    ]);
-    if (file.size === 0 || file.size > 15 * 1024 * 1024) {
-      setUploadMessage("Choose a file smaller than 15 MB.");
-      return;
-    }
-    if (!allowedTypes.has(file.type || "application/octet-stream")) {
-      setUploadMessage(
-        "This file type is not supported. Use PDF, an image, text, or an Office document."
-      );
-      return;
-    }
-    setUploadingId(record.id);
-    setUploadMessage(null);
-    try {
-      const response = await fetch(apiUrl("/api/documents/upload"), {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": file.type || "application/octet-stream",
-          "X-File-Name": encodeURIComponent(file.name),
-          ...previewAuthHeader(),
-        },
-        body: file,
-      });
-      const result = (await response.json()) as {
-        key?: string;
-        url?: string;
-        originalName?: string;
-        mimeType?: string;
-        size?: number;
-        uploadedAt?: string;
-        error?: string;
-      };
-      if (response.status === 401 || response.status === 403) {
-        setUploadMessage(
-          "Please sign in to the journal to use private document storage."
-        );
-        return;
-      }
-      if (
-        !response.ok ||
-        !result.key ||
-        !result.url ||
-        !result.originalName ||
-        !result.mimeType ||
-        typeof result.size !== "number" ||
-        !result.uploadedAt
-      )
-        throw new Error(result.error || "Upload failed");
-      const attachment: DocumentAttachment = {
-        key: result.key,
-        url: result.url,
-        originalName: result.originalName,
-        mimeType: result.mimeType,
-        size: result.size,
-        uploadedAt: result.uploadedAt,
-      };
-      updateRecord(record.id, current => ({ ...current, attachment }));
-      setUploadMessage(
-        `${attachment.originalName} attached to ${record.title}.`
-      );
-    } catch {
-      setUploadMessage(
-        "The file could not be stored. Your metadata record was kept unchanged."
-      );
-    } finally {
-      setUploadingId(null);
-    }
   }
   function RecordCard({ record }: { record: RenewalRecord }) {
     const status = documentReviewStatus(record);
@@ -13543,6 +13440,8 @@ function DocumentRenewalPage({
             </small>
           ) : null}
           {record.attachment ? (
+            // Attached before files were kept on the device: still opens, and
+            // can be forgotten, but new files go through the list below.
             <div className="document-attachment">
               <a href={record.attachment.url} target="_blank" rel="noreferrer">
                 Open {record.attachment.originalName}
@@ -13553,32 +13452,26 @@ function DocumentRenewalPage({
               </small>
               <button
                 type="button"
-                title="The stored file itself stays in storage until your account is deleted"
-                onClick={() => {
+                onClick={() =>
                   updateRecord(record.id, current => ({
                     ...current,
                     attachment: undefined,
-                  }));
-                  toast("Reference removed. The stored file remains in storage until the account is deleted.");
-                }}
+                  }))
+                }
               >
                 Forget this file
               </button>
             </div>
-          ) : (
-            <label className="document-attachment-upload">
-              {uploadingId === record.id ? "Storing file…" : "Attach a file"}
-              <input
-                type="file"
-                accept="application/pdf,image/jpeg,image/png,image/webp,text/plain,text/markdown,.docx,.xlsx"
-                disabled={uploadingId !== null}
-                onChange={event => {
-                  void uploadAttachment(record, event.target.files?.[0]);
-                  event.currentTarget.value = "";
-                }}
-              />
-            </label>
-          )}
+          ) : null}
+          <FileAttachments
+            files={record.attachments ?? []}
+            onChange={next =>
+              updateRecord(record.id, current => ({
+                ...current,
+                attachments: next,
+              }))
+            }
+          />
         </div>
         <div className="document-renewal-actions">
           <button type="button" onClick={() => editRecord(record)}>
@@ -13658,8 +13551,8 @@ function DocumentRenewalPage({
               );
               if (editingId === record.id) resetDraft();
               toast(
-                record.attachment
-                  ? `Removed ${record.title}. Its stored file remains until the account is deleted.`
+                record.attachment || record.attachments?.length
+                  ? `Removed ${record.title}. Its attached files stay stored until you remove them.`
                   : `Removed ${record.title}`
               );
             }}
@@ -13682,18 +13575,19 @@ function DocumentRenewalPage({
         <h2 id="documents-title">
           Keep the dates,
           <br />
-          <em>not the files.</em>
+          <em>and the files.</em>
         </h2>
         <p className="page-intro">
           Track the dates that help you review or renew an important record,
-          and optionally attach the file itself.
+          and attach the file or a photo of it. Files stay on this device and
+          back up to your account when you are signed in.
         </p>
         <div className="document-safety">
           <HeartPulse size={15} />
           <span>
             {auth.isAuthenticated
-              ? "Files open only for your signed-in account"
-              : "Sign in to attach files"}
+              ? "Stored on this device, backed up to your account"
+              : "Stored on this device only. Sign in to back them up"}
           </span>
         </div>
       </div>
@@ -13856,11 +13750,6 @@ function DocumentRenewalPage({
             </button>
           </form>
         </section>
-        {uploadMessage ? (
-          <div className="document-upload-message" role="status">
-            {uploadMessage}
-          </div>
-        ) : null}
         <section className="document-review-section">
           <div>
             <span>Review now</span>

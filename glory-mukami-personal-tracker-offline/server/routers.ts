@@ -38,6 +38,7 @@ import {
   verifyTotp,
 } from "./totp";
 import { TRPCError } from "@trpc/server";
+import { purgeFilesForOwner } from "./mongoFiles";
 import {
   isDeviceActive,
   listDevices,
@@ -285,6 +286,8 @@ export const appRouter = router({
         // deletion.
         const journal = await purgeMongoJournalForOwner(ctx.user.id);
         await purgeDevices(ctx.user.id);
+        // Photos and documents backed up to the account go with it.
+        await purgeFilesForOwner(ctx.user.id);
         await deleteUser(ctx.user.id);
 
         ctx.res.clearCookie(COOKIE_NAME, {
@@ -370,6 +373,7 @@ export const appRouter = router({
       .mutation(async ({ ctx }) => {
         const deleted = await purgeOwner(ctx.user.id);
         await purgeDevices(ctx.user.id);
+        await purgeFilesForOwner(ctx.user.id);
         return { deleted };
       }),
   }),

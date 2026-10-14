@@ -8,6 +8,7 @@ import { SearchPalette } from "./components/SearchPalette";
 import { TimersProvider } from "./contexts/TimersContext";
 import { TimerBar } from "./components/TimerBar";
 import { NativeBridges } from "./components/NativeBridges";
+import { FileSyncBridge } from "./components/FileSyncBridge";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
 import { Login } from "./pages/Login";
@@ -90,6 +91,8 @@ function App() {
               {/* Reminder schedule and home-screen widget, kept in step with
                   the journal. Renders nothing. */}
               <NativeBridges />
+              {/* Backs attached files and photos up to the account. */}
+              <FileSyncBridge />
               <AuthGate>
                 <Router />
               </AuthGate>

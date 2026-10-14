@@ -252,6 +252,24 @@ them**, they are shown once and are the only way in if the phone is lost.
 - `REQUIRE_TWO_FACTOR=false` skips the requirement for accounts that have not
   linked an app. It is for local development, not for a public server.
 
+## Photos and documents
+
+Attached files live on the device first, so they work offline and signed out.
+When someone is signed in they are copied to MongoDB (GridFS, in the same
+database as the journal) and fetched back on another device or after a
+reinstall. There is no separate storage service to set up.
+
+- Allowed: PDF, JPEG/PNG/WebP photos, plain text and Markdown, `.docx`, `.xlsx`,
+  up to 15 MB each. The server checks the file's real contents against its
+  declared type, so a script renamed to `.jpg` is refused.
+- Photos are resized to 2048 px and re-encoded on the device, which also removes
+  their location (EXIF) data before they are stored anywhere.
+- `FILE_QUOTA_MB` (default 100) caps each account. Atlas's free tier is 512 MB
+  in total, shared with the journal.
+- Deleting the account, or "Delete my data", deletes the backed-up files too.
+  "Erase this device" clears the on-device copy.
+- Files are not part of the JSON export; they are backed up through the account.
+
 ## What each layer promises, and the limit of each
 
 - **Offline**: every device holds the whole journal. Writes made offline
