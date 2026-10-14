@@ -7,6 +7,7 @@
  * offline-first app and nobody should be locked out of their own notes.
  */
 
+import { TwoFactorStep } from "@/components/TwoFactorStep";
 import { useGoogleSignIn } from "@/hooks/useGoogleSignIn";
 import { isNative } from "@/lib/native";
 import { useEffect, useRef } from "react";
@@ -22,7 +23,17 @@ export function Login({ onContinueWithoutAccount }: { onContinueWithoutAccount: 
     if (signIn.available && !native) signIn.renderButton(buttonHost.current);
     // renderButton changes identity with the client id only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [signIn.available, native]);
+  }, [signIn.available, native, Boolean(signIn.secondStep)]);
+
+  if (signIn.secondStep) {
+    return (
+      <main className="login-screen">
+        <div className="login-card">
+          <TwoFactorStep signIn={signIn} />
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="login-screen" aria-labelledby="login-title">

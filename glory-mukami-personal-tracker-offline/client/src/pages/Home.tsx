@@ -1381,6 +1381,10 @@ export default function Home() {
   const [turnDestination, setTurnDestination] = useState<View>("contents");
   const [turnCarriesContent, setTurnCarriesContent] = useState(false);
   const [turnVertical, setTurnVertical] = useState(false);
+  const pendingTurnRef = useRef<{ nextView: View; duration: number } | null>(
+    null
+  );
+  const turnOverlayRef = useRef<HTMLDivElement>(null);
   const journalStageRef = useRef<HTMLDivElement>(null);
   const flipFrontHostRef = useRef<HTMLDivElement>(null);
   const flipBackStandInRef = useRef<HTMLDivElement>(null);
@@ -1821,16 +1825,53 @@ export default function Home() {
     );
     setTurnDirection(direction);
     setTurnDestination(nextView);
+    // The turn is finished by the effect below once the leaf has actually
+    // landed, not by a timer started here: the overlay (and the copies of the
+    // page on the leaf) take time to build, so a timer started now would tear
+    // the overlay down before a late-starting animation finished.
+    pendingTurnRef.current = { nextView, duration };
     setIsTurning(true);
-    window.setTimeout(() => {
+  }
+
+  useEffect(() => {
+    if (!isTurning) return;
+    const pending = pendingTurnRef.current;
+    if (!pending) return;
+    let finished = false;
+    let timer: number | undefined;
+    let frame = 0;
+    const overlay = turnOverlayRef.current;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      pendingTurnRef.current = null;
       setActivePage(currentPage =>
-        activePageAfterNavigation(currentPage, nextView)
+        activePageAfterNavigation(currentPage, pending.nextView)
       );
-      setView(nextView);
+      setView(pending.nextView);
       setIsTurning(false);
       focusArrivedPage();
-    }, duration);
-  }
+    };
+    const onAnimationEnd = (event: AnimationEvent) => {
+      if ((event.target as Element).classList.contains("flip-r3")) finish();
+    };
+    overlay?.addEventListener("animationend", onAnimationEnd);
+    // Fallback, started after the overlay has painted, for the case where no
+    // animationend arrives (interrupted animation, hidden tab).
+    frame = requestAnimationFrame(() => {
+      frame = requestAnimationFrame(() => {
+        timer = window.setTimeout(finish, pending.duration + 150);
+      });
+    });
+    return () => {
+      overlay?.removeEventListener("animationend", onAnimationEnd);
+      cancelAnimationFrame(frame);
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
+    // finish() only touches state setters and a ref; re-running on anything
+    // but isTurning would restart the fallback timer mid-turn.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isTurning]);
 
   function selectContentsItem(nextView: View) {
     setContentsPreferences(prev => ({
@@ -2780,6 +2821,7 @@ export default function Home() {
               later rule in the file winning. */}
           {isTurning && (
               <div
+                ref={turnOverlayRef}
                 className={cn(
                   "page-turn",
                   "whole-page-turn",

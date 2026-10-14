@@ -29,6 +29,18 @@ export type StoredUser = {
   role: "user" | "admin";
   createdAt: Date;
   lastSignedIn: Date;
+  /** Present once an authenticator app has been linked. Never sent to clients. */
+  twoFactor?: TwoFactorRecord;
+};
+
+export type TwoFactorRecord = {
+  /** The base32 secret, AES-GCM encrypted (see totp.ts). */
+  secretEnc: string;
+  enabledAt: Date;
+  /** Newest time step already accepted, so a code cannot be used twice. */
+  lastStep: number;
+  /** SHA-256 hashes of the unused recovery codes. */
+  recoveryHashes: string[];
 };
 
 type Counter = { key: string; value: number };
@@ -144,4 +156,63 @@ export async function deleteUser(id: number): Promise<boolean> {
   const { users } = await collections();
   const result = await users.deleteOne({ id });
   return result.deletedCount === 1;
+}
+
+/**
+ * Links an authenticator, but only if none is linked yet. The condition is in
+ * the update itself, so two devices finishing setup at once cannot both win
+ * and leave the account holding a secret the first one never saw confirmed.
+ */
+export async function enableTwoFactor(
+  id: number,
+  record: Pick<TwoFactorRecord, "secretEnc" | "lastStep" | "recoveryHashes">
+): Promise<boolean> {
+  const { users } = await collections();
+  const result = await users.updateOne(
+    { id, twoFactor: { $exists: false } },
+    { $set: { twoFactor: { ...record, enabledAt: new Date() } } }
+  );
+  return result.modifiedCount === 1;
+}
+
+/**
+ * Records an accepted time step. Succeeds only if the step is newer than the
+ * last one, atomically, so the same code submitted twice at once is accepted
+ * once.
+ */
+export async function advanceTotpStep(
+  id: number,
+  step: number
+): Promise<boolean> {
+  const { users } = await collections();
+  const result = await users.updateOne(
+    { id, "twoFactor.lastStep": { $lt: step } },
+    { $set: { "twoFactor.lastStep": step } }
+  );
+  return result.modifiedCount === 1;
+}
+
+/** Spends a recovery code: removed in the same operation that finds it. */
+export async function consumeRecoveryCode(
+  id: number,
+  hash: string
+): Promise<boolean> {
+  const { users } = await collections();
+  const result = await users.updateOne(
+    { id, "twoFactor.recoveryHashes": hash },
+    { $pull: { "twoFactor.recoveryHashes": hash } }
+  );
+  return result.modifiedCount === 1;
+}
+
+export async function replaceRecoveryCodes(
+  id: number,
+  hashes: string[]
+): Promise<boolean> {
+  const { users } = await collections();
+  const result = await users.updateOne(
+    { id, twoFactor: { $exists: true } },
+    { $set: { "twoFactor.recoveryHashes": hashes } }
+  );
+  return result.modifiedCount === 1;
 }

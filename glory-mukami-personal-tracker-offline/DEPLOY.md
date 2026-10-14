@@ -237,6 +237,21 @@ Android client (step 2b), and install
 
 ---
 
+## Two-step verification
+
+Signing in with Google is followed by a code from an authenticator app (Google
+Authenticator, Authy, 1Password and similar). The first time, the app walks you
+through scanning a QR code and gives you ten one-time recovery codes: **save
+them**, they are shown once and are the only way in if the phone is lost.
+
+- The authenticator secret is stored encrypted with a key derived from `JWT_SECRET`.
+  Changing `JWT_SECRET` makes every linked authenticator unreadable, so treat it
+  as permanent once people have signed in.
+- Five wrong codes lock that account for 15 minutes. The counter is in memory,
+  so run one server instance (the documented setup) or move it into MongoDB first.
+- `REQUIRE_TWO_FACTOR=false` skips the requirement for accounts that have not
+  linked an app. It is for local development, not for a public server.
+
 ## What each layer promises, and the limit of each
 
 - **Offline**: every device holds the whole journal. Writes made offline

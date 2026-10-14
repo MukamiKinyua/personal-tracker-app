@@ -33130,3 +33130,155 @@ button.attention-row:focus-visible {
   color: #ffb4c8;
   font-size: 0.7rem;
 }
+
+/* Page-turn performance: the live page copies on the leaf and underneath it
+   are laid out once and then only moved, so they are isolated from the rest
+   of the document. Layout, paint and style containment change nothing
+   visually (both hosts already clip their overflow). */
+.page-flip .flip-face-content,
+.page-flip .flip-reveal {
+  contain: layout paint style;
+}
+
+/* Authenticator step (components/TwoFactorStep.tsx), shared by the sign-in
+   page and the account panel, so it inherits the colour of whatever hosts it. */
+.twofactor {
+  display: grid;
+  gap: 0.8rem;
+  text-align: left;
+  color: inherit;
+}
+.twofactor h2 {
+  margin: 0;
+  font-family: "Playfair Display", serif;
+  font-size: 1.5rem;
+  letter-spacing: -0.02em;
+}
+.twofactor p {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  opacity: 0.85;
+}
+.twofactor-qr {
+  justify-self: center;
+  width: 192px;
+  height: 192px;
+  border-radius: 12px;
+  background: #fff;
+  overflow: hidden;
+}
+.twofactor-qr svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.twofactor-manual {
+  font-size: 0.75rem;
+}
+.twofactor-manual summary {
+  cursor: pointer;
+}
+.twofactor-manual code {
+  display: block;
+  margin: 0.5rem 0 0.25rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  word-break: break-all;
+}
+.twofactor-manual small,
+.twofactor-hint {
+  font-size: 0.7rem;
+  opacity: 0.75;
+}
+.twofactor-form {
+  display: grid;
+  gap: 0.6rem;
+}
+.twofactor-form label {
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.twofactor-form input {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 10px;
+  padding: 0.7rem 0.8rem;
+  color: inherit;
+  background: rgba(255, 255, 255, 0.1);
+  font: inherit;
+  font-size: 1.1rem;
+  letter-spacing: 0.18em;
+  text-align: center;
+}
+.twofactor-form button,
+.twofactor-actions button,
+.twofactor-primary {
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 999px;
+  padding: 0.7rem 1rem;
+  color: #2e1d48;
+  background: #fff6fb;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.twofactor-actions button {
+  flex: 1;
+  color: inherit;
+  background: transparent;
+}
+.twofactor button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.twofactor-back {
+  justify-self: center;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 0.75rem;
+  text-decoration: underline;
+  opacity: 0.8;
+  cursor: pointer;
+}
+.twofactor-error {
+  color: #ffb4c8;
+  font-size: 0.75rem;
+}
+.twofactor-codes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0.7rem;
+  list-style: none;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.1);
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 0.85rem;
+  letter-spacing: 0.06em;
+  text-align: center;
+}
+.twofactor-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+.twofactor-saved {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+}
+.twofactor button:focus-visible,
+.twofactor input:focus-visible {
+  outline: 2px solid #ffd2e9;
+  outline-offset: 2px;
+}

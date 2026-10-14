@@ -10,6 +10,7 @@
 
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useRecordStore } from "@/contexts/RecordStoreContext";
+import { TwoFactorStep } from "@/components/TwoFactorStep";
 import { useGoogleSignIn } from "@/hooks/useGoogleSignIn";
 import {
   describeRevoke,
@@ -36,6 +37,11 @@ export function AccountPanel() {
   });
   const revokeDevice = trpc.devices.revoke.useMutation({
     onSuccess: () => void utils.devices.list.invalidate(),
+  });
+
+  const twoFactor = trpc.auth.twoFactorStatus.useQuery(undefined, {
+    enabled: signedIn,
+    retry: false,
   });
 
   const [confirmingRevoke, setConfirmingRevoke] = useState<string>();
@@ -81,6 +87,14 @@ export function AccountPanel() {
               Sign out
             </button>
           </div>
+
+          {twoFactor.data ? (
+            <p className="account-note">
+              {twoFactor.data.enabled
+                ? `Two-step verification is on. ${twoFactor.data.recoveryCodesLeft} recovery code${twoFactor.data.recoveryCodesLeft === 1 ? "" : "s"} left.`
+                : "Two-step verification is off for this account."}
+            </p>
+          ) : null}
 
           <div className="account-sync-row">
             <span>
@@ -170,6 +184,8 @@ export function AccountPanel() {
             )}
           </div>
         </>
+      ) : signIn.secondStep ? (
+        <TwoFactorStep signIn={signIn} />
       ) : signIn.available ? (
         <div className="account-signin">
           <p>

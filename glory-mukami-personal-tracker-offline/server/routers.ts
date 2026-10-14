@@ -10,7 +10,34 @@ import {
   SESSION_MAX_AGE_MS,
   signInWithGoogle,
 } from "./googleAuth";
-import { deleteUser } from "./mongoUsers";
+import {
+  deleteUser,
+  enableTwoFactor,
+  getUserById,
+  replaceRecoveryCodes,
+  type StoredUser,
+} from "./mongoUsers";
+import {
+  checkSecondFactor,
+  encryptionKey,
+  readChallenge,
+  signChallenge,
+  TWO_FACTOR_ISSUER,
+  twoFactorRequired,
+  assertNotLocked,
+  clearFailures,
+  recordFailure,
+} from "./twoFactor";
+import {
+  decryptSecret,
+  encryptSecret,
+  generateRecoveryCodes,
+  generateSecret,
+  hashRecoveryCode,
+  otpauthUri,
+  verifyTotp,
+} from "./totp";
+import { TRPCError } from "@trpc/server";
 import {
   isDeviceActive,
   listDevices,
@@ -61,6 +88,27 @@ const pushWriteSchema = z.object({
   externalId: z.string().max(200).optional(),
 });
 
+/** Creates the session cookie and the matching token for the Android build. */
+async function startSession(
+  ctx: { req: Parameters<typeof getSessionCookieOptions>[0]; res: { cookie: (name: string, value: string, options: object) => unknown } },
+  user: StoredUser
+) {
+  const token = await createSessionToken(user);
+  ctx.res.cookie(COOKIE_NAME, token, {
+    ...getSessionCookieOptions(ctx.req),
+    maxAge: SESSION_MAX_AGE_MS,
+  });
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    picture: user.picture,
+    // Returned as well as set, for clients that cannot rely on the cookie
+    // reaching a server on another origin (the Android build).
+    sessionToken: token,
+  };
+}
+
 export const appRouter = router({
   // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
   system: systemRouter,
@@ -80,22 +128,145 @@ export const appRouter = router({
       .input(z.object({ idToken: z.string().min(1).max(4096) }))
       .mutation(async ({ ctx, input }) => {
         const user = await signInWithGoogle(input.idToken);
-        const token = await createSessionToken(user);
 
-        ctx.res.cookie(COOKIE_NAME, token, {
-          ...getSessionCookieOptions(ctx.req),
-          maxAge: SESSION_MAX_AGE_MS,
-        });
+        // Google has said who this is. That is not yet a session: an account
+        // with an authenticator linked must present a code first.
+        if (user.twoFactor) {
+          return {
+            status: "totp_required" as const,
+            challengeToken: await signChallenge({
+              purpose: "verify",
+              userId: user.id,
+            }),
+          };
+        }
 
+        // No authenticator yet. Linking one is part of signing in, unless
+        // this server has been told (for local development) not to insist.
+        if (twoFactorRequired()) {
+          const secret = generateSecret();
+          return {
+            status: "totp_setup" as const,
+            secret,
+            otpauthUri: otpauthUri({
+              secret,
+              account: user.email ?? user.name ?? `account-${user.id}`,
+              issuer: TWO_FACTOR_ISSUER,
+            }),
+            // The secret rides in the signed challenge, encrypted, so nothing
+            // is stored until the person proves their app can produce codes.
+            challengeToken: await signChallenge({
+              purpose: "setup",
+              userId: user.id,
+              secretEnc: encryptSecret(secret, encryptionKey()),
+            }),
+          };
+        }
+
+        return { status: "signed_in" as const, ...(await startSession(ctx, user)) };
+      }),
+    /** Second step for an account that already has an authenticator. */
+    verifyTotp: publicProcedure
+      .input(
+        z.object({
+          challengeToken: z.string().min(1).max(4096),
+          code: z.string().min(1).max(32),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const claims = await readChallenge(input.challengeToken, "verify");
+        const user = await getUserById(claims.userId);
+        if (!user) {
+          throw new TRPCError({ code: "UNAUTHORIZED", message: "No such account." });
+        }
+        const result = await checkSecondFactor(user, input.code);
         return {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          picture: user.picture,
-          // Returned as well as set, for clients that cannot rely on the
-          // cookie reaching a server on another origin (the Android build).
-          sessionToken: token,
+          ...(await startSession(ctx, user)),
+          usedRecoveryCode: result.usedRecoveryCode,
+          recoveryCodesLeft: Math.max(
+            0,
+            (user.twoFactor?.recoveryHashes.length ?? 0) -
+              (result.usedRecoveryCode ? 1 : 0)
+          ),
         };
+      }),
+    /**
+     * Finishes linking an authenticator: the person types a code from the app
+     * they just scanned, which proves the secret really reached it. Only then
+     * is anything saved, and the recovery codes are shown exactly once.
+     */
+    confirmTotpSetup: publicProcedure
+      .input(
+        z.object({
+          challengeToken: z.string().min(1).max(4096),
+          code: z.string().min(1).max(32),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const claims = await readChallenge(input.challengeToken, "setup");
+        if (claims.purpose !== "setup") {
+          throw new TRPCError({ code: "UNAUTHORIZED", message: "Bad setup step." });
+        }
+        const user = await getUserById(claims.userId);
+        if (!user) {
+          throw new TRPCError({ code: "UNAUTHORIZED", message: "No such account." });
+        }
+        if (user.twoFactor) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "An authenticator is already linked. Sign in again.",
+          });
+        }
+
+        assertNotLocked(user.id);
+        const secret = decryptSecret(claims.secretEnc, encryptionKey());
+        const step = verifyTotp(secret, input.code);
+        if (step === null) {
+          recordFailure(user.id);
+          throw new TRPCError({
+            code: "UNAUTHORIZED",
+            message:
+              "That code didn't match. Make sure the app shows this account, and use the current code.",
+          });
+        }
+
+        const recoveryCodes = generateRecoveryCodes(10);
+        const saved = await enableTwoFactor(user.id, {
+          secretEnc: claims.secretEnc,
+          lastStep: step,
+          recoveryHashes: recoveryCodes.map(hashRecoveryCode),
+        });
+        if (!saved) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "An authenticator is already linked. Sign in again.",
+          });
+        }
+        clearFailures(user.id);
+        return { ...(await startSession(ctx, user)), recoveryCodes };
+      }),
+    twoFactorStatus: protectedProcedure.query(async ({ ctx }) => {
+      const user = await getUserById(ctx.user.id);
+      return {
+        enabled: Boolean(user?.twoFactor),
+        recoveryCodesLeft: user?.twoFactor?.recoveryHashes.length ?? 0,
+      };
+    }),
+    /** New recovery codes, replacing the old ones. Needs a current code. */
+    regenerateRecoveryCodes: protectedProcedure
+      .input(z.object({ code: z.string().min(1).max(32) }))
+      .mutation(async ({ ctx, input }) => {
+        const user = await getUserById(ctx.user.id);
+        if (!user?.twoFactor) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Two-step verification is not set up.",
+          });
+        }
+        await checkSecondFactor(user, input.code);
+        const recoveryCodes = generateRecoveryCodes(10);
+        await replaceRecoveryCodes(user.id, recoveryCodes.map(hashRecoveryCode));
+        return { recoveryCodes };
       }),
     /**
      * Deletes the account and everything in it.
