@@ -52,6 +52,12 @@ export function registerStorageProxy(app: Express) {
 
     for (const localPath of candidatePaths) {
       if (fs.existsSync(localPath) && fs.statSync(localPath).isFile()) {
+        // Public artwork and video carry a content hash in their file name
+        // (name_ab12cd34.png), so a given URL never changes and can be kept
+        // for good. Private documents are never cached this way.
+        if (ownerId === null && /_[0-9a-f]{8}\.[a-z0-9]+$/i.test(key)) {
+          res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+        }
         res.sendFile(localPath);
         return;
       }

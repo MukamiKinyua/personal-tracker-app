@@ -9,6 +9,7 @@ import { registerStorageProxy } from "./storageProxy";
 import { appRouter } from "../routers";
 import { storagePut } from "../storage";
 import { registerFileRoutes } from "../filesRoutes";
+import compression from "compression";
 import {
   DOCUMENT_UPLOAD_MAX_BYTES,
   isSupportedDocumentMimeType,
@@ -40,6 +41,10 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 async function startServer() {
   const app = express();
   const server = createServer(app);
+  // The app's script and stylesheet are about 2 MB uncompressed and roughly a
+  // fifth of that gzipped; without this every first visit pays for all of it.
+  // Already-compressed media (png, jpg, mp4) is skipped by the default filter.
+  app.use(compression());
   // Configure body parser with larger size limit for file uploads
   // Before anything that answers under /api, so preflights never reach a
   // handler that would want a body or a session first.
