@@ -33401,3 +33401,51 @@ button.attention-row:focus-visible {
   font-size: 0.7rem;
   font-weight: 700;
 }
+
+/* Backup status (components/BackupStatus.tsx): a verdict you can read at a
+   glance. Colours are set on the mark only, so it inherits the panel's text. */
+.backup-status {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: start;
+  gap: 0.6rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid rgba(127, 127, 127, 0.4);
+  border-radius: 12px;
+}
+.backup-status-mark {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-weight: 800;
+  color: #1c1024;
+  background: #9ed6bd;
+}
+.backup-status-waiting .backup-status-mark {
+  background: #f4c766;
+}
+.backup-status-warn .backup-status-mark {
+  background: #ff9fb6;
+}
+.backup-status-off .backup-status-mark {
+  background: rgba(127, 127, 127, 0.55);
+  color: inherit;
+}
+.backup-status-warn {
+  border-color: #ff9fb6;
+}
+.backup-status-copy {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+.backup-status-copy b {
+  font-size: 0.8rem;
+}
+.backup-status-copy small {
+  font-size: 0.7rem;
+  line-height: 1.4;
+  opacity: 0.85;
+}

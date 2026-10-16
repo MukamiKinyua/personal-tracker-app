@@ -10,6 +10,7 @@
 
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useRecordStore } from "@/contexts/RecordStoreContext";
+import { BackupStatus } from "@/components/BackupStatus";
 import { TwoFactorStep } from "@/components/TwoFactorStep";
 import { useGoogleSignIn } from "@/hooks/useGoogleSignIn";
 import {
@@ -67,6 +68,9 @@ export function AccountPanel() {
         <b>Your account</b>
         <small>{store.syncStatusMessage}</small>
       </div>
+
+      {/* The one answer to "is it actually backed up?", above the details. */}
+      <BackupStatus />
 
       {durability ? (
         <p
