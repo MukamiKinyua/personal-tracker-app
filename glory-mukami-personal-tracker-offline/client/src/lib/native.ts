@@ -8,6 +8,7 @@
  * which platform it is on; it asks whether a capability exists.
  */
 
+import { App } from "@capacitor/app";
 import { Capacitor, registerPlugin } from "@capacitor/core";
 import { Directory, Encoding, Filesystem } from "@capacitor/filesystem";
 import { LocalNotifications } from "@capacitor/local-notifications";
@@ -82,16 +83,28 @@ export async function requestNotificationPermission(): Promise<boolean> {
   return (await Notification.requestPermission()) === "granted";
 }
 
+/** A one-off notification at a specific moment (an assignment due, say). */
+export type PlannedOneOff = {
+  id: number;
+  title: string;
+  body: string;
+  at: Date;
+};
+
 /**
- * Replaces the device's schedule with this plan.
+ * Replaces the device's whole schedule: the daily repeats and the dated
+ * one-offs together.
  *
- * Cancel-then-schedule rather than a diff: the plan is at most a handful of
- * daily repeats, and a diff that got out of step with the device would leave
- * a reminder the user switched off still firing — the one failure that
- * breaks trust in the whole feature.
+ * Cancel-then-schedule rather than a diff: the plan is a handful of daily
+ * repeats and a bounded number of one-offs, and a diff that got out of step
+ * with the device would leave a reminder the user switched off still firing -
+ * the one failure that breaks trust in the whole feature. Because everything
+ * pending is cancelled, both kinds have to be handed over in the same call, or
+ * one would silently erase the other.
  */
-export async function scheduleDaily(
-  plan: PlannedNotification[]
+export async function scheduleAll(
+  daily: PlannedNotification[],
+  oneOffs: PlannedOneOff[] = []
 ): Promise<void> {
   if (!isNative()) return;
 
@@ -101,20 +114,52 @@ export async function scheduleDaily(
       notifications: pending.notifications.map(({ id }) => ({ id })),
     });
   }
-  if (plan.length === 0) return;
+  if (daily.length === 0 && oneOffs.length === 0) return;
 
   await LocalNotifications.schedule({
-    notifications: plan.map(item => ({
-      id: item.id,
-      title: item.title,
-      body: item.body,
-      schedule: {
-        on: { hour: item.hour, minute: item.minute },
-        repeats: true,
-        allowWhileIdle: true,
-      },
-    })),
+    notifications: [
+      ...daily.map(item => ({
+        id: item.id,
+        title: item.title,
+        body: item.body,
+        schedule: {
+          on: { hour: item.hour, minute: item.minute },
+          repeats: true,
+          allowWhileIdle: true,
+        },
+      })),
+      ...oneOffs.map(item => ({
+        id: item.id,
+        title: item.title,
+        body: item.body,
+        schedule: { at: item.at, allowWhileIdle: true },
+      })),
+    ],
   });
+}
+
+/** Daily repeats only; kept for callers that have no dated notifications. */
+export function scheduleDaily(plan: PlannedNotification[]): Promise<void> {
+  return scheduleAll(plan, []);
+}
+
+/**
+ * Runs `callback` each time the app returns to the foreground. The dated
+ * notifications are planned a fortnight ahead, so every return is a chance to
+ * extend the window and drop anything that has since been done.
+ */
+export function onAppResume(callback: () => void): () => void {
+  if (!isNative()) return () => undefined;
+  let handle: { remove: () => Promise<void> } | undefined;
+  let removed = false;
+  void App.addListener("resume", callback).then(listener => {
+    if (removed) void listener.remove();
+    else handle = listener;
+  });
+  return () => {
+    removed = true;
+    void handle?.remove();
+  };
 }
 
 /** Shows one now. Used by the browser path, which can only act while open. */

@@ -46,6 +46,13 @@ import { SettingsPanel } from "@/components/SettingsPanel";
 import { DayPlanner } from "@/components/DayPlanner";
 import { WorkoutStudio } from "@/components/WorkoutStudio";
 import { FileAttachments } from "@/components/FileAttachments";
+import { usePublishUpcoming } from "@/hooks/usePublishUpcoming";
+import {
+  isNative,
+  notificationsPermitted,
+  requestNotificationPermission,
+} from "@/lib/native";
+import { publishNotificationSettings } from "@/lib/upcoming";
 import { useRecordStore } from "@/contexts/RecordStoreContext";
 import type { AnyRecord } from "@/lib/core/recordStore";
 import { toCSV } from "@/lib/core/exportData";
@@ -1417,6 +1424,31 @@ export default function Home() {
       security: { enabled: true, timing: "Monthly review" },
     });
   const [localReminders, setLocalReminders] = useState<LocalReminder[]>([]);
+  // The notification scheduler lives above the pages and cannot see this
+  // state, so what it needs is published: the wording choice, the per-area
+  // switches, and the reminders the person has set for a moment.
+  useEffect(() => {
+    publishNotificationSettings({
+      previewMode: notificationPreviewMode,
+      assignments: reminderPreferences.assignments,
+      documents: reminderPreferences.documents,
+    });
+  }, [notificationPreviewMode, reminderPreferences]);
+  usePublishUpcoming(
+    "reminder",
+    localReminders
+      .filter(
+        reminder =>
+          reminder.enabled && !reminder.completed && !reminder.deliveredAt
+      )
+      .map(reminder => ({
+        id: reminder.id,
+        source: "reminder" as const,
+        title: reminder.title,
+        date: "",
+        atMs: reminder.dueAt,
+      }))
+  );
   const [reminderNotice, setReminderNotice] = useState<string | null>(null);
   const [pixelRecords, setPixelRecords] = useState<Record<string, PixelCells>>(
     {}
@@ -4322,6 +4354,18 @@ function EnhancedAssignmentsPage({
     subtasks: [] as AssignmentPlan["subtasks"],
   };
   const [assignments, setAssignments] = useState<AssignmentPlan[]>([]);
+  // Open assignments with a due date become notifications (see lib/upcoming).
+  usePublishUpcoming(
+    "assignment",
+    assignments
+      .filter(item => !item.completed && item.due)
+      .map(item => ({
+        id: item.id,
+        source: "assignment" as const,
+        title: item.title,
+        date: item.due,
+      }))
+  );
   const [draft, setDraft] = useState(emptyDraft);
   const [subtaskDraft, setSubtaskDraft] = useState("");
   const [formOpen, setFormOpen] = useState(false);
@@ -9206,10 +9250,20 @@ function NotificationPreviewPage({
   const [permission, setPermission] = useState<
     NotificationPermission | "unsupported"
   >(() =>
-    typeof window !== "undefined" && "Notification" in window
-      ? Notification.permission
-      : "unsupported"
+    // The Android WebView has no Notification API, but the app can still
+    // notify through the phone, so it is never "unsupported" there.
+    isNative()
+      ? "default"
+      : typeof window !== "undefined" && "Notification" in window
+        ? Notification.permission
+        : "unsupported"
   );
+  useEffect(() => {
+    if (!isNative()) return;
+    void notificationsPermitted().then(granted => {
+      if (granted) setPermission("granted");
+    });
+  }, []);
   const [draftTitle, setDraftTitle] = useState("");
   const [draftKind, setDraftKind] = useState("General");
   const [draftDueAt, setDraftDueAt] = useState(() => {
@@ -9255,6 +9309,12 @@ function NotificationPreviewPage({
     setDraftMessage("Reminder saved locally.");
   }
   function requestReminderPermission() {
+    if (isNative()) {
+      void requestNotificationPermission().then(granted =>
+        setPermission(granted ? "granted" : "denied")
+      );
+      return;
+    }
     if (typeof Notification === "undefined") return;
     void Notification.requestPermission().then(nextPermission =>
       setPermission(nextPermission)
@@ -9273,10 +9333,10 @@ function NotificationPreviewPage({
           <em>reminder reveals.</em>
         </h2>
         <p className="page-intro">
-          Choose visible local reminder preferences for each journal area, or
-          add a local due-time reminder. Browser delivery is best-effort while
-          this site can run; guaranteed operating-system delivery remains
-          outside the web scope.
+          Choose what a reminder reveals for each journal area, or add a
+          due-time reminder. In the Android app these are delivered by the
+          phone, even with the app closed; in a browser they only appear while
+          the app is open.
         </p>
       </div>
       <div className="spread-page notifications-page">
@@ -9285,11 +9345,13 @@ function NotificationPreviewPage({
           <b>Preview mode: {previewMode}</b>
         </div>
         <small className="notification-sample-note">
-          Sample wording, not real reminders: these show how much each area
-          would reveal on a lock screen under the preview mode above. The
-          on/off and timing choices are saved, but they are not yet connected
-          to any page’s dates — nothing here schedules on its own. Only the
-          reminders you add further down actually fire.
+          Sample wording: these show how much each area would reveal on a lock
+          screen under the preview mode above. In the Android app, Assignment
+          and Document are live: they are scheduled with your phone from the
+          dates on those pages and arrive even when the app is closed (they
+          also respect the master switch and quiet hours in Settings). The
+          other areas are saved preferences only for now, and Period never
+          sends anything. Reminders you add further down always fire.
         </small>
         {reminders.map(([key, kind, detail]) => {
           const preference = preferences[key];
@@ -9420,11 +9482,13 @@ function NotificationPreviewPage({
               className="local-reminder-permission"
               onClick={requestReminderPermission}
             >
-              Allow browser notifications
+              {isNative() ? "Allow notifications" : "Allow browser notifications"}
             </button>
           ) : (
             <small className="local-reminder-message">
-              Browser notifications are enabled on this device.
+              {isNative()
+                ? "Notifications are enabled on this device."
+                : "Browser notifications are enabled on this device."}
             </small>
           )}
           <div className="local-reminder-list">
@@ -13277,6 +13341,25 @@ function DocumentRenewalPage({
 }) {
   const today = sleepDateInputValue(new Date());
   const [records, setRecords] = useState<RenewalRecord[]>([]);
+  // Records still waiting on a review or renewal become notifications, each
+  // with its own "how far ahead" setting (see lib/upcoming).
+  usePublishUpcoming(
+    "document",
+    records
+      .filter(
+        record =>
+          record.reviewDate &&
+          record.state !== "Renewed" &&
+          record.state !== "Archived"
+      )
+      .map(record => ({
+        id: record.id,
+        source: "document" as const,
+        title: record.title,
+        date: record.reviewDate,
+        timing: record.reviewWindow,
+      }))
+  );
   const [lastRecords, setLastRecords] = useState<RenewalRecord[] | null>(null);
   const [customTypes, setCustomTypes] = useState<string[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);

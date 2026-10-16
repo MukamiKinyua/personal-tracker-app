@@ -252,6 +252,26 @@ them**, they are shown once and are the only way in if the phone is lost.
 - `REQUIRE_TWO_FACTOR=false` skips the requirement for accounts that have not
   linked an app. It is for local development, not for a public server.
 
+## Notifications
+
+On Android, reminders are scheduled with the phone itself, so they arrive with
+the app closed and survive a reboot. There are two kinds:
+
+- **Daily check-ins** (water, sleep, mood, habits, journal, weekly review), set
+  under Settings, repeating at the chosen time.
+- **Dated notifications**, built from the journal: an assignment due, a document
+  up for review (using that record's own "how far ahead"), and any reminder
+  set for a specific moment on the Reminder Preview page. They are planned a
+  fortnight ahead and re-planned whenever the app opens or comes back to the
+  foreground, so opening the app at least every couple of weeks keeps them
+  rolling. The wording follows "what a reminder reveals", and the title is
+  always just the app's name.
+
+Everything respects the master switch and quiet hours (a notification inside
+quiet hours is moved to when they end). Period and cycle data never send a
+notification. In a browser, notifications only appear while the app is open.
+The first time, Android asks for permission to show notifications.
+
 ## Photos and documents
 
 Attached files live on the device first, so they work offline and signed out.

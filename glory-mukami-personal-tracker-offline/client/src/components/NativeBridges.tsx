@@ -12,15 +12,18 @@ import { useRecordStore } from "@/contexts/RecordStoreContext";
 import { useTimers } from "@/contexts/TimersContext";
 import { markSent } from "@/lib/core/notifications";
 import { formatTimer } from "@/lib/core/timers";
+import { planEventNotifications } from "@/lib/eventReminders";
 import {
   isNative,
+  onAppResume,
   publishWidget,
-  scheduleDaily,
+  scheduleAll,
   showNow,
   type WidgetSummary,
 } from "@/lib/native";
 import { dueNow, planDailyReminders } from "@/lib/reminders";
-import { useEffect, useRef } from "react";
+import { useUpcomingSnapshot } from "@/lib/upcoming";
+import { useEffect, useRef, useState } from "react";
 
 function wallClock(now = new Date()): string {
   return `${String(now.getHours()).padStart(2, "0")}:${String(
@@ -43,15 +46,38 @@ function useReminderDelivery() {
    * app is open. Re-planned whenever the settings change, and once a day so
    * the quiet-hours decision is made against the current day.
    */
+  const upcoming = useUpcomingSnapshot();
+  // Each return to the foreground re-plans, so the fortnight of dated
+  // notifications keeps rolling forward and anything since done is dropped.
+  const [resumes, setResumes] = useState(0);
+  useEffect(() => onAppResume(() => setResumes(count => count + 1)), []);
+
   const planKey = JSON.stringify([
     preferences.notifications,
     preferences.reminders.map(r => [r.kind, r.enabled, r.at, r.ignoredCount]),
     today,
+    upcoming.items,
+    upcoming.settings,
+    resumes,
   ]);
   useEffect(() => {
     if (!ready || !isNative()) return;
-    void scheduleDaily(planDailyReminders(preferences, today)).catch(error =>
-      console.warn("[reminders] could not schedule", error)
+    // Daily check-ins and dated notifications are scheduled in one call:
+    // scheduling replaces everything pending, so two calls would erase each
+    // other.
+    const events = upcoming.settings
+      ? planEventNotifications({
+          items: upcoming.items,
+          settings: {
+            ...upcoming.settings,
+            notificationsEnabled: preferences.notifications.enabled,
+            quietHoursStart: preferences.notifications.quietHoursStart,
+            quietHoursEnd: preferences.notifications.quietHoursEnd,
+          },
+        })
+      : [];
+    void scheduleAll(planDailyReminders(preferences, today), events).catch(
+      error => console.warn("[reminders] could not schedule", error)
     );
     // `planKey` is the dependency: it captures exactly what the plan reads.
     // eslint-disable-next-line react-hooks/exhaustive-deps
