@@ -185,6 +185,14 @@ export type WidgetSummary = {
   tasksOpen: number;
   /** "Rest 1:20 · Squat", or absent when nothing is running. */
   timer?: string;
+  /** Open tasks, today's first; already reduced to what may be shown. */
+  tasks?: string[];
+  /** The next few dated items; already reduced to what may be shown. */
+  upcoming?: Array<{ label: string; when: string }>;
+  /** Last night's sleep, or null when there is none or it is hidden. */
+  sleep?: { hours: number; quality: string } | null;
+  /** True when Privacy mode is hiding detail. */
+  hidden?: boolean;
   updatedAt: string;
 };
 
@@ -192,6 +200,8 @@ const WIDGET_KEY = "widget";
 
 type WidgetBridgePlugin = {
   refresh(): Promise<void>;
+  /** The page a widget tap asked for, once; null if there was none. */
+  takeLaunchTarget(): Promise<{ view: string | null }>;
 };
 
 /**
@@ -201,8 +211,26 @@ type WidgetBridgePlugin = {
  * "now".
  */
 const WidgetBridge = registerPlugin<WidgetBridgePlugin>("WidgetBridge", {
-  web: () => Promise.resolve({ refresh: async () => undefined }),
+  web: () =>
+    Promise.resolve({
+      refresh: async () => undefined,
+      takeLaunchTarget: async () => ({ view: null }),
+    }),
 });
+
+/**
+ * Which page the home-screen widget that opened the app wants, or null. Taken
+ * (and cleared) rather than peeked, so the same tap is never acted on twice.
+ */
+export async function takeWidgetLaunchTarget(): Promise<string | null> {
+  if (!isNative()) return null;
+  try {
+    return (await WidgetBridge.takeLaunchTarget()).view;
+  } catch {
+    // An older APK without the method: nothing to open.
+    return null;
+  }
+}
 
 export async function publishWidget(summary: WidgetSummary): Promise<void> {
   if (!isNative()) return;

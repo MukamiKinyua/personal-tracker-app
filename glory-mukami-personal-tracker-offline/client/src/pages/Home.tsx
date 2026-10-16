@@ -50,7 +50,9 @@ import { usePublishUpcoming } from "@/hooks/usePublishUpcoming";
 import {
   isNative,
   notificationsPermitted,
+  onAppResume,
   requestNotificationPermission,
+  takeWidgetLaunchTarget,
 } from "@/lib/native";
 import { publishNotificationSettings } from "@/lib/upcoming";
 import { useRecordStore } from "@/contexts/RecordStoreContext";
@@ -1902,6 +1904,23 @@ export default function Home() {
     // but isTurning would restart the fallback timer mid-turn.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isTurning]);
+
+  // A tap on a home-screen widget opens the app at the page it belongs to.
+  // The native side holds the request until the web layer asks, so it is read
+  // on launch and each time the app returns to the foreground.
+  const turnToRef = useRef(turnTo);
+  turnToRef.current = turnTo;
+  useEffect(() => {
+    const openRequested = () => {
+      void takeWidgetLaunchTarget().then(target => {
+        if (target && (journalViews as readonly string[]).includes(target)) {
+          turnToRef.current(target as View);
+        }
+      });
+    };
+    openRequested();
+    return onAppResume(openRequested);
+  }, []);
 
   function selectContentsItem(nextView: View) {
     setContentsPreferences(prev => ({

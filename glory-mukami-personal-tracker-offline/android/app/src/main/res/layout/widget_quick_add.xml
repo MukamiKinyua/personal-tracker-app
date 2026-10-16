@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/quick_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:background="@drawable/widget_background"
+    android:padding="8dp">
+
+    <TextView
+        android:id="@+id/quick_water"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:layout_margin="3dp"
+        android:gravity="center"
+        android:background="@drawable/widget_button"
+        android:textColor="#FFFAF2"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:text="Water" />
+
+    <TextView
+        android:id="@+id/quick_task"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:layout_margin="3dp"
+        android:gravity="center"
+        android:background="@drawable/widget_button"
+        android:textColor="#FFFAF2"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:text="Task" />
+
+    <TextView
+        android:id="@+id/quick_sleep"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:layout_margin="3dp"
+        android:gravity="center"
+        android:background="@drawable/widget_button"
+        android:textColor="#FFFAF2"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:text="Sleep" />
+
+    <TextView
+        android:id="@+id/quick_reflect"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:layout_margin="3dp"
+        android:gravity="center"
+        android:background="@drawable/widget_button"
+        android:textColor="#FFFAF2"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:text="Reflect" />
+</LinearLayout>

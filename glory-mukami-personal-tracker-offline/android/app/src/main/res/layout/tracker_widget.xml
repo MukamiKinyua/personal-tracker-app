@@ -24,6 +24,16 @@
         android:textSize="12sp"
         android:text="" />
 
+    <ProgressBar
+        android:id="@+id/widget_water_bar"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="6dp"
+        android:layout_marginTop="6dp"
+        android:max="100"
+        android:progress="0"
+        android:progressDrawable="@drawable/widget_progress" />
+
     <TextView
         android:id="@+id/widget_tasks"
         android:layout_width="wrap_content"

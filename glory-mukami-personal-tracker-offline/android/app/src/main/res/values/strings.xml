@@ -5,4 +5,17 @@
     <string name="package_name">com.glorymukami.tracker</string>
     <string name="custom_url_scheme">com.glorymukami.tracker</string>
     <string name="widget_description">Water so far today, open tasks and a running timer.</string>
+    <string name="widget_water_description">Water so far today against your goal.</string>
+    <string name="widget_tasks_description">Your next open tasks.</string>
+    <string name="widget_upcoming_description">The next assignments, documents and reminders coming up.</string>
+    <string name="widget_timer_description">The timer that is running now.</string>
+    <string name="widget_sleep_description">Last night\'s sleep.</string>
+    <string name="widget_quickadd_description">Shortcuts to log water, a task, sleep or a reflection.</string>
+    <string name="widget_label_today">Tracker: Today</string>
+    <string name="widget_label_water">Tracker: Water</string>
+    <string name="widget_label_tasks">Tracker: Tasks</string>
+    <string name="widget_label_upcoming">Tracker: Coming up</string>
+    <string name="widget_label_timer">Tracker: Timer</string>
+    <string name="widget_label_sleep">Tracker: Sleep</string>
+    <string name="widget_label_quickadd">Tracker: Quick add</string>
 </resources>

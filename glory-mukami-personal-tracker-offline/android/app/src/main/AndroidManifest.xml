@@ -25,10 +25,11 @@
 
         </activity>
 
-        <!-- Home-screen widget. Drawn from the summary the app writes; see
-             TrackerWidget.java. -->
+        <!-- Home-screen widgets. Each draws its slice of the summary the app
+             writes; see BaseTrackerWidget.java. -->
         <receiver
             android:name=".TrackerWidget"
+            android:label="@string/widget_label_today"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
@@ -36,6 +37,78 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/tracker_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".WaterWidget"
+            android:label="@string/widget_label_water"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/water_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".TasksWidget"
+            android:label="@string/widget_label_tasks"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/tasks_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".UpcomingWidget"
+            android:label="@string/widget_label_upcoming"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/upcoming_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".TimerWidget"
+            android:label="@string/widget_label_timer"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/timer_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".SleepWidget"
+            android:label="@string/widget_label_sleep"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/sleep_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".QuickAddWidget"
+            android:label="@string/widget_label_quickadd"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/quickadd_widget_info" />
         </receiver>
 
         <provider

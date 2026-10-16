@@ -177,8 +177,12 @@ here). `android/local.properties` points at the SDK and is not committed —
 on another machine, run `npm run android:open` once and let Android Studio
 create it.
 
-The home-screen widget appears in the launcher's widget picker as
-"Personal Tracker". Reminders are under the app's Settings → Reminders; the
+Seven home-screen widgets appear in the launcher's widget picker, all named
+"Tracker: ...": **Today** (water, open tasks, timer), **Water** (progress bar),
+**Tasks** (your next open tasks), **Coming up** (the next assignments, documents
+and reminders), **Timer**, **Sleep** (last night) and **Quick add** (shortcuts
+to log water, a task, sleep or a reflection). Tapping any of them opens the app
+on the matching page. Reminders are under the app's Settings → Reminders; the
 first time you switch them on, Android asks for notification permission.
 
 ---
@@ -301,8 +305,14 @@ reinstall. There is no separate storage service to set up.
 - **Reminders**: on the phone, delivered by Android at the set time with the
   app closed. In a browser, only while the app is open — that is the most a
   web page is allowed to do.
-- **Widget**: shows what the app last wrote. It updates when you use the app
-  and every 30 minutes otherwise; it is a mirror, not a second source.
+- **Widgets**: show what the app last wrote. They update when you use the app
+  and every 30 minutes otherwise; they are a mirror, not a second source. The
+  app decides what may appear on a home screen before writing it: task and
+  reminder titles show only when "what a reminder reveals" is set to show
+  everything and Privacy mode is off, otherwise a widget says "Task" or
+  "Assignment" and keeps the dates and counts. In Privacy mode the tasks and
+  sleep widgets show nothing but a note. There are deliberately no widgets for
+  cycle, finances or mood. Habits has no widget yet.
 - **Floating over other apps**: not built. Android's overlay permission is
   the one it warns users about most, and a home-screen widget covers the
   same glance-at-it need without it.

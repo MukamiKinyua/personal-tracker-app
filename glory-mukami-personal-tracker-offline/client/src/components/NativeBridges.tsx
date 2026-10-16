@@ -12,6 +12,7 @@ import { useRecordStore } from "@/contexts/RecordStoreContext";
 import { useTimers } from "@/contexts/TimersContext";
 import { markSent } from "@/lib/core/notifications";
 import { formatTimer } from "@/lib/core/timers";
+import { buildWidgetExtras } from "@/lib/widgetSummary";
 import { planEventNotifications } from "@/lib/eventReminders";
 import {
   isNative,
@@ -141,11 +142,34 @@ function useWidgetSync() {
   // Timers tick every second; the widget does not need to. Only a change in
   // the minute shown, or in the numbers, reaches the phone.
   const timerMinute = timer?.replace(/:\d\d$/, "");
+
+  // What each widget may say is decided here, before anything is written, so
+  // the native side can never show more than this chose to give it.
+  const upcoming = useUpcomingSnapshot();
+  const extras = buildWidgetExtras({
+    tasks: journal.inScope("task").map(record => ({
+      title: String(record.body.title ?? ""),
+      done: Boolean(record.body.done),
+      when: String(record.body.when ?? ""),
+    })),
+    sleep: journal.inScope("sleep").map(record => ({
+      hours: Number(record.body.hours) || 0,
+      quality: String(record.body.quality ?? ""),
+      start: record.period.start,
+    })),
+    items: upcoming.items,
+    previewMode: upcoming.settings?.previewMode ?? "Hide sensitive names",
+    privacyMode: journal.preferences.privacyMode,
+  });
+  // The minute changes the day label's meaning near midnight, so the date is
+  // part of the key.
   const summaryKey = JSON.stringify([
     waterMl,
     journal.preferences.waterGoalMl,
     tasksOpen,
     timerMinute,
+    extras,
+    journal.today,
   ]);
 
   useEffect(() => {
@@ -155,6 +179,7 @@ function useWidgetSync() {
       waterGoalMl: journal.preferences.waterGoalMl,
       tasksOpen,
       timer: timerMinute,
+      ...extras,
       updatedAt: new Date().toISOString(),
     };
     void publishWidget(summary).catch(error =>
